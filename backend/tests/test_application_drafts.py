@@ -230,3 +230,21 @@ def test_financial_totals_are_safe_json_integers(client, field):
     assert draft[field] == 9_007_199_254_740_991
     assert patch(client, headers, draft, **{field: 9_007_199_254_740_992}).status_code == 422
     assert client.get(f"{BASE}/{draft['id']}").json() == draft
+
+
+def test_patch_product_code_openapi_matches_runtime(client):
+    headers = authenticate(client)
+    draft = create(client, headers)
+    assert patch(client, headers, draft).json() == draft
+    assert patch(client, headers, draft, product_code=None).status_code == 422
+    changed = patch(client, headers, draft, product_code='equipment')
+    assert changed.status_code == 200
+    assert changed.json()['product_code'] == 'equipment'
+    assert changed.json()['version'] == 2
+    schema = client.get('/api/v1/openapi.json').json()['components']['schemas']['DraftPatch']
+    assert 'product_code' not in schema['required']
+    product = schema['properties']['product_code']
+    assert product.get('type') == 'string'
+    assert product['enum'] == ['working_capital', 'equipment']
+    assert 'anyOf' not in product
+    assert 'default' not in product

@@ -3,6 +3,7 @@ from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from app.products.schemas import ProductCode
 
@@ -30,7 +31,8 @@ class DraftCreate(DraftFields):
 
 
 class DraftPatch(DraftFields):
-    product_code: ProductCode | None = None
+    # None обозначает только отсутствие поля; явный null отклоняет валидатор.
+    product_code: ProductCode | SkipJsonSchema[None] = None
     expected_version: Annotated[StrictInt, Field(ge=1, le=2_147_483_647)]
 
     @model_validator(mode='after')
