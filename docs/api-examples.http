@@ -1,0 +1,197 @@
+# Примеры для REST Client: сохраняйте cookie между запросами.
+# Полная актуальная схема: {{base}}/openapi.json
+# Выполняйте запросы по одному. Ответы на команды меняют version.
+# После входа используйте НОВЫЙ csrf_token из его ответа.
+# При потере ответа повторяйте ТОТ ЖЕ Idempotency-Key и тело.
+# Для нового действия задавайте новый UUID. Не переиспользуйте ключ с другим телом.
+@base = http://localhost:8080/api/v1
+@password = Demo-credit-2026!
+
+### Сессия до входа
+# @name csrf
+GET {{base}}/auth/csrf
+
+### Вход профилем C (пароль замените на фактический DEMO_PASSWORD)
+# @name clientLogin
+POST {{base}}/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.$.csrf_token}}
+
+{"email":"demo-c@example.test","password":"{{password}}"}
+
+### Каталог и версия демонстрационных условий
+GET {{base}}/products
+
+### Тексты и версия подтверждений
+# @name policy
+GET {{base}}/submission-policy
+
+### Черновик C: суммы в копейках, период из завершённых месяцев
+# @name draft
+POST {{base}}/applications
+Content-Type: application/json
+X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
+
+{
+  "product_code":"equipment",
+  "purpose":"Синтетическая демонстрационная заявка",
+  "amount_kopecks":200000000,
+  "term_months":24,
+  "period_start":"2026-07-01",
+  "period_end":"2026-09-30",
+  "revenue_kopecks":210000000,
+  "operating_expenses_kopecks":150000000,
+  "existing_debt_payments_kopecks":15000000
+}
+
+### Документ: сначала создайте /tmp/credit-demo.png по инструкции сценариев
+# @name financial
+POST {{base}}/applications/{{draft.response.body.$.id}}/documents?document_type=financial_statement&filename=credit-demo.png&expected_version={{draft.response.body.$.version}}
+Content-Type: image/png
+X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
+
+< /tmp/credit-demo.png
+
+### Прочитайте актуальную версию после загрузки
+# @name withFinancial
+GET {{base}}/applications/{{draft.response.body.$.id}}
+
+### Для оборудования обязателен второй тип документа
+POST {{base}}/applications/{{draft.response.body.$.id}}/documents?document_type=equipment_invoice&filename=invoice.png&expected_version={{withFinancial.response.body.$.version}}
+Content-Type: image/png
+X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
+
+< /tmp/credit-demo.png
+
+### Версия перед отправкой
+# @name ready
+GET {{base}}/applications/{{draft.response.body.$.id}}
+
+### Отправка: 202, revision_id и processing_run_id
+# @name submitted
+POST {{base}}/applications/{{draft.response.body.$.id}}/submit
+Content-Type: application/json
+X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79001
+
+{
+  "expected_version":{{ready.response.body.$.version}},
+  "data_confirmed":true,
+  "bki_consent":true,
+  "consent_version":"{{policy.response.body.$.consent_version}}"
+}
+
+### Повторяйте чтение до needs_info; первая информация о запросе ниже индексом 0
+# @name clarification
+GET {{base}}/applications/{{draft.response.body.$.id}}
+
+### Исправление рабочей копии ещё не запускает проверку
+# @name corrected
+PATCH {{base}}/applications/{{draft.response.body.$.id}}
+Content-Type: application/json
+X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
+
+{"expected_version":{{clarification.response.body.$.version}},"revenue_kopecks":240000000}
+
+### Ответ создаёт НОВЫЙ снимок и pending-запуск
+POST {{base}}/applications/{{draft.response.body.$.id}}/information-responses
+Content-Type: application/json
+X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79002
+
+{
+  "expected_version":{{corrected.response.body.$.version}},
+  "request_id":"{{clarification.response.body.$.information_requests[0].id}}",
+  "message":"Выручка за период исправлена",
+  "data_confirmed":true,
+  "bki_consent":true,
+  "consent_version":"{{policy.response.body.$.consent_version}}"
+}
+
+### История доступна владельцу и сотруднику
+GET {{base}}/applications/{{draft.response.body.$.id}}/history
+
+### Вход сотрудника: заменит клиентскую сессию в этом cookie-хранилище
+# @name staffCsrf
+GET {{base}}/auth/csrf
+
+### После входа дальнейшие команды используют staffLogin.csrf_token
+# @name staffLogin
+POST {{base}}/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{staffCsrf.response.body.$.csrf_token}}
+
+{"email":"staff@example.test","password":"{{password}}"}
+
+### Очередь сотрудника
+GET {{base}}/applications?limit=20&offset=0
+
+### Ниже подставьте id отдельной отправленной заявки D в manual_review.
+# Каждый альтернативный пример требует подходящего статуса и свежей версии.
+@reviewId = REPLACE_WITH_APPLICATION_UUID
+
+### Актуальная карточка (повторять перед НОВЫМ действием)
+# @name review
+GET {{base}}/applications/{{reviewId}}
+
+### Результаты синтетических проверок и расчёт (только сотрудник)
+GET {{base}}/applications/{{reviewId}}/assessment
+
+### Вариант: запросить уточнение
+POST {{base}}/applications/{{reviewId}}/information-requests
+Content-Type: application/json
+X-CSRF-Token: {{staffLogin.response.body.$.csrf_token}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79003
+
+{"expected_version":{{review.response.body.$.version}},"message":"Уточните выручку за период","requested_fields":["revenue_kopecks"],"requested_document_types":[]}
+
+### Альтернатива в manual_review: решение approved или rejected, причина обязательна
+POST {{base}}/applications/{{reviewId}}/decisions
+Content-Type: application/json
+X-CSRF-Token: {{staffLogin.response.body.$.csrf_token}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79004
+
+{"expected_version":{{review.response.body.$.version}},"outcome":"approved","reason":"Синтетические данные рассмотрены сотрудником"}
+
+### Альтернатива в manual_review: предложить допустимые условия того же продукта
+POST {{base}}/applications/{{reviewId}}/offers
+Content-Type: application/json
+X-CSRF-Token: {{staffLogin.response.body.$.csrf_token}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79005
+
+{"expected_version":{{review.response.body.$.version}},"amount_kopecks":40000000,"term_months":12,"reason":"Предлагается меньшая сумма финансирования"}
+
+### Только после failed/interrupted: сотрудник повторяет обработку
+POST {{base}}/applications/{{reviewId}}/processing-retries
+Content-Type: application/json
+X-CSRF-Token: {{staffLogin.response.body.$.csrf_token}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79006
+
+{"expected_version":{{review.response.body.$.version}}}
+
+### Принятие предложения: сначала войдите ВЛАДЕЛЬЦЕМ заявки и прочитайте карточку.
+# Подставьте актуальные версии и новый токен из клиентского входа.
+# Для отказа используйте альтернативный запрос ниже с актуальными версиями.
+# Принятие -> approved; отказ клиента -> manual_review.
+@offerId = REPLACE_WITH_ACTIVE_OFFER_UUID
+@ownerToken = REPLACE_WITH_NEW_CLIENT_CSRF
+@applicationVersion = 1
+@offerVersion = 1
+POST {{base}}/offers/{{offerId}}/accept
+Content-Type: application/json
+X-CSRF-Token: {{ownerToken}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79007
+
+{"expected_version":{{applicationVersion}},"offer_version":{{offerVersion}}}
+
+### Альтернатива принятию: отказ от ещё действующего предложения
+POST {{base}}/offers/{{offerId}}/decline
+Content-Type: application/json
+X-CSRF-Token: {{ownerToken}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79008
+
+{"expected_version":{{applicationVersion}},"offer_version":{{offerVersion}}}
+
+### Выход: подставьте токен действующей сессии
+POST {{base}}/auth/logout
+X-CSRF-Token: {{ownerToken}}
