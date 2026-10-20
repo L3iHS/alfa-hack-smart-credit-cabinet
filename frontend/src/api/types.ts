@@ -78,3 +78,8 @@ export interface Recovery {
   values: FormValues;
   application: Application | null;
 }
+
+export interface CsrfBinding {
+  csrf_token: string;
+  user_id: string | null;
+}

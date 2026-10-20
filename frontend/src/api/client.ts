@@ -1,4 +1,4 @@
-import type { User } from "./types";
+import type { CsrfBinding, User } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -10,18 +10,37 @@ export class ApiError extends Error {
     super(message);
   }
 }
-let csrfToken: string | null = null;
-let csrfRequest: Promise<string> | null = null;
+let binding: CsrfBinding | null = null;
+let csrfRequest: Promise<CsrfBinding> | null = null;
 let identity: string | null = null;
-export function setIdentity(user: User | null) {
-  identity = user?.id ?? null;
+let generation = 0;
+function invalidateCsrf() {
+  generation++;
+  binding = null;
+  csrfRequest = null;
 }
-export function setCsrf(token: string | null) {
-  csrfToken = token;
+export function setIdentity(user: User | null) {
+  const next = user?.id ?? null;
+  if (next !== identity) {
+    identity = next;
+    invalidateCsrf();
+  }
+}
+export function setCsrf(token: string | null, userId: string | null = null) {
+  invalidateCsrf();
+  binding = token ? { csrf_token: token, user_id: userId } : null;
 }
 function expire() {
-  csrfToken = null;
+  identity = null;
+  invalidateCsrf();
   window.dispatchEvent(new Event("session-expired"));
+}
+function sessionChanged() {
+  return new ApiError(
+    401,
+    "session_changed",
+    "Сессия изменилась. Войдите снова перед сохранением",
+  );
 }
 async function decode(response: Response) {
   if (response.status === 204) return undefined;
@@ -57,20 +76,32 @@ async function raw(path: string, init?: RequestInit) {
     );
   }
 }
-async function csrf() {
-  if (csrfToken) return csrfToken;
-  if (!csrfRequest)
-    csrfRequest = raw("/auth/csrf")
+async function csrf(): Promise<CsrfBinding> {
+  if (binding) return binding;
+  if (!csrfRequest) {
+    const started = generation;
+    const request = raw("/auth/csrf")
       .then(async (response) => {
         const body = await decode(response);
         if (!response.ok)
           throw new ApiError(response.status, body.code, body.message);
-        csrfToken = body.csrf_token;
-        return body.csrf_token as string;
+        if (
+          !body ||
+          typeof body.csrf_token !== "string" ||
+          !body.csrf_token ||
+          (body.user_id !== null && typeof body.user_id !== "string")
+        )
+          throw sessionChanged();
+        // Ответ старой сессии не должен заменить токен после нового входа.
+        if (generation !== started) throw sessionChanged();
+        binding = { csrf_token: body.csrf_token, user_id: body.user_id };
+        return binding;
       })
       .finally(() => {
-        csrfRequest = null;
+        if (csrfRequest === request) csrfRequest = null;
       });
+    csrfRequest = request;
+  }
   return csrfRequest;
 }
 export async function api<T>(
@@ -78,8 +109,31 @@ export async function api<T>(
   options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
   const method = options.method || "GET";
+  const login = path === "/auth/login" && method === "POST";
+  const expectedIdentity = identity;
+  const started = generation;
+  const unchanged = () =>
+    identity === expectedIdentity && generation === started;
   const headers: Record<string, string> = {};
-  if (method !== "GET") headers["X-CSRF-Token"] = await csrf();
+  if (method !== "GET") {
+    if (!login && expectedIdentity === null) {
+      expire();
+      throw sessionChanged();
+    }
+    let current: CsrfBinding;
+    try {
+      current = await csrf();
+    } catch (error) {
+      if (!login && unchanged()) expire();
+      throw error;
+    }
+    if (!unchanged()) throw sessionChanged();
+    if (!login && current.user_id !== expectedIdentity) {
+      expire();
+      throw sessionChanged();
+    }
+    headers["X-CSRF-Token"] = current.csrf_token;
+  }
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   const response = await raw(path, {
     method,
@@ -88,18 +142,32 @@ export async function api<T>(
   });
   const body = await decode(response);
   if (!response.ok) {
-    if (response.status === 401 && path !== "/auth/login" && identity !== null)
+    if (
+      response.status === 401 &&
+      !login &&
+      expectedIdentity !== null &&
+      unchanged()
+    )
       expire();
-    if (response.status === 403 && body.code === "csrf_failed") {
-      csrfToken = null;
-      const current = await raw("/me");
-      if (
-        current.status === 401 ||
-        (current.ok && (await decode(current)).id !== identity)
-      )
-        expire();
-      else await csrf();
-      // Повтор изменения выполняет пользователь: автоматическая отправка может потерять данные.
+    if (response.status === 403 && body.code === "csrf_failed" && unchanged()) {
+      invalidateCsrf();
+      if (!login) {
+        const checking = generation;
+        try {
+          const current = await csrf();
+          if (
+            generation === checking &&
+            identity === expectedIdentity &&
+            current.user_id !== expectedIdentity
+          )
+            expire();
+        } catch {
+          // Неподтверждённый владелец токена запрещает следующий повтор изменения.
+          if (generation === checking && identity === expectedIdentity)
+            expire();
+        }
+      }
+      // Изменение автоматически не повторяется даже при подтверждённой сессии.
     }
     throw new ApiError(
       response.status,

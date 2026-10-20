@@ -128,6 +128,7 @@ function DraftEditor({
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState(false);
+  const [reloadError, setReloadError] = useState("");
   const [busy, setBusy] = useState(false);
   const product = catalog.items.find(
     (item) => item.code === values.product_code,
@@ -245,6 +246,7 @@ function DraftEditor({
   async function reloadVersion() {
     if (!record) return;
     setBusy(true);
+    setReloadError("");
     try {
       const latest = await api<Application>(`/applications/${record.id}`);
       setRecord(latest);
@@ -253,7 +255,7 @@ function DraftEditor({
       setError("");
       setFields({});
     } catch (e) {
-      setError(errorMessage(e));
+      setReloadError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -441,6 +443,7 @@ function DraftEditor({
                 данными с сервера; при необходимости сначала скопируйте свои
                 изменения.
               </p>
+              {reloadError && <p className="field-error">{reloadError}</p>}
               <button
                 className="button secondary"
                 type="button"

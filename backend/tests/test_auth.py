@@ -194,3 +194,15 @@ def test_openapi_describes_actual_error_contract(client):
     if "$ref" in error_schema:
         error_schema = schema["components"]["schemas"][error_schema["$ref"].split("/")[-1]]
     assert {"code", "message", "field_errors"} <= error_schema["properties"].keys()
+
+
+def test_csrf_binding_matches_the_current_session(client):
+    anonymous = client.get("/api/v1/auth/csrf").json()
+    assert anonymous["user_id"] is None
+    first = login(client).json()
+    first_binding = client.get("/api/v1/auth/csrf").json()
+    assert first_binding == {"csrf_token": first["csrf_token"], "user_id": first["user"]["id"]}
+    second = login(client, "client2@example.test").json()
+    second_binding = client.get("/api/v1/auth/csrf").json()
+    assert second_binding == {"csrf_token": second["csrf_token"], "user_id": second["user"]["id"]}
+    assert first_binding["user_id"] != second_binding["user_id"]

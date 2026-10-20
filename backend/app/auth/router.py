@@ -22,7 +22,7 @@ def csrf(request: Request, response: Response, db: Session = Depends(get_db)):
         session, token = create_session(db)
         db.commit()
         set_session_cookie(response, token)
-    return CsrfOutput(csrf_token=session.csrf_token)
+    return CsrfOutput(csrf_token=session.csrf_token, user_id=session.user_id)
 
 
 @router.post("/auth/login", response_model=LoginOutput, tags=["Доступ"])

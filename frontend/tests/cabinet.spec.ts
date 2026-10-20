@@ -293,3 +293,143 @@ for (const viewport of [
     ).toBe(true);
   });
 }
+
+for (const mode of [
+  "empty",
+  "inflight",
+  "cached-network",
+  "cached-503",
+] as const) {
+  test(`csrf_account_switch_blocks_draft_${mode}`, async ({
+    page,
+    context,
+  }) => {
+    await login(page);
+    await page.getByRole("link", { name: "Новая заявка" }).first().click();
+    if (mode === "empty" || mode === "inflight") await page.reload();
+    const marker = `Не передавать другой компании ${mode} ${Date.now()}`;
+    await page.getByLabel("Цель финансирования").fill(marker);
+    const other = await context.newPage();
+    const mutations: number[] = [];
+    page.on("response", (response) => {
+      if (
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/api/v1/applications"
+      )
+        mutations.push(response.status());
+    });
+    let release = () => {};
+    let entered = () => {};
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    if (mode === "inflight") {
+      await page.route(
+        "**/api/v1/auth/csrf",
+        async (route) => {
+          const response = await route.fetch();
+          entered();
+          await gate;
+          await route.fulfill({ response });
+        },
+        { times: 1 },
+      );
+      await page.getByRole("button", { name: "Сохранить черновик" }).click();
+      await started;
+    }
+    await other.goto("/applications");
+    await other.getByRole("button", { name: "Выйти" }).click();
+    await expect(other).toHaveURL(/\/login$/);
+    await login(other, "client2@example.test");
+    const before = await (
+      await other.request.get("/api/v1/applications?limit=100")
+    ).json();
+    let injected = 0;
+    if (mode.startsWith("cached")) {
+      await page.route(
+        /\/api\/v1\/(me|auth\/csrf)$/,
+        async (route) => {
+          injected++;
+          if (mode === "cached-network") await route.abort("failed");
+          else
+            await route.fulfill({
+              status: 503,
+              contentType: "application/json",
+              body: JSON.stringify({
+                code: "database_unavailable",
+                message: "Сервис временно недоступен",
+              }),
+            });
+        },
+        { times: 1 },
+      );
+    }
+    if (mode === "inflight") release();
+    else await page.getByRole("button", { name: "Сохранить черновик" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    const after = await (
+      await other.request.get("/api/v1/applications?limit=100")
+    ).json();
+    expect(after.total).toBe(before.total);
+    expect(
+      after.items.some((item: { purpose: string }) => item.purpose === marker),
+    ).toBe(false);
+    expect(mutations).toEqual(mode === "empty" ? [] : [403]);
+    if (mode.startsWith("cached")) expect(injected).toBe(1);
+    await page.getByLabel("Электронная почта").fill("client1@example.test");
+    await page.getByLabel("Пароль", { exact: true }).fill(password);
+    await page.getByRole("button", { name: "Войти", exact: true }).click();
+    await expect(page).toHaveURL(/\/applications\/new$/);
+    await expect(page.getByLabel("Цель финансирования")).toHaveValue(marker);
+    await other.close();
+  });
+}
+
+test("conflict_reload_failure_is_visible_and_retry_preserves_input", async ({
+  page,
+  context,
+}) => {
+  await login(page);
+  const id = await createDraft(page);
+  await page.getByRole("link", { name: "Продолжить заполнение" }).click();
+  await page
+    .getByLabel("Цель финансирования")
+    .fill("Несохранённый ввод при конфликте");
+  const current = await (
+    await page.request.get(`/api/v1/applications/${id}`)
+  ).json();
+  await page.request.patch(`/api/v1/applications/${id}`, {
+    headers: { "X-CSRF-Token": await csrf(page) },
+    data: {
+      expected_version: current.version,
+      purpose: "Новая серверная версия",
+    },
+  });
+  await page.getByRole("button", { name: "Сохранить черновик" }).click();
+  await expect(
+    page.getByText("Заявка изменилась в другой вкладке", { exact: true }),
+  ).toBeVisible();
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "Загрузить новую версию" }).click();
+  await expect(
+    page.getByText(
+      "Нет связи с сервером. Проверьте подключение и повторите попытку",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.getByLabel("Цель финансирования")).toHaveValue(
+    "Несохранённый ввод при конфликте",
+  );
+  if (process.env.SCREENSHOT_DIR)
+    await page.screenshot({
+      path: `${process.env.SCREENSHOT_DIR}/conflict-reload-error.png`,
+    });
+  await context.setOffline(false);
+  await page.getByRole("button", { name: "Загрузить новую версию" }).click();
+  await expect(page.getByLabel("Цель финансирования")).toHaveValue(
+    "Новая серверная версия",
+  );
+});

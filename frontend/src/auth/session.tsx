@@ -60,8 +60,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     );
     const restore = recovery.current?.owner === result.user.id;
     if (!restore) recovery.current = null;
-    setCsrf(result.csrf_token);
     setIdentity(result.user);
+    setCsrf(result.csrf_token, result.user.id);
     setUser(result.user);
     setExpired(false);
     navigate(

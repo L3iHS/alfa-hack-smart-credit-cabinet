@@ -27,6 +27,7 @@ class UserOutput(BaseModel):
 
 class CsrfOutput(BaseModel):
     csrf_token: str
+    user_id: uuid.UUID | None
 
 
 class LoginOutput(BaseModel):
