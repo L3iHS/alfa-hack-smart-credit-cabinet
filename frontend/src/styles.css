@@ -1467,6 +1467,11 @@ dd {
 }
 .document-download {
   overflow-wrap: anywhere;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 44px;
+  text-align: left;
 }
 .document-remove {
   flex: none;

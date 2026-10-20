@@ -35,6 +35,38 @@ export default function ApplicationDocuments({
   const [busy, setBusy] = useState(false);
   const [mutationError, setMutationError] = useState("");
   const [conflict, setConflict] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<{
+    document: ApplicationDocument;
+    message: string;
+  } | null>(null);
+  async function download(document: ApplicationDocument) {
+    if (downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const file = await api<Blob>(
+        `/applications/${application.id}/documents/${document.id}`,
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(file);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = document.filename;
+      window.document.body.appendChild(link);
+      try {
+        link.click();
+      } finally {
+        link.remove();
+        // Браузер должен успеть начать скачивание до освобождения URL.
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    } catch (error) {
+      setDownloadError({ document, message: errorMessage(error) });
+    } finally {
+      setDownloading(false);
+    }
+  }
   const editable =
     application.available_actions.includes("upload_document") && !locked;
   async function mutation(action: () => Promise<number>) {
@@ -119,6 +151,21 @@ export default function ApplicationDocuments({
         <h2 id="documents-title">Документы</h2>
         <span className="muted">PDF, PNG, JPEG · до 10 МиБ</span>
       </div>
+      {downloadError && (
+        <div className="notice error download-error" role="alert">
+          <p>
+            Не удалось скачать «{downloadError.document.filename}».{" "}
+            {downloadError.message}
+          </p>
+          <button
+            className="button secondary"
+            disabled={downloading}
+            onClick={() => void download(downloadError.document)}
+          >
+            Повторить скачивание
+          </button>
+        </div>
+      )}
       {mutationError && (
         <div className="notice error" role="alert">
           <p>{mutationError}</p>
@@ -164,13 +211,15 @@ export default function ApplicationDocuments({
                       {files.map((file) => (
                         <li key={file.id}>
                           <div>
-                            <a
+                            <button
                               className="text-link document-download"
-                              href={`/api/v1/applications/${application.id}/documents/${file.id}`}
+                              type="button"
+                              disabled={downloading}
+                              onClick={() => void download(file)}
                               aria-label={`Скачать ${file.filename}`}
                             >
                               {file.filename}
-                            </a>
+                            </button>
                             <small>
                               {Math.max(1, Math.ceil(file.size_bytes / 1024))}{" "}
                               КБ · {dateTime(file.created_at)}

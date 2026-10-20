@@ -58,7 +58,13 @@ test("other_client_cannot_open_draft", async ({ page, browser }) => {
 test("staff_queue_does_not_include_drafts", async ({ page }) => {
   await login(page);
   const id = await createDraft(page);
+  await page.route("**/api/v1/auth/logout", async (route) => {
+    // Задержка сети воспроизводит уход со страницы до завершения выхода.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await route.continue();
+  });
   await page.getByRole("button", { name: "Выйти" }).click();
+  await expect(page).toHaveURL(/\/login$/);
   await login(page, "staff@example.test");
   await expect(
     page.getByRole("heading", { name: "Заявки на рассмотрение", exact: true }),
@@ -284,6 +290,7 @@ for (const viewport of [
       ),
     ).toBe(true);
     await page.getByRole("button", { name: "Выйти" }).click();
+    await expect(page).toHaveURL(/\/login$/);
     await login(page, "staff@example.test");
     await expect(
       page.getByRole("heading", {

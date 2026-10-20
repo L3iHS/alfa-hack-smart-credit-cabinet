@@ -41,7 +41,7 @@ async function draft(page: Page, product = "working_capital", complete = true) {
 }
 async function upload(page: Page, label = "Финансовая отчётность") {
   const previousCount = await page
-    .getByRole("link", { name: "Скачать report.png" })
+    .getByRole("button", { name: "Скачать report.png" })
     .count();
   await page
     .getByLabel(`Файл: ${label}`, { exact: true })
@@ -50,11 +50,30 @@ async function upload(page: Page, label = "Финансовая отчётнос
     .getByRole("button", { name: `Загрузить: ${label}`, exact: true })
     .click();
   await expect(
-    page.getByRole("link", { name: "Скачать report.png" }),
+    page.getByRole("button", { name: "Скачать report.png" }),
   ).toHaveCount(previousCount + 1);
   await expect(
     page.getByRole("button", { name: `Загрузить: ${label}`, exact: true }),
   ).toBeEnabled();
+}
+async function openQueuedApplication(page: Page, id: string) {
+  const row = page.getByRole("link").filter({ hasText: id.slice(0, 8) });
+  const next = page.getByRole("button", { name: "Далее", exact: true });
+  while (!(await row.isVisible())) {
+    await expect
+      .poll(
+        async () =>
+          (await row.isVisible()) ||
+          ((await next.isVisible()) && (await next.isEnabled())),
+      )
+      .toBe(true);
+    if (await row.isVisible()) break;
+    const first = page.locator(".application-row small").first();
+    const previous = await first.innerText();
+    await next.click();
+    await expect(first).not.toHaveText(previous);
+  }
+  await row.click();
 }
 async function confirm(page: Page) {
   await page.locator("#data-confirmed").check();
@@ -75,6 +94,7 @@ for (const product of ["working_capital", "equipment"]) {
     const staffContext = await browser.newContext();
     const staff = await staffContext.newPage();
     await login(staff, "staff@example.test");
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
     if (process.env.SCREENSHOT_DIR)
       await page.screenshot({
         path: `${process.env.SCREENSHOT_DIR}/submission-${product}.png`,
@@ -101,22 +121,20 @@ for (const product of ["working_capital", "equipment"]) {
     await expect(page.locator(".page-heading .status")).toHaveText(
       "Отправлена",
     );
-    const download = await page.request.get(
-      (await page
-        .getByRole("link", { name: "Скачать report.png" })
-        .first()
-        .getAttribute("href")) as string,
-    );
-    expect(download.status()).toBe(200);
-    expect(await download.body()).toEqual(png);
+    const downloadPromise = page.waitForEvent("download");
+    await page
+      .getByRole("button", { name: "Скачать report.png" })
+      .first()
+      .click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("report.png");
+    const { readFile } = await import("node:fs/promises");
+    expect(await readFile((await download.path())!)).toEqual(png);
     await page.goto(`/applications/${id}/edit`);
     await expect(
       page.getByRole("heading", { name: "Редактирование недоступно" }),
     ).toBeVisible();
-    await staff
-      .getByRole("link")
-      .filter({ hasText: id.slice(0, 8) })
-      .click();
+    await openQueuedApplication(staff, id);
     await expect(staff).toHaveURL(new RegExp(`/staff/applications/${id}$`));
     await expect(staff.locator(".page-heading .status")).toHaveText(
       "Отправлена",
@@ -143,7 +161,7 @@ test("incomplete_application_displays_errors_and_document_can_be_deleted", async
   await upload(page);
   await page.getByRole("button", { name: "Удалить report.png" }).click();
   await expect(
-    page.getByRole("link", { name: "Скачать report.png" }),
+    page.getByRole("button", { name: "Скачать report.png" }),
   ).toHaveCount(0);
 });
 test("lost_submit_response_reuses_key_and_body", async ({ page }) => {
@@ -199,9 +217,12 @@ test("upload_rejects_changed_account_and_other_company_cannot_download", async (
   await login(page);
   const id = await draft(page);
   await upload(page);
-  const fileUrl = await page
-    .getByRole("link", { name: "Скачать report.png" })
-    .getAttribute("href");
+  const document = (
+    await (
+      await page.request.get(`/api/v1/applications/${id}/documents`)
+    ).json()
+  ).items[0];
+  const fileUrl = `/api/v1/applications/${id}/documents/${document.id}`;
   const otherContext = await browser.newContext();
   const other = await otherContext.newPage();
   await login(other, "client2@example.test");
@@ -304,4 +325,79 @@ test("stale_editor_locks_after_reloading_submitted_application", async ({
   await expect(
     page.getByRole("button", { name: "Сохранить черновик" }),
   ).toHaveCount(0);
+});
+
+for (const failure of ["404", "503", "network"] as const) {
+  test(`download_${failure}_stays_in_card_and_can_be_retried`, async ({
+    page,
+  }) => {
+    await login(page);
+    const id = await draft(page);
+    await upload(page);
+    const document = (
+      await (
+        await page.request.get(`/api/v1/applications/${id}/documents`)
+      ).json()
+    ).items[0];
+    await page.route(
+      `**/api/v1/applications/${id}/documents/${document.id}`,
+      async (route) => {
+        if (failure === "network") await route.abort("failed");
+        else
+          await route.fulfill({
+            status: Number(failure),
+            contentType: "application/json",
+            body: JSON.stringify({
+              code: failure === "404" ? "document_not_found" : "unavailable",
+              message:
+                failure === "404"
+                  ? "Документ не найден"
+                  : "Сервис временно недоступен",
+            }),
+          });
+      },
+      { times: 1 },
+    );
+    await page.getByLabel("Скачать report.png", { exact: true }).click();
+    await expect(page.locator(".download-error")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/applications/${id}$`));
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Повторить скачивание" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("report.png");
+    const { readFile } = await import("node:fs/promises");
+    expect(await readFile((await download.path())!)).toEqual(png);
+    await expect(page.locator(".download-error")).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`/applications/${id}$`));
+  });
+}
+test("download_401_returns_to_login_instead_of_api_document", async ({
+  page,
+}) => {
+  await login(page);
+  const id = await draft(page);
+  await upload(page);
+  const document = (
+    await (
+      await page.request.get(`/api/v1/applications/${id}/documents`)
+    ).json()
+  ).items[0];
+  await page.route(
+    `**/api/v1/applications/${id}/documents/${document.id}`,
+    (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "authentication_required",
+          message: "Войдите в кабинет",
+        }),
+      }),
+    { times: 1 },
+  );
+  await page.getByLabel("Скачать report.png", { exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(
+    page.getByRole("heading", { name: "Вход в кабинет" }),
+  ).toBeVisible();
 });

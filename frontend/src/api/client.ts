@@ -111,6 +111,7 @@ export async function api<T>(
     body?: unknown;
     rawBody?: Blob;
     headers?: Record<string, string>;
+    responseType?: "json" | "blob";
   } = {},
 ): Promise<T> {
   const method = options.method || "GET";
@@ -155,6 +156,17 @@ export async function api<T>(
       options.rawBody ??
       (options.body === undefined ? undefined : JSON.stringify(options.body)),
   });
+  if (response.ok && options.responseType === "blob") {
+    try {
+      return (await response.blob()) as T;
+    } catch {
+      throw new ApiError(
+        0,
+        "network_error",
+        "Не удалось скачать файл. Проверьте подключение и повторите попытку",
+      );
+    }
+  }
   const body = await decode(response);
   if (!response.ok) {
     if (
