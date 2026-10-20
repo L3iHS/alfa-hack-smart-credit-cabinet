@@ -1600,17 +1600,24 @@ dd {
   margin: 1px 0 0;
   accent-color: var(--red);
 }
+.submission-panel > .button,
+.submission-panel > .text-link {
+  width: 100%;
+  max-width: 320px;
+  margin-left: auto;
+}
 .submission-panel > .button {
   display: flex;
-  width: fit-content;
-  max-width: 100%;
-  margin-left: auto;
   padding-inline: 18px;
 }
 .submission-panel > .text-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  line-height: 1.4;
   text-align: center;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .submission-errors {
   margin: 16px 0;
@@ -1649,8 +1656,9 @@ dd {
     width: 16px;
     height: 16px;
   }
-  .submission-panel > .button {
-    width: 100%;
+  .submission-panel > .button,
+  .submission-panel > .text-link {
+    max-width: none;
   }
   .documents-panel {
     padding: 22px 18px;

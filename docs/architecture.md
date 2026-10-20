@@ -6,11 +6,11 @@
 
 ```mermaid
 flowchart LR
-    Browser[React / TypeScript] --> Nginx[nginx: SPA и прокси /api]
+    Browser[React / TypeScript] --> Nginx[nginx: веб-интерфейс и прокси /api]
     Nginx --> API[FastAPI: сессии, заявки, документы, рассмотрение]
     API --> DB[(PostgreSQL)]
     API --> Files[(Постоянный том документов)]
-    Worker[Worker внутри процесса backend] --> DB
+    Worker[Обработчик внутри процесса backend] --> DB
     Worker --> Providers[Локальные синтетические источники]
     Worker --> Rules[Версионированные правила и расчёт]
 ```
@@ -21,21 +21,25 @@ Docker Compose запускает PostgreSQL, backend и frontend; локаль�
 
 ## Модель данных
 
+Названия сущностей сохранены как в коде. Подписи линий описывают связи между записями, а не порядок выполнения действий. Обозначения на концах линии: `||` — ровно одна запись, `o|` — ноль или одна, `o{` — ноль или несколько.
+
+`ApplicationRevision` — снимок отправленных данных заявки, `ProcessingRun` — отдельный запуск проверок, `IdempotencyRecord` — запись для защиты команды от повторного выполнения.
+
 ```mermaid
 erDiagram
-    Company o|--o{ User : client_company
-    Company ||--o{ Application : owns
-    Application ||--o{ Document : files
-    Application ||--o{ ApplicationRevision : submissions
-    Application ||--o{ ApplicationEvent : history
-    ApplicationRevision ||--o| ProcessingRun : evaluated_by
-    ProcessingRun ||--o{ CheckResult : checks
-    ProcessingRun ||--o| Calculation : load
-    ApplicationRevision ||--o{ Decision : outcomes
-    ApplicationRevision ||--o{ InformationRequest : questions
-    ApplicationRevision ||--o{ Offer : alternatives
-    User o|--o{ AuthSession : login
-    User ||--o{ IdempotencyRecord : commands
+    Company o|--o{ User : "имеет пользователей"
+    Company ||--o{ Application : "подаёт заявки"
+    Application ||--o{ Document : "содержит документы"
+    Application ||--o{ ApplicationRevision : "сохраняет отправленные версии"
+    Application ||--o{ ApplicationEvent : "имеет историю событий"
+    ApplicationRevision ||--o| ProcessingRun : "проходит обработку"
+    ProcessingRun ||--o{ CheckResult : "сохраняет результаты проверок"
+    ProcessingRun ||--o| Calculation : "сохраняет расчёт нагрузки"
+    ApplicationRevision ||--o{ Decision : "получает решения"
+    ApplicationRevision ||--o{ InformationRequest : "получает запросы уточнений"
+    ApplicationRevision ||--o{ Offer : "получает предложения условий"
+    User o|--o{ AuthSession : "имеет сессии входа"
+    User ||--o{ IdempotencyRecord : "сохраняет записи команд"
 ```
 
 `Application` содержит рабочие поля, статус и счётчик `version`. `ApplicationRevision.snapshot` фиксирует компанию, продукт, финансы, документы и подтверждения при отправке. Ответ на уточнение создаёт новый снимок; сохранение формы и загрузка файла сами по себе не возобновляют обработку. Ранее отправленные документы удалить нельзя.
@@ -48,6 +52,15 @@ erDiagram
 
 ```mermaid
 stateDiagram-v2
+    state "Черновик (draft)" as draft
+    state "Отправлена (submitted)" as submitted
+    state "Проверяется (processing)" as processing
+    state "Нужны уточнения (needs_info)" as needs_info
+    state "На рассмотрении сотрудника (manual_review)" as manual_review
+    state "Предложены другие условия (counteroffer)" as counteroffer
+    state "Одобрена (approved)" as approved
+    state "Отказ (rejected)" as rejected
+
     [*] --> draft
     draft --> submitted: Отправка клиента
     submitted --> processing: Запуск проверок
