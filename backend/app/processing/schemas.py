@@ -22,6 +22,10 @@ class InformationRequestOutput(BaseModel):
     requested_fields: list[str]
     requested_document_types: list[DocumentType]
     created_at: datetime
+    response_message: str | None = None
+    responded_by: uuid.UUID | None = None
+    responded_at: datetime | None = None
+    response_revision_id: uuid.UUID | None = None
 
 
 class OfferTerms(BaseModel):

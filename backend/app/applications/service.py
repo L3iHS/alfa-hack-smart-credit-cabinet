@@ -55,7 +55,7 @@ def application_output(application: Application, user: User) -> ApplicationOutpu
         if application.status == 'draft':
             result.available_actions = ['edit_draft', 'upload_document', 'submit']
         elif application.status == 'needs_info':
-            result.available_actions = ['upload_document', 'respond_information']
+            result.available_actions = ['edit_draft', 'upload_document', 'respond_information']
         elif application.status == 'counteroffer':
             result.available_actions = ['accept_offer', 'decline_offer']
     elif application.status == 'manual_review':
@@ -88,8 +88,9 @@ def validate_draft(values: dict) -> None:
         raise HTTPException(422, {'code': 'validation_error', 'message': 'Проверьте введённые данные', 'field_errors': errors})
 
 
-def add_event(db: Session, application: Application, user: User, event_type: str) -> None:
-    db.add(ApplicationEvent(application_id=application.id, actor_id=user.id, event_type=event_type, application_version=application.version))
+def add_event(db: Session, application: Application, user: User, event_type: str, *, revision_id=None, processing_run_id=None) -> None:
+    db.add(ApplicationEvent(application_id=application.id, actor_id=user.id, event_type=event_type,
+                            application_version=application.version, revision_id=revision_id, processing_run_id=processing_run_id))
 
 
 def create_draft(db: Session, user: User, body: DraftCreate) -> Application:
@@ -108,17 +109,22 @@ def update_draft(db: Session, user: User, application_id: uuid.UUID, body: Draft
     require_client(user)
     # Строка заявки блокируется независимо от авторизационной сессии.
     application = get_application(db, user, application_id, lock=True)
-    if application.status != 'draft' or application.version != body.expected_version:
+    if application.status not in ('draft', 'needs_info') or application.version != body.expected_version:
         raise HTTPException(409, {'code': 'version_conflict', 'message': 'Заявка изменилась, обновите страницу'})
     changes = body.model_dump(exclude_unset=True, exclude={'expected_version'})
     values = {name: getattr(application, name) for name in DraftFields.model_fields}
     values.update(changes)
+    if application.status == 'needs_info':
+        from app.review.service import open_request
+        open_request(db, application)
+        if values['product_code'] != application.product_code:
+            raise HTTPException(422, {'code': 'validation_error', 'message': 'Продукт отправленной заявки менять нельзя', 'field_errors': {'product_code': 'Сохраните выбранный продукт'}})
     validate_draft(values)
     if any(getattr(application, name) != value for name, value in changes.items()):
         for name, value in changes.items():
             setattr(application, name, value)
         application.version += 1
         application.updated_at = datetime.now(timezone.utc)
-        add_event(db, application, user, 'draft_updated')
+        add_event(db, application, user, 'working_copy_updated' if application.status == 'needs_info' else 'draft_updated')
     db.commit()
     return application

@@ -34,8 +34,9 @@ def get_document(db: Session, user: User, application_id: uuid.UUID, document_id
     return document
 
 
-def require_editable(application, expected_version: int) -> None:
-    if application.status != 'draft' or application.version != expected_version:
+def require_editable(application, expected_version: int, *, allow_information: bool = False) -> None:
+    statuses = ('draft', 'needs_info') if allow_information else ('draft',)
+    if application.status not in statuses or application.version != expected_version:
         raise HTTPException(409, {'code': 'version_conflict', 'message': 'Заявка изменилась, обновите страницу'})
 
 
@@ -79,7 +80,10 @@ def upload_document(db: Session, user: User, application_id: uuid.UUID, expected
     require_client(user)
     filename = validate_file(content, filename, content_type)
     application = get_application(db, user, application_id, lock=True)
-    require_editable(application, expected_version)
+    require_editable(application, expected_version, allow_information=True)
+    if application.status == 'needs_info':
+        from app.review.service import open_request
+        open_request(db, application)
     identifier = uuid.uuid4()
     document = Document(
         id=identifier, application_id=application.id, author_id=user.id,
@@ -111,8 +115,15 @@ def upload_document(db: Session, user: User, application_id: uuid.UUID, expected
 def delete_document(db: Session, user: User, application_id: uuid.UUID, document_id: uuid.UUID, expected_version: int):
     require_client(user)
     application = get_application(db, user, application_id, lock=True)
-    require_editable(application, expected_version)
+    require_editable(application, expected_version, allow_information=True)
     document = get_document(db, user, application_id, document_id)
+    if application.status == 'needs_info':
+        from app.applications.submission_models import ApplicationRevision
+        from app.review.service import open_request
+        open_request(db, application)
+        for snapshot in db.scalars(select(ApplicationRevision.snapshot).where(ApplicationRevision.application_id == application.id)):
+            if any(item['id'] == str(document.id) for item in snapshot['documents']):
+                raise HTTPException(409, {'code': 'document_in_revision', 'message': 'Документ уже отправлен и сохраняется в истории'})
     document.deleted_at = datetime.now(timezone.utc)
     application.version += 1
     application.updated_at = document.deleted_at

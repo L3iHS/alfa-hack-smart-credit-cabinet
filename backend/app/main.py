@@ -20,6 +20,7 @@ from app.core.db import get_db
 from app.core.config import settings
 from app.processing.router import router as processing_router
 from app.processing.worker import ProcessingWorker
+from app.review.router import router as review_router
 
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ app.include_router(companies_router, prefix="/api/v1")
 app.include_router(applications_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(processing_router, prefix="/api/v1")
+app.include_router(review_router, prefix="/api/v1")
 
 
 @app.middleware("http")

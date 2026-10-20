@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import uuid
 from datetime import date, datetime, timezone
 
@@ -18,6 +19,9 @@ from app.processing.models import Calculation, CheckResult, Decision, Informatio
 from app.processing.policy import SUPPORTED_POLICY_VERSIONS, evaluate
 from app.processing.schemas import AssessmentOutput, CalculationOutput, CheckOutput, DecisionOutput, RetryInput, RunOutput
 from app.products.catalog import CATALOG_VERSION
+
+
+logger = logging.getLogger(__name__)
 
 
 def now():
@@ -154,6 +158,7 @@ def process_next() -> bool:
     run_id = claim_next()
     if run_id is None:
         return False
+    stage = 'initialization'
     try:
         with SessionLocal() as db:
             state = current_locked(db, run_id)
@@ -168,6 +173,7 @@ def process_next() -> bool:
             db.commit()
         checks = {}
         for kind in ('registry','tax','bki'):
+            stage = f'check_{kind}'
             with SessionLocal() as db:
                 cached = db.scalar(select(CheckResult).where(CheckResult.run_id == run_id, CheckResult.kind == kind))
                 if cached:
@@ -182,9 +188,11 @@ def process_next() -> bool:
                 db.add(CheckResult(run_id=run.id, revision_id=run.revision_id, kind=kind, source_version=source_version, data=data))
                 db.commit()
                 checks[kind] = data
+        stage = 'policy'
         result = evaluate(snapshot['application'], registered_at=date.fromisoformat(checks['registry']['registered_at']),
                           submitted_at=submitted_at, liquidated=checks['registry']['liquidated'], overdue_days=checks['bki']['overdue_days'],
                           expected_monthly_revenue_kopecks=checks['tax']['expected_monthly_revenue_kopecks'], policy_version=policy_version)
+        stage = 'persist_result'
         with SessionLocal() as db:
             state = current_locked(db, run_id)
             if state is None:
@@ -209,6 +217,9 @@ def process_next() -> bool:
             run.error_code = None
             db.commit()
     except Exception as exc:
+        # Не пишем входные сведения и текст исключения: источник может включить их в ошибку.
+        if not isinstance(exc, providers.UnsupportedVersion):
+            logger.error('Unexpected processing failure', extra={'run_id': str(run_id), 'stage': stage, 'exception_type': type(exc).__name__})
         with SessionLocal() as db:
             state = current_locked(db, run_id)
             if state:
