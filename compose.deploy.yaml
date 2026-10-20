@@ -1,0 +1,41 @@
+x-bounded-logs: &bounded-logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    restart: unless-stopped
+    logging: *bounded-logs
+  backend:
+    environment:
+      COOKIE_SECURE: "true"
+      FORWARDED_ALLOW_IPS: "*"
+    restart: unless-stopped
+    logging: *bounded-logs
+  frontend:
+    restart: unless-stopped
+    logging: *bounded-logs
+  caddy:
+    image: caddy:2.11.7-alpine
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.deploy}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    restart: unless-stopped
+    logging: *bounded-logs
+
+volumes:
+  caddy_data:
+  caddy_config:
