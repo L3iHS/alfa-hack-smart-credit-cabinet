@@ -6,6 +6,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
 
+from app.applications.router import router as applications_router
+from app.companies.router import router as companies_router
+from app.products.router import router as products_router
 from app.auth.router import router as auth_router
 from app.auth.schemas import ErrorOutput
 from app.auth.service import require_csrf
@@ -18,6 +21,9 @@ app = FastAPI(
     responses={status: {"model": ErrorOutput} for status in (401, 403, 422, 500, 503)},
 )
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(products_router, prefix="/api/v1")
+app.include_router(companies_router, prefix="/api/v1")
+app.include_router(applications_router, prefix="/api/v1")
 
 
 @app.middleware("http")
