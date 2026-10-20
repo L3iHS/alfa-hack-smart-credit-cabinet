@@ -25,7 +25,8 @@ async function geometry(page: Page) {
       const { x, y, width, height, right } = document.querySelector(selector)!.getBoundingClientRect();
       return { x, y, width, height, right };
     };
-    return { topbar: bounds(".topbar"), panel: bounds("main .panel"), viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth };
+    const dataSelector = document.querySelector(".details-grid") ? ".details-grid" : "#amount_kopecks";
+    return { topbar: bounds(".topbar"), panel: bounds("main .panel"), firstData: bounds(dataSelector), viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth };
   });
 }
 
@@ -40,6 +41,19 @@ for (const width of [1366, 1440, 320, 390]) {
     await expect(page.locator(".details-panel")).toBeVisible();
     const details = await geometry(page);
     await page.screenshot({ path: `${folder}/layout-details-${width}.png`, fullPage: true });
+    const editBox = await page.getByRole("link", { name: "Редактировать", exact: true }).boundingBox();
+    expect(editBox!.height).toBeGreaterThanOrEqual(44);
+    expect(editBox!.width).toBeGreaterThanOrEqual(44);
+    if (width < 700) {
+      await expect(page.locator(".sidebar nav")).toBeHidden();
+      const section = await page.locator(".details-panel .section-top").boundingBox();
+      expect(section!.height).toBeLessThanOrEqual(45);
+      const back = page.locator(".topbar .back-link");
+      await expect(back).toHaveAccessibleName("Мои заявки");
+      const backBox = await back.boundingBox();
+      expect(backBox!.width).toBeGreaterThanOrEqual(44);
+      expect(backBox!.height).toBeGreaterThanOrEqual(44);
+    }
     await page.goto(`/applications/${id}/edit`);
     await expect(page.getByRole("heading", { name: "Выбор продукта" })).toBeVisible();
     const form = await geometry(page);
@@ -54,6 +68,10 @@ for (const width of [1366, 1440, 320, 390]) {
         expect(value.topbar.height).toBeLessThanOrEqual(72);
       }
     }
+    if (width < 700) {
+      expect(details.firstData.y).toBeLessThanOrEqual(width === 320 ? 400 : 370);
+      expect(form.firstData.y).toBeLessThanOrEqual(width === 320 ? 620 : 560);
+    }
     const save = page.getByRole("button", { name: "Сохранить черновик" });
     await save.scrollIntoViewIfNeeded();
     const saveBox = await save.boundingBox();
@@ -62,6 +80,13 @@ for (const width of [1366, 1440, 320, 390]) {
     if (width > 700) {
       const area = await page.locator(".save-area").boundingBox();
       expect(Math.abs(saveBox!.x + saveBox!.width - area!.x - area!.width)).toBeLessThan(1);
+    } else {
+      await page.getByRole("link", { name: "К заявке", exact: true }).focus();
+      await page.keyboard.press("Enter");
+      await expect(page).toHaveURL(new RegExp(`/applications/${id}$`));
+      await page.getByRole("link", { name: "Редактировать", exact: true }).focus();
+      await page.keyboard.press("Enter");
+      await expect(page).toHaveURL(new RegExp(`/applications/${id}/edit$`));
     }
   });
 }
@@ -111,12 +136,49 @@ test("staff_long_name_and_header_controls_fit_320", async ({ page }) => {
   await page.reload();
   await expect(page.locator(".company-name")).toContainText(displayName);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
-  for (const selector of [".account-menu", ".company-name", ".logout"]) {
-    const bounds = await page.locator(selector).boundingBox();
-    expect(bounds!.x).toBeGreaterThanOrEqual(0);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
-  }
   const folder = process.env.SCREENSHOT_DIR || "test-results/layout";
   await mkdir(folder, { recursive: true });
-  await page.screenshot({ path: `${folder}/staff-long-name-320.png`, fullPage: true });
+  for (const inner of [false, true]) {
+    if (inner) {
+      await page.goto("/staff/applications/00000000-0000-0000-0000-000000000000");
+      await expect(page.getByRole("heading", { name: "Заявка не найдена" })).toBeVisible();
+      await expect(page.locator(".topbar .back-link")).toHaveAccessibleName("Очередь заявок");
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+    for (const selector of [".account-menu", ".company-name", ".logout"]) {
+      const bounds = await page.locator(selector).boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+    }
+    const textFits = await page.locator(".company-name").evaluate((element) =>
+      element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1,
+    );
+    expect(textFits).toBe(true);
+    await page.screenshot({ path: `${folder}/staff-long-name-320${inner ? "-inner" : ""}.png`, fullPage: true });
+  }
+});
+
+test("mobile_long_company_keeps_header_content_visible", async ({ page }) => {
+  await login(page);
+  const id = await draft(page, "working_capital");
+  const name = "Демонстрационная компания электромеханического оборудования и комплектующих";
+  await page.route("**/api/v1/company", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...await response.json(), name } });
+  });
+  const folder = process.env.SCREENSHOT_DIR || "test-results/layout";
+  await mkdir(folder, { recursive: true });
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`/applications/${id}`);
+    await expect(page.locator(".company-name")).toContainText(name);
+    await expect(page.getByRole("link", { name: "Мои заявки", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Выйти", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    const textFits = await page.locator(".company-name").evaluate((element) =>
+      element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1,
+    );
+    expect(textFits).toBe(true);
+    await page.screenshot({ path: `${folder}/company-long-name-${width}.png`, fullPage: true });
+  }
 });

@@ -37,7 +37,7 @@ export default function AppShell() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <div className="shell">
+    <div className={`shell${showBack ? " shell-inner" : ""}`}>
       <a className="skip-link" href="#content">
         К содержимому
       </a>
@@ -70,9 +70,9 @@ export default function AppShell() {
       <div className="workspace">
         <header className="topbar">
           {showBack && (
-            <Link className="back-link" to={backPath}>
-              <span aria-hidden="true">‹&nbsp;</span>
-              {backLabel}
+            <Link className="back-link" to={backPath} aria-label={backLabel}>
+              <span aria-hidden="true">‹</span>
+              <span className="back-label">{backLabel}</span>
             </Link>
           )}
           <div className="account-menu">

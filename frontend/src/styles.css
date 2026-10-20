@@ -303,8 +303,12 @@ svg {
   white-space: nowrap;
   flex-shrink: 0;
 }
+.edit-icon {
+  display: none;
+}
 .back-link {
   display: inline-flex;
+  gap: 4px;
   align-items: center;
   min-height: 44px;
   color: var(--muted);
@@ -1154,12 +1158,29 @@ dd {
     gap: 9px;
     max-width: 100%;
   }
+  .shell-inner .sidebar nav {
+    display: none;
+  }
+  .topbar .back-link {
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    font-size: 28px;
+  }
+  .topbar .back-label {
+    display: none;
+  }
   .topbar:has(.back-link) .account-menu {
-    width: 100%;
+    flex: 1;
     justify-content: flex-end;
+  }
+  .shell-inner .page-heading {
+    gap: 12px;
+    margin-bottom: 20px;
   }
   .company-name {
     font-size: 12px;
+    overflow-wrap: anywhere;
   }
   .company-name > span {
     font-size: 10px;
@@ -1611,11 +1632,22 @@ dd {
 
 @media (max-width: 650px) {
   .details-panel > .section-top {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
   }
-  .details-panel > .section-top .button {
+  .details-panel > .section-top .edit-draft {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    gap: 6px;
+    padding: 10px;
+    font-size: 13px;
     margin-left: auto;
+  }
+  .edit-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
   }
   .submission-panel > .button {
     width: 100%;
@@ -1635,5 +1667,11 @@ dd {
   }
   .document-upload .button {
     width: 100%;
+  }
+}
+
+@media (max-width: 360px) {
+  .edit-draft .edit-label {
+    display: none;
   }
 }
