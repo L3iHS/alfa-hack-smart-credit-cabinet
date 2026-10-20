@@ -273,12 +273,6 @@ function DraftEditor({
   }
   return (
     <>
-      <Link
-        className="back-link"
-        to={record ? `/applications/${record.id}` : "/applications"}
-      >
-        ‹ {record ? "К заявке" : "Мои заявки"}
-      </Link>
       <PageHeading
         title="Заявка на кредитование"
         subtitle="Заполните то, что знаете сейчас. Остальное можно добавить позже."
@@ -472,10 +466,14 @@ function DraftEditor({
             )
           )}
           <div className="save-actions">
-            <button className="button primary" disabled={busy || conflict}>
+            <span id="save-hint">Сохранение не отправляет заявку в банк</span>
+            <button
+              className="button primary"
+              disabled={busy || conflict}
+              aria-describedby="save-hint"
+            >
               {busy ? "Сохраняем…" : "Сохранить черновик"}
             </button>
-            <span>Сохранение не отправляет заявку в банк</span>
           </div>
         </div>
       </form>

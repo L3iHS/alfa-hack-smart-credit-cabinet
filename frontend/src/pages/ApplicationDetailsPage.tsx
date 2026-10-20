@@ -111,23 +111,12 @@ function Details({
   );
   return (
     <>
-      <Link
-        className="back-link"
-        to={staff ? "/staff/applications" : "/applications"}
-      >
-        ‹ {staff ? "Очередь заявок" : "Мои заявки"}
-      </Link>
       <PageHeading
         title={product?.name || "Кредитная заявка"}
         subtitle={`Заявка № ${item.id.slice(0, 8)} · ${dateTime(item.updated_at)}`}
       >
         <Status status={item.status} />
       </PageHeading>
-      {saved && item.status === "draft" && (
-        <div className="notice success" role="status">
-          Черновик сохранён. Вы можете вернуться к нему в любой момент.
-        </div>
-      )}
       {refreshError && (
         <div className="notice error" role="status">
           Не удалось обновить статус. {refreshError}
@@ -136,10 +125,15 @@ function Details({
       <div className="details-layout">
         <div className="details-main">
           <section className="panel details-panel">
+            {saved && item.status === "draft" && (
+              <div className="notice success" role="status">
+                Черновик сохранён. Вы можете вернуться к нему в любой момент.
+              </div>
+            )}
             <div className="section-top">
               <h2>{staff ? "Данные заявки" : "Ваша заявка"}</h2>
               {!locked && item.available_actions.includes("edit_draft") && (
-                <Link className="text-link" to={`/applications/${id}/edit`}>
+                <Link className="button secondary" to={`/applications/${id}/edit`}>
                   Редактировать
                 </Link>
               )}
