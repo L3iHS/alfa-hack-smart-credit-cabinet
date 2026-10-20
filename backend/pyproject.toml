@@ -1,0 +1,21 @@
+[project]
+name = "smart-credit-cabinet"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.151.0",
+  "uvicorn==0.34.2",
+  "SQLAlchemy==2.0.40",
+  "alembic==1.15.2",
+  "psycopg[binary]==3.2.6",
+  "pydantic-settings==2.8.1",
+  "pwdlib[argon2]==0.2.1",
+  "starlette==0.52.1",
+]
+
+[dependency-groups]
+dev = ["pytest==8.3.5", "httpx==0.28.1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

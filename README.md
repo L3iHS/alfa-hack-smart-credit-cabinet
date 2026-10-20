@@ -10,7 +10,7 @@
 
 Первые продукты — оборотный кредит и кредит на оборудование.
 
-## Планируемый стек
+## Стек
 
 - Backend: Python, FastAPI, SQLAlchemy, Alembic
 - Данные: PostgreSQL
@@ -27,4 +27,41 @@
 
 ## Запуск
 
-Приложение находится на этапе проектирования. Инструкция воспроизводимого запуска через Docker будет добавлена вместе с первой работающей версией.
+Нужны Docker и Docker Compose. Из корня проекта:
+
+```sh
+cp .env.example .env
+docker compose up --build -d
+docker compose exec backend uv run python -m app.seed
+```
+
+Приложение: http://localhost:8080. Документация API: http://localhost:8080/api/v1/docs. OpenAPI: http://localhost:8080/api/v1/openapi.json.
+
+При запуске backend автоматически применяет миграции. PostgreSQL хранит данные в Docker volume. Обычный перезапуск сохраняет данные и действующие серверные сессии:
+
+```sh
+docker compose restart
+```
+
+### Демонстрационные учётные записи
+
+| Email | Роль | Компания |
+| --- | --- | --- |
+| `client1@example.test` | Клиент | Демо Пекарня |
+| `client2@example.test` | Клиент | Демо Мастерская |
+| `staff@example.test` | Сотрудник | — |
+
+Пароль при первом заполнении — значение `DEMO_PASSWORD` из `.env` (в примере `Demo-credit-2026!`). Повторный запуск seed добавляет недостающие записи и сохраняет существующие данные и пароли.
+
+Сейчас доступны серверная авторизация, получение профиля, выход и стартовая страница React. Экраны кабинетов и работа с кредитными заявками ещё разрабатываются; ML и LLM пока не подключены.
+
+API использует cookie сессии. Перед POST получите токен через `GET /api/v1/auth/csrf` и передавайте cookie и заголовок `X-CSRF-Token`. Успешный вход возвращает новый токен; прежняя сессия отзывается. Сессия действует 8 часов по умолчанию (`SESSION_TTL_SECONDS`). Для размещения за HTTPS задаётся `COOKIE_SECURE=true`.
+
+### Проверки
+
+```sh
+docker compose run --rm backend uv run pytest tests/test_auth.py -q
+docker compose exec backend uv run alembic check
+```
+
+Проверки авторизации используют отдельную временную базу PostgreSQL, применяют миграции и удаляют только эту тестовую базу. Для её создания пользователь PostgreSQL должен иметь право `CREATEDB`; в локальном Compose оно доступно. Данные приложения тесты не очищают.
