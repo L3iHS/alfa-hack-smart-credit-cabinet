@@ -1,6 +1,7 @@
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from app.applications.models import Application, ApplicationEvent  # noqa: F401
 from app.auth.models import AuthSession, User  # noqa: F401
 from app.companies.models import Company  # noqa: F401
 from app.core.config import settings
