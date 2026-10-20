@@ -446,3 +446,253 @@ test("download_401_returns_to_login_instead_of_api_document", async ({
     page.getByRole("heading", { name: "Вход в кабинет" }),
   ).toBeVisible();
 });
+
+
+async function submissionEvidence(
+  page: Page,
+  id: string,
+  original: { revision_id: string; processing_run_id: string },
+  browser: import("@playwright/test").Browser,
+  checkAuthors = false,
+) {
+  const staffContext = await browser.newContext();
+  try {
+    const staff = await staffContext.newPage();
+    await login(staff, "staff@example.test");
+    await staff.goto(`/staff/applications/${id}`);
+    const history = await (
+      await staff.request.get(`/api/v1/applications/${id}/history?limit=100`)
+    ).json();
+    expect(
+      history.items.filter(
+        (event: { event_type: string }) =>
+          event.event_type === "application_submitted",
+      ),
+    ).toHaveLength(1);
+    const assessment = await (
+      await staff.request.get(`/api/v1/applications/${id}/assessment`)
+    ).json();
+    expect(assessment.runs).toHaveLength(1);
+    expect(assessment.runs[0].id).toBe(original.processing_run_id);
+    expect(assessment.runs[0].revision_id).toBe(original.revision_id);
+    if (checkAuthors) {
+      await expect(staff.locator(".page-heading .status")).toHaveText(
+        "На рассмотрении сотрудника",
+      );
+      await staff
+        .getByLabel("Основание решения или предложения")
+        .fill("Проверены уточняющие сведения о компании");
+      await staff
+        .getByRole("button", { name: "Одобрить заявку", exact: true })
+        .click();
+      await expect(staff.locator(".page-heading .status")).toHaveText(
+        "Одобрена",
+      );
+      await expect(page.locator(".page-heading .status")).toHaveText(
+        "Одобрена",
+      );
+      for (const [view, otherAuthor] of [
+        [page, "Сотрудник банка"],
+        [staff, "Клиент компании"],
+      ] as const) {
+        const signatures = view.locator(".history small");
+        await expect(
+          signatures.filter({ hasText: /^Вы · версия \d+$/ }).first(),
+        ).toBeVisible();
+        await expect(
+          signatures.filter({ hasText: /^Система · версия \d+$/ }).first(),
+        ).toBeVisible();
+        await expect(
+          signatures
+            .filter({ hasText: new RegExp(`^${otherAuthor} · версия \\d+$`) })
+            .first(),
+        ).toBeVisible();
+        await expect(
+          signatures.filter({ hasText: /Пользователь|[a-f0-9]{8}/ }),
+        ).toHaveCount(0);
+        await expect(view.locator(".history time").first()).toHaveAttribute(
+          "datetime",
+          /.+/,
+        );
+        if (process.env.SCREENSHOT_DIR)
+          await view.screenshot({path: `${process.env.SCREENSHOT_DIR}/history-authors-${view === page ? "client" : "staff"}.png`, fullPage: true});
+      }
+    }
+    await test
+      .info()
+      .attach("submission-evidence.json", {
+        contentType: "application/json",
+        body: JSON.stringify({
+          application_id: id,
+          revision_id: original.revision_id,
+          processing_run_id: original.processing_run_id,
+          runs: assessment.runs.length,
+          submitted_events: history.items.filter(
+            (event: { event_type: string }) =>
+              event.event_type === "application_submitted",
+          ).length,
+        }),
+      });
+  } finally {
+    await staffContext.close();
+  }
+}
+
+test("committed_submit_survives_delayed_response_session_switch_and_has_readable_authors", async ({
+  page,
+  browser,
+}) => {
+  await login(page, "demo-d@example.test");
+  const id = await draft(page);
+  await upload(page);
+  await confirm(page);
+  const owner = await (await page.request.get("/api/v1/me")).json();
+  const storageKey = `credit-submit:${owner.id}:${id}`;
+  const commands: {
+    key: string | undefined;
+    body: string | null;
+    path: string;
+  }[] = [];
+  const results: { revision_id: string; processing_run_id: string }[] = [];
+  let committed = false;
+  let release!: () => void;
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(`**/api/v1/applications/${id}/submit`, async (route) => {
+    commands.push({
+      key: route.request().headers()["idempotency-key"],
+      body: route.request().postData(),
+      path: new URL(route.request().url()).pathname,
+    });
+    const response = await route.fetch();
+    expect(response.status()).toBe(202);
+    results.push(await response.json());
+    if (commands.length === 1) {
+      committed = true;
+      await delayed;
+    }
+    await route.fulfill({ response });
+  });
+  await page
+    .getByRole("button", { name: "Отправить заявку", exact: true })
+    .click();
+  await expect.poll(() => committed).toBe(true);
+  await expect(page.locator(".page-heading .status")).toHaveText(
+    "На рассмотрении сотрудника",
+  );
+  const original = await page.evaluate(
+    (key) => JSON.parse(sessionStorage.getItem(key) || "null"),
+    storageKey,
+  );
+  expect(original.key).toBe(commands[0].key);
+  await page.evaluate(() => window.dispatchEvent(new Event("session-expired")));
+  await expect(page).toHaveURL(/\/login$/);
+  const delivered = page.waitForResponse((response) =>
+    response.url().endsWith(`/applications/${id}/submit`),
+  );
+  release();
+  await delivered;
+  await page.request.get("/api/v1/health");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) => JSON.parse(sessionStorage.getItem(key) || "null"),
+        storageKey,
+      ),
+    )
+    .toEqual(original);
+  await page.getByLabel("Электронная почта").fill("client2@example.test");
+  await page.getByLabel("Пароль", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Войти", exact: true }).click();
+  await expect(page).toHaveURL(/\/applications$/);
+  await page.goto(`/applications/${id}`);
+  await expect(
+    page.getByRole("heading", { name: "Заявка не найдена", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Повторить отправку", exact: true }),
+  ).toHaveCount(0);
+  expect(commands).toHaveLength(1);
+  await page.getByRole("button", { name: "Выйти", exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await login(page, "demo-d@example.test");
+  await page.goto(`/applications/${id}`);
+  await expect(page.locator(".page-heading .status")).toHaveText(
+    "На рассмотрении сотрудника",
+  );
+  await page
+    .getByRole("button", { name: "Повторить отправку", exact: true })
+    .click();
+  await expect.poll(() => commands.length).toBe(2);
+  await expect.poll(() => results.length).toBe(2);
+  expect(commands[1]).toEqual(commands[0]);
+  expect(results[1]).toEqual(results[0]);
+  await expect
+    .poll(() => page.evaluate((key) => sessionStorage.getItem(key), storageKey))
+    .toBeNull();
+  await submissionEvidence(page, id, results[0], browser, true);
+});
+
+test("unknown_submit_survives_retry_401_and_reuses_original_submission", async ({
+  page,
+  browser,
+}) => {
+  await login(page, "demo-d@example.test");
+  const id = await draft(page);
+  await upload(page);
+  await confirm(page);
+  const owner = await (await page.request.get("/api/v1/me")).json();
+  const storageKey = `credit-submit:${owner.id}:${id}`;
+  const commands: {
+    key: string | undefined;
+    body: string | null;
+    path: string;
+  }[] = [];
+  const results: { revision_id: string; processing_run_id: string }[] = [];
+  await page.route(`**/api/v1/applications/${id}/submit`, async (route) => {
+    commands.push({
+      key: route.request().headers()["idempotency-key"],
+      body: route.request().postData(),
+      path: new URL(route.request().url()).pathname,
+    });
+    if (commands.length === 2) {
+      await route.fulfill({
+        status: 401,
+        json: { code: "session_expired", message: "Войдите снова" },
+      });
+      return;
+    }
+    const response = await route.fetch();
+    expect(response.status()).toBe(202);
+    results.push(await response.json());
+    if (commands.length === 1) await route.abort("failed");
+    else await route.fulfill({ response });
+  });
+  await page
+    .getByRole("button", { name: "Отправить заявку", exact: true })
+    .click();
+  await expect(page.locator(".page-heading .status")).toHaveText(
+    "На рассмотрении сотрудника",
+  );
+  await page
+    .getByRole("button", { name: "Повторить отправку", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel("Электронная почта").fill("demo-d@example.test");
+  await page.getByLabel("Пароль", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Войти", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/applications/${id}$`));
+  await page
+    .getByRole("button", { name: "Повторить отправку", exact: true })
+    .click();
+  await expect.poll(() => commands.length).toBe(3);
+  await expect.poll(() => results.length).toBe(2);
+  expect(commands[1]).toEqual(commands[0]);
+  expect(commands[2]).toEqual(commands[0]);
+  expect(results[1]).toEqual(results[0]);
+  await expect
+    .poll(() => page.evaluate((key) => sessionStorage.getItem(key), storageKey))
+    .toBeNull();
+  await submissionEvidence(page, id, results[0], browser);
+});

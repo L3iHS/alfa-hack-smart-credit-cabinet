@@ -253,7 +253,33 @@ function Details({
     </>
   );
 }
+const staffHistoryEvents = new Set([
+  "information_requested",
+  "offer_created",
+  "staff_approved",
+  "staff_rejected",
+  "processing_retried",
+]);
+const clientHistoryEvents = new Set([
+  "draft_created",
+  "draft_updated",
+  "document_uploaded",
+  "document_deleted",
+  "application_submitted",
+  "working_copy_updated",
+  "information_responded",
+  "offer_accepted",
+  "offer_declined",
+]);
+function historyAuthor(event: HistoryEvent, owner: string) {
+  if (event.actor_type === "system") return "Система";
+  if (event.actor_id === owner) return "Вы";
+  if (staffHistoryEvents.has(event.event_type)) return "Сотрудник банка";
+  if (clientHistoryEvents.has(event.event_type)) return "Клиент компании";
+  return "Участник заявки";
+}
 function History({ id, version }: { id: string; version: number }) {
+  const { user } = useSession();
   const [offset, setOffset] = useState(0);
   const { data, error, reload } = useResource(
     () =>
@@ -304,10 +330,8 @@ function History({ id, version }: { id: string; version: number }) {
                     )[item.event_type] || "Заявка обновлена"}
                   </strong>
                   <small>
-                    {item.actor_type === "system"
-                      ? "Система"
-                      : `Пользователь ${item.actor_id?.slice(0, 8) || ""}`}{" "}
-                    · версия {item.application_version}
+                    {historyAuthor(item, user!.id)} · версия{" "}
+                    {item.application_version}
                   </small>
                   <time dateTime={item.created_at}>
                     {dateTime(item.created_at)}

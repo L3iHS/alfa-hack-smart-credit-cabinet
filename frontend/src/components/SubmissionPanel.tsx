@@ -115,11 +115,16 @@ export default function SubmissionPanel({
       setError(errorMessage(error));
       if (error instanceof ApiError) {
         setFieldErrors(error.fields);
-        // При неизвестном исходе повторяем ту же команду: новая версия или ключ создадут конфликт.
+        // Смена сессии после POST и отказ авторизации повтора не проясняют прежний исход.
+        const uncertainSession =
+          error.code === "session_changed" ||
+          (!!command && (error.status === 401 || error.status === 403));
+        // При неизвестном исходе повторяем ту же команду с исходными ключом и телом.
         if (
           error.status > 0 &&
           error.status < 500 &&
-          error.code !== "invalid_response"
+          error.code !== "invalid_response" &&
+          !uncertainSession
         )
           remember(null);
         if (error.status === 409) setConflict(true);
