@@ -372,3 +372,43 @@ def test_needs_info_actions_and_working_copy_guards(client, db):
     assert patch(client, headers, {**detail, 'version': detail['version'] - 1}, purpose='Уточнение').status_code == 409
     assert upload(client, headers, {**detail, 'version': detail['version'] - 1}).status_code == 409
     assert current(client, identifier)['version'] == detail['version']
+
+
+@pytest.mark.parametrize('profile', ['c', 'd'])
+def test_information_response_is_readable_by_client_and_staff(client, db, profile):
+    from datetime import datetime, timezone
+
+    headers, identifier, _ = prepared(client, profile)
+    process()
+    if profile == 'd':
+        staff = authenticate(client, 'staff@example.test')
+        requested = command(client, staff, f'{BASE}/{identifier}/information-requests', {
+            'expected_version': current(client, identifier)['version'], 'message': 'Поясните размер выручки',
+            'requested_fields': ['revenue_kopecks'],
+        })
+        assert requested.status_code == 201, requested.text
+        headers = authenticate(client, 'demo-d@example.test')
+    detail = current(client, identifier)
+    original_request = detail['information_requests'][-1]
+    response_fields = ('response_message', 'responded_by', 'responded_at', 'response_revision_id')
+    for name in response_fields:
+        assert original_request[name] is None
+    author = client.get('/api/v1/me').json()['id']
+    before = datetime.now(timezone.utc)
+    body = response_body(detail, message='Проверили суммы за три месяца; выручка указана без округления')
+    sent = command(client, headers, f'{BASE}/{identifier}/information-responses', body)
+    assert sent.status_code == 202, sent.text
+    after = datetime.now(timezone.utc)
+    for email in (f'demo-{profile}@example.test', 'staff@example.test'):
+        authenticate(client, email)
+        visible = current(client, identifier)['information_requests'][-1]
+        assert visible['response_message'] == body['message']
+        assert visible['responded_by'] == author
+        assert visible['response_revision_id'] == sent.json()['revision_id']
+        assert before <= datetime.fromisoformat(visible['responded_at']) <= after
+        assert visible['status'] == 'answered'
+        assert {name: value for name, value in visible.items() if name not in (*response_fields, 'status')} == {
+            name: value for name, value in original_request.items() if name not in (*response_fields, 'status')
+        }
+    authenticate(client, 'client2@example.test')
+    assert client.get(f'{BASE}/{identifier}').status_code == 404
