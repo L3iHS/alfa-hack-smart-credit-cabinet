@@ -71,11 +71,16 @@ export function useReviewCommand(
       setError(errorMessage(value));
       if (value instanceof ApiError) {
         setFields(value.fields);
-        // Сбой сети, сервера или чтения ответа не подтверждает отсутствие записи.
+        // Смена сессии после POST и отказ авторизации повтора не проясняют прежний исход.
+        const uncertainSession =
+          value.code === "session_changed" ||
+          (!!pending && (value.status === 401 || value.status === 403));
+        // Сбой сети, сервера или чтения ответа также не подтверждает отсутствие записи.
         if (
           value.status > 0 &&
           value.status < 500 &&
-          value.code !== "invalid_response"
+          value.code !== "invalid_response" &&
+          !uncertainSession
         )
           remember(null);
         if (value.status === 409) setConflict(true);

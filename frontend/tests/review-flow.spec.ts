@@ -586,3 +586,224 @@ test("real_information_working_copy_and_extra_document_wait_for_explicit_respons
     await staffContext.close();
   }
 });
+
+async function preparedReview(page: Page) {
+  await login(page, false, "demo-d@example.test");
+  const { csrf_token } = await (
+    await page.request.get("/api/v1/auth/csrf")
+  ).json();
+  const headers = { "X-CSRF-Token": csrf_token };
+  const now = new Date();
+  const created = await page.request.post("/api/v1/applications", {
+    headers,
+    data: {
+      product_code: "working_capital",
+      purpose: "Проверка сохранности команды",
+      amount_kopecks: 50000000,
+      term_months: 12,
+      period_start: new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, 1),
+      )
+        .toISOString()
+        .slice(0, 10),
+      period_end: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0))
+        .toISOString()
+        .slice(0, 10),
+      revenue_kopecks: 120000000,
+      operating_expenses_kopecks: 90000000,
+      existing_debt_payments_kopecks: 3000000,
+    },
+  });
+  expect(created.status()).toBe(201);
+  const item = await created.json();
+  const attached = await page.request.post(
+    `/api/v1/applications/${item.id}/documents?document_type=financial_statement&expected_version=${item.version}&filename=session.png`,
+    {
+      headers: { ...headers, "Content-Type": "image/png" },
+      data: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN4b6gCAANXAUWe8DG4AAAAAElFTkSuQmCC",
+        "base64",
+      ),
+    },
+  );
+  expect(attached.status()).toBe(201);
+  const uploaded = await attached.json();
+  const sent = await page.request.post(
+    `/api/v1/applications/${item.id}/submit`,
+    {
+      headers: { ...headers, "Idempotency-Key": crypto.randomUUID() },
+      data: {
+        expected_version: uploaded.application_version,
+        data_confirmed: true,
+        bki_consent: true,
+        consent_version: "demo-consent-v1",
+      },
+    },
+  );
+  expect(sent.status()).toBe(202);
+  await expect
+    .poll(
+      async () =>
+        (
+          await (
+            await page.request.get(`/api/v1/applications/${item.id}`)
+          ).json()
+        ).status,
+    )
+    .toBe("manual_review");
+  await page.getByRole("button", { name: "Выйти", exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await login(page, true);
+  const owner = await (await page.request.get("/api/v1/me")).json();
+  await page.goto(`/staff/applications/${item.id}`);
+  return {
+    id: item.id as string,
+    storageKey: `credit-command:v1:${owner.id}:${item.id}`,
+  };
+}
+
+test("committed_delayed_command_survives_local_session_changed_and_owner_switch", async ({
+  page,
+}) => {
+  const item = await preparedReview(page);
+  const commands: {
+    key: string | undefined;
+    body: string | null;
+    path: string;
+  }[] = [];
+  let committed = false;
+  let release!: () => void;
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    `**/api/v1/applications/${item.id}/decisions`,
+    async (route) => {
+      commands.push({
+        key: route.request().headers()["idempotency-key"],
+        body: route.request().postData(),
+        path: new URL(route.request().url()).pathname,
+      });
+      if (commands.length === 1) {
+        const response = await route.fetch();
+        expect(response.status()).toBe(201);
+        committed = true;
+        await delayed;
+        await route.fulfill({ response });
+      } else await route.continue();
+    },
+  );
+  await page
+    .getByLabel("Основание решения или предложения")
+    .fill("Согласовано после проверки данных");
+  await page
+    .getByRole("button", { name: "Одобрить заявку", exact: true })
+    .click();
+  await expect.poll(() => committed).toBe(true);
+  const original = await page.evaluate(
+    (key) => JSON.parse(sessionStorage.getItem(key) || "null"),
+    item.storageKey,
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event("session-expired")));
+  await expect(page).toHaveURL(/\/login$/);
+  const delivered = page.waitForResponse((response) =>
+    response.url().endsWith(`/applications/${item.id}/decisions`),
+  );
+  release();
+  await delivered;
+  // Следующий сетевой цикл даёт обработчику позднего ответа завершиться.
+  await page.request.get("/api/v1/health");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) => JSON.parse(sessionStorage.getItem(key) || "null"),
+        item.storageKey,
+      ),
+    )
+    .toEqual(original);
+  await page.getByLabel("Электронная почта").fill("client1@example.test");
+  await page.getByLabel("Пароль", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Войти", exact: true }).click();
+  await expect(page).toHaveURL(/\/applications$/);
+  await expect(
+    page.getByRole("button", { name: "Повторить действие", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel("Основание решения или предложения"),
+  ).toHaveCount(0);
+  expect(commands).toHaveLength(1);
+  await page.getByRole("button", { name: "Выйти", exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await login(page, true);
+  await page.goto(`/staff/applications/${item.id}`);
+  await page
+    .getByRole("button", { name: "Повторить действие", exact: true })
+    .click();
+  await expect.poll(() => commands.length).toBe(2);
+  expect(commands[1]).toEqual(commands[0]);
+  await expect
+    .poll(() =>
+      page.evaluate((key) => sessionStorage.getItem(key), item.storageKey),
+    )
+    .toBeNull();
+  expect(
+    (await (await page.request.get(`/api/v1/applications/${item.id}`)).json())
+      .status,
+  ).toBe("approved");
+});
+
+test("unknown_command_survives_retry_401_until_same_owner_retries_exact_body", async ({
+  page,
+}) => {
+  const item = await preparedReview(page);
+  const commands: {
+    key: string | undefined;
+    body: string | null;
+    path: string;
+  }[] = [];
+  await page.route(
+    `**/api/v1/applications/${item.id}/decisions`,
+    async (route) => {
+      commands.push({
+        key: route.request().headers()["idempotency-key"],
+        body: route.request().postData(),
+        path: new URL(route.request().url()).pathname,
+      });
+      if (commands.length === 1) {
+        const response = await route.fetch();
+        expect(response.status()).toBe(201);
+        await route.abort("failed");
+      } else if (commands.length === 2)
+        await route.fulfill({
+          status: 401,
+          json: { code: "session_expired", message: "Войдите снова" },
+        });
+      else await route.continue();
+    },
+  );
+  await page
+    .getByLabel("Основание решения или предложения")
+    .fill("Проверенные сведения позволяют одобрить");
+  await page
+    .getByRole("button", { name: "Одобрить заявку", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Повторить действие", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel("Электронная почта").fill("staff@example.test");
+  await page.getByLabel("Пароль", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Войти", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/staff/applications/${item.id}$`));
+  await page
+    .getByRole("button", { name: "Повторить действие", exact: true })
+    .click();
+  await expect.poll(() => commands.length).toBe(3);
+  expect(commands[1]).toEqual(commands[0]);
+  expect(commands[2]).toEqual(commands[0]);
+  await expect
+    .poll(() =>
+      page.evaluate((key) => sessionStorage.getItem(key), item.storageKey),
+    )
+    .toBeNull();
+});
