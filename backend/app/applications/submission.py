@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.applications.models import Application
 from app.applications.schemas import DraftFields, SubmissionInput
 from app.applications.service import add_event, get_application, require_client, validate_draft
 from app.applications.submission_models import ApplicationRevision, IdempotencyRecord, ProcessingRun
@@ -36,6 +37,13 @@ def submit_application(db: Session, user: User, application_id: uuid.UUID, body:
         return previous.response
     application = get_application(db, user, application_id, lock=True)
     require_editable(application, body.expected_version)
+    result, _ = create_submission(db, user, application, body)
+    db.add(IdempotencyRecord(user_id=user.id, operation='submit', key=key, fingerprint=fingerprint, response=result))
+    db.commit()
+    return result
+
+
+def validate_submission(db: Session, application: Application, body: SubmissionInput):
     values = DraftFields.model_validate(application).model_dump()
     validate_draft(values)
     errors = {}
@@ -60,6 +68,12 @@ def submit_application(db: Session, user: User, application_id: uuid.UUID, body:
         path = settings.document_storage_path / document.storage_key
         if not path.is_file() or path.stat().st_size != document.size_bytes:
             raise HTTPException(503, {'code': 'document_unavailable', 'message': 'Один из файлов временно недоступен'})
+    return documents
+
+
+def create_submission(db: Session, user: User, application: Application, body: SubmissionInput,
+                      event_type: str = 'application_submitted'):
+    documents = validate_submission(db, application, body)
     now = datetime.now(timezone.utc)
     application.version += 1
     application.status = 'submitted'
@@ -85,11 +99,10 @@ def submit_application(db: Session, user: User, application_id: uuid.UUID, body:
         catalog_version=application.catalog_version, policy_version=POLICY_VERSION, source_version=SOURCE_VERSION,
     )
     db.add(run)
-    add_event(db, application, user, 'application_submitted')
+    db.flush()
+    add_event(db, application, user, event_type, revision_id=revision.id, processing_run_id=run.id)
     result = {
         'application_id': str(application.id), 'version': application.version, 'status': 'submitted',
         'revision_id': str(revision.id), 'processing_run_id': str(run.id),
     }
-    db.add(IdempotencyRecord(user_id=user.id, operation='submit', key=key, fingerprint=fingerprint, response=result))
-    db.commit()
-    return result
+    return result, revision

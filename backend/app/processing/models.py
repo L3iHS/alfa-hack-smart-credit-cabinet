@@ -64,6 +64,9 @@ class InformationRequest(Base):
     requested_fields: Mapped[list] = mapped_column(JSONB)
     requested_document_types: Mapped[list] = mapped_column(JSONB)
     response_revision_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('application_revisions.id'))
+    response_message: Mapped[str | None] = mapped_column(String(4000))
+    responded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('users.id'))
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
