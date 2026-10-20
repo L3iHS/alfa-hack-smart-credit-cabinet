@@ -74,6 +74,18 @@ test("staff_queue_does_not_include_drafts", async ({ page }) => {
   ).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Новая заявка" })).toHaveCount(0);
 });
+test("staff_navigation_fits_narrow_viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await login(page, "staff@example.test");
+  await expect(
+    page.getByRole("link", { name: "Заявки на рассмотрение", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
 test("expired_session_returns_to_login", async ({ page }) => {
   await login(page);
   const id = await createDraft(page);

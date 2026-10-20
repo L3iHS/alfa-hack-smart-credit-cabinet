@@ -362,6 +362,8 @@ svg {
   place-items: center;
   width: 16px;
   height: 16px;
+  flex: 0 0 16px;
+  line-height: 1;
   border: 1px solid #babdc3;
   border-radius: 50%;
   font-size: 11px;
@@ -703,8 +705,8 @@ dd {
 .details-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 28px 20px;
-  margin: 28px 0 0;
+  gap: 24px 20px;
+  margin: 24px 0 0;
 }
 .summary-amount {
   font-size: 25px;
@@ -717,10 +719,10 @@ dd {
 .details-divider {
   height: 1px;
   background: var(--line);
-  margin: 30px 0;
+  margin: 24px 0;
 }
 .financial-details {
-  margin: 24px 0 0;
+  margin: 16px 0 0;
 }
 .financial-details > div {
   display: flex;
@@ -1389,13 +1391,15 @@ dd {
 @media (max-width: 700px) {
   .sidebar {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
     padding-bottom: 6px;
   }
   .sidebar nav {
-    margin: 0;
+    max-width: 100%;
+    margin: 0 0 0 auto;
   }
   .sidebar nav a {
     font-size: 12px;
@@ -1426,7 +1430,7 @@ dd {
   gap: 10px;
 }
 .document-group {
-  padding-top: 22px;
+  padding-top: 20px;
 }
 .document-group + .document-group {
   border-top: 1px solid var(--line);
@@ -1448,21 +1452,21 @@ dd {
 .document-list {
   list-style: none;
   padding: 0;
-  margin: 12px 0;
+  margin: 8px 0;
 }
 .document-list li {
   display: flex;
   align-items: center;
   gap: 16px;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 4px 0;
 }
 .document-list li > div {
   min-width: 0;
 }
 .document-list small {
   display: block;
-  margin-top: 4px;
+  margin-top: 0;
   color: var(--muted);
 }
 .document-download {
@@ -1485,28 +1489,55 @@ dd {
   display: flex;
   align-items: start;
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 12px;
 }
-.document-upload .field {
+.document-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   flex: 1;
   min-width: 0;
-  margin: 0;
-}
-.document-upload input {
-  width: 100%;
-  min-height: 48px;
-  padding: 10px;
+  min-height: 50px;
+  padding: 6px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  font-size: 14px;
+  background: #f1f2f4;
+  cursor: pointer;
 }
-.document-upload input::file-selector-button {
-  border: 0;
-  background: #eef0f2;
-  padding: 6px;
-  border-radius: 4px;
-  margin-right: 8px;
-  color: #242426;
+.document-picker:has(input:focus-visible) {
+  outline: 3px solid #2273ce;
+  outline-offset: 3px;
+}
+.document-picker:has(input:disabled) {
+  opacity: 0.6;
+  cursor: wait;
+}
+.document-picker input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
+}
+.file-picker-button {
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.4;
+}
+.file-picker-name {
+  flex: 1 1 100px;
+  min-width: 0;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 .consent-list {
   display: flex;
@@ -1559,8 +1590,12 @@ dd {
   .document-upload {
     flex-direction: column;
   }
-  .document-upload .field {
+  .document-picker {
     width: 100%;
+  }
+  .document-picker[data-selected="true"] .file-picker-name {
+    flex-basis: 100%;
+    padding-bottom: 4px;
   }
   .document-upload .button {
     width: 100%;

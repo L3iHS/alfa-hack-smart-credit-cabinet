@@ -43,9 +43,13 @@ async function upload(page: Page, label = "Финансовая отчётнос
   const previousCount = await page
     .getByRole("button", { name: "Скачать report.png" })
     .count();
+  const picker = page.locator(".document-picker").filter({
+    has: page.getByLabel(`Файл: ${label}`, { exact: true }),
+  });
   await page
     .getByLabel(`Файл: ${label}`, { exact: true })
     .setInputFiles({ name: "report.png", mimeType: "image/png", buffer: png });
+  await expect(picker.getByText("report.png", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: `Загрузить: ${label}`, exact: true })
     .click();
@@ -55,6 +59,7 @@ async function upload(page: Page, label = "Финансовая отчётнос
   await expect(
     page.getByRole("button", { name: `Загрузить: ${label}`, exact: true }),
   ).toBeEnabled();
+  await expect(picker.getByText("Файл не выбран", { exact: true })).toBeVisible();
 }
 async function openQueuedApplication(page: Page, id: string) {
   const row = page.getByRole("link").filter({ hasText: id.slice(0, 8) });

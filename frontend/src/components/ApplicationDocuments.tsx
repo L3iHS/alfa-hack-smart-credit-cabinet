@@ -36,6 +36,9 @@ export default function ApplicationDocuments({
   const [mutationError, setMutationError] = useState("");
   const [conflict, setConflict] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<
+    Partial<Record<DocumentType, string>>
+  >({});
   const [downloadError, setDownloadError] = useState<{
     document: ApplicationDocument;
     message: string;
@@ -128,6 +131,7 @@ export default function ApplicationDocuments({
         rawBody: file,
       });
       form.reset();
+      setSelectedFiles((current) => ({ ...current, [type]: "" }));
       return result.application_version;
     });
   }
@@ -246,12 +250,28 @@ export default function ApplicationDocuments({
                         void upload(event, type as DocumentType)
                       }
                     >
-                      <label className="field" htmlFor={`file-${type}`}>
-                        <span className="sr-only">Файл: {label}</span>
+                      <label
+                        className="document-picker"
+                        htmlFor={`file-${type}`}
+                        data-selected={Boolean(selectedFiles[type as DocumentType])}
+                      >
+                        <span className="file-picker-button" aria-hidden="true">
+                          Выбрать файл
+                        </span>
+                        <span className="file-picker-name" aria-hidden="true">
+                          {selectedFiles[type as DocumentType] || "Файл не выбран"}
+                        </span>
                         <input
                           id={`file-${type}`}
                           name="file"
                           type="file"
+                          aria-label={`Файл: ${label}`}
+                          onChange={(event) =>
+                            setSelectedFiles((current) => ({
+                              ...current,
+                              [type]: event.target.files?.[0]?.name || "",
+                            }))
+                          }
                           accept={policy.accepted_content_types.join(",")}
                           disabled={busy || conflict}
                         />
