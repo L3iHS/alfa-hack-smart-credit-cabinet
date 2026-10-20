@@ -156,6 +156,7 @@ export async function api<T>(
       options.rawBody ??
       (options.body === undefined ? undefined : JSON.stringify(options.body)),
   });
+  if (!unchanged()) throw sessionChanged();
   if (response.ok && options.responseType === "blob") {
     try {
       return (await response.blob()) as T;

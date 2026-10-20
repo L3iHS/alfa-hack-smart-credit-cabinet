@@ -226,7 +226,13 @@ function DraftEditor({
       const saved = record
         ? await api<Application>(`/applications/${record.id}`, {
             method: "PATCH",
-            body: { ...body, expected_version: record.version },
+            body: {
+              ...body,
+              ...(record.status === "needs_info"
+                ? { product_code: undefined }
+                : {}),
+              expected_version: record.version,
+            },
           })
         : await api<Application>("/applications", { method: "POST", body });
       recovery.current = null;
@@ -275,7 +281,11 @@ function DraftEditor({
     <>
       <PageHeading
         title="Заявка на кредитование"
-        subtitle="Заполните то, что знаете сейчас. Остальное можно добавить позже."
+        subtitle={
+          record?.status === "needs_info"
+            ? "Дополните сведения по запросу. После сохранения отправьте ответ из карточки заявки."
+            : "Заполните то, что знаете сейчас. Остальное можно добавить позже."
+        }
       />
       <form onSubmit={save} noValidate>
         <div className="form-layout">
@@ -292,6 +302,7 @@ function DraftEditor({
                     <input
                       type="radio"
                       name="product_code"
+                      disabled={record?.status === "needs_info"}
                       value={item.code}
                       checked={values.product_code === item.code}
                       onChange={() => change("product_code", item.code)}
@@ -472,7 +483,11 @@ function DraftEditor({
               disabled={busy || conflict}
               aria-describedby="save-hint"
             >
-              {busy ? "Сохраняем…" : "Сохранить черновик"}
+              {busy
+                ? "Сохраняем…"
+                : record?.status === "needs_info"
+                  ? "Сохранить дополнения"
+                  : "Сохранить черновик"}
             </button>
           </div>
         </div>

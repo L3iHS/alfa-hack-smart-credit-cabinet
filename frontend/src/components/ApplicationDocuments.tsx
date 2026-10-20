@@ -124,6 +124,10 @@ export default function ApplicationDocuments({
       setDownloading(false);
     }
   }
+  const openRequest = application.information_requests.find(
+    (item) => item.status === "open",
+  );
+  const requested = openRequest?.requested_document_types || [];
   const editable =
     application.available_actions.includes("upload_document") && !locked;
   async function mutation(action: () => Promise<number>) {
@@ -247,6 +251,7 @@ export default function ApplicationDocuments({
             .filter(
               ([type]) =>
                 required.includes(type as DocumentType) ||
+                requested.includes(type as DocumentType) ||
                 data.items.some((item) => item.document_type === type),
             )
             .map(([type, label]) => {
@@ -282,16 +287,20 @@ export default function ApplicationDocuments({
                               КБ · {dateTime(file.created_at)}
                             </small>
                           </div>
-                          {editable && (
-                            <button
-                              className="document-remove"
-                              aria-label={`Удалить ${file.filename}`}
-                              disabled={busy || conflict}
-                              onClick={() => remove(file)}
-                            >
-                              Удалить
-                            </button>
-                          )}
+                          {editable &&
+                            (application.status === "draft" ||
+                              (openRequest &&
+                                new Date(file.created_at) >
+                                  new Date(openRequest.created_at))) && (
+                              <button
+                                className="document-remove"
+                                aria-label={`Удалить ${file.filename}`}
+                                disabled={busy || conflict}
+                                onClick={() => remove(file)}
+                              >
+                                Удалить
+                              </button>
+                            )}
                         </li>
                       ))}
                     </ul>

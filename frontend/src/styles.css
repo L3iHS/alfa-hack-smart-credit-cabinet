@@ -1675,3 +1675,48 @@ dd {
     display: none;
   }
 }
+
+/* Рассмотрение использует существующие цвет, типографику и ширину кабинета. */
+.review-panel, .assessment-panel { padding: 28px; }
+.review-panel > h2, .assessment-panel > h2 { margin-top: 0; }
+.review-panel p, .assessment-panel p { overflow-wrap: anywhere; line-height: 1.55; }
+.public-reasons { padding-left: 20px; line-height: 1.6; }
+.information-request, .offer-comparison { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 20px; }
+.review-form { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 20px; }
+.review-form .field { margin: 18px 0; }
+.review-buttons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; margin-top: 20px; }
+.request-options { border: 0; padding: 0; margin: 18px 0; display: grid; gap: 10px; }
+.request-options label { display: flex; gap: 9px; align-items: flex-start; }
+.review-panel summary, .assessment-panel summary { cursor: pointer; font-weight: 600; line-height: 1.5; }
+.offer-comparison table { width: 100%; border-collapse: collapse; margin: 18px 0; }
+.offer-comparison th, .offer-comparison td { text-align: left; padding: 12px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.offer-comparison th { font-weight: 600; }
+.offer-comparison thead { color: var(--muted); font-size: 13px; }
+.assessment-run { border-top: 1px solid var(--line); padding: 18px 0; }
+.assessment-run > .muted { font-size: 12px; }
+.check-list { list-style: none; padding: 0; }
+.check-list li { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.check-list li > span { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
+.assessment-decision { margin-top: 20px; }
+.status-processing, .status-needs_info, .status-manual_review, .status-counteroffer { color: #805209; background: #fff3da; }
+.status-approved { color: #17633b; background: #e6f5ec; }
+.status-rejected { color: #b12020; background: #ffebeb; }
+.history small { display: block; font-size: 11px; color: var(--muted); margin-top: 5px; overflow-wrap: anywhere; }
+.past-offers { margin-top: 24px; }
+.button.disabled { opacity: .55; cursor: default; }
+@media (max-width: 600px) {
+ .review-panel, .assessment-panel { padding: 20px; }
+ .review-buttons { flex-direction: column; }
+ .review-buttons .button { width: 100%; }
+ .offer-comparison th, .offer-comparison td { font-size: 12px; padding: 10px 4px; }
+}
+
+.status { white-space: normal; max-width: 100%; line-height: 1.4; }
+.status > span { flex: 0 0 6px; }
+
+.answered-requests { margin-top: 20px; }
+.answered-requests article { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; }
+
+.offer-comparison table { table-layout: fixed; }
+.offer-comparison th:first-child { width: 23%; }
+.offer-comparison th, .offer-comparison td { overflow-wrap: normal; }

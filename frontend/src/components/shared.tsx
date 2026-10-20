@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
+import type { ApplicationStatus } from "../api/types";
 import { ApiError, errorMessage } from "../api/client";
 
 export function Loading() {
@@ -92,15 +93,11 @@ export function PageHeading({
     </div>
   );
 }
-export function Status({
-  status = "draft",
-}: {
-  status?: "draft" | "submitted";
-}) {
+export function Status({ status = "draft" }: { status?: ApplicationStatus }) {
   return (
     <span className={`status status-${status}`}>
       <span />
-      {status === "submitted" ? "Отправлена" : "Черновик"}
+      {statusLabels[status]}
     </span>
   );
 }
@@ -166,3 +163,14 @@ export function RouteFocus() {
   }, [pathname]);
   return null;
 }
+
+export const statusLabels: Record<ApplicationStatus, string> = {
+  draft: "Черновик",
+  submitted: "Отправлена",
+  processing: "Проверяем данные",
+  needs_info: "Нужны уточнения",
+  manual_review: "На рассмотрении сотрудника",
+  counteroffer: "Предложены другие условия",
+  approved: "Одобрена",
+  rejected: "Отказ",
+};

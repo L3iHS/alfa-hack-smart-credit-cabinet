@@ -78,24 +78,22 @@ export default function SubmissionPanel({
   useEffect(() => {
     lock(!!command || busy);
   }, [command, busy, lock]);
-  useEffect(() => {
-    setConfirmed(false);
-    setConsent(false);
-    if (application.status === "submitted") {
-      remember(null);
-      setError("");
-      setFieldErrors({});
-    }
-  }, [application.version, application.status]);
+
   async function send() {
-    if (busy || !policy || conflict) return;
+    if (
+      busy ||
+      (!command && !policy) ||
+      conflict ||
+      (!command && !application.available_actions.includes("submit"))
+    )
+      return;
     const request = command || {
       key: crypto.randomUUID(),
       body: {
         expected_version: application.version,
         data_confirmed: confirmed,
         bki_consent: consent,
-        consent_version: policy.consent_version,
+        consent_version: policy!.consent_version,
       },
     };
     remember(request);
@@ -143,18 +141,7 @@ export default function SubmissionPanel({
       setBusy(false);
     }
   }
-  if (application.status === "submitted")
-    return (
-      <section className="panel next-step">
-        <h2>Заявка принята</h2>
-        <p>
-          Данные и документы переданы в банк. Статус и история обновляются
-          автоматически.
-        </p>
-        <small>Решение по заявке ещё не принято.</small>
-      </section>
-    );
-  if (staff) return null;
+  if (staff || (application.status !== "draft" && !command)) return null;
   return (
     <section className="panel next-step submission-panel">
       <h2>Отправка заявки</h2>
@@ -216,7 +203,11 @@ export default function SubmissionPanel({
       ) : (
         <button
           className="button primary"
-          disabled={busy || !policy}
+          disabled={
+            busy ||
+            (!command && !policy) ||
+            (!command && !application.available_actions.includes("submit"))
+          }
           onClick={() => void send()}
         >
           {busy

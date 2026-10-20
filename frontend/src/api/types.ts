@@ -42,20 +42,22 @@ export interface DraftFields {
 export interface Application extends DraftFields {
   id: string;
   version: number;
-  status: "draft" | "submitted";
+  status: ApplicationStatus;
   updated_at: string;
   catalog_version: string;
   public_reasons: string[];
-  available_actions: ("edit_draft" | "upload_document" | "submit")[];
+  processing_status: ProcessingStatus | null;
+  information_requests: InformationRequest[];
+  offers: Offer[];
+  available_actions: Action[];
 }
 export interface HistoryEvent {
   id: string;
-  event_type:
-    | "draft_created"
-    | "draft_updated"
-    | "document_uploaded"
-    | "document_deleted"
-    | "application_submitted";
+  event_type: string;
+  actor_type: "user" | "system";
+  actor_id: string | null;
+  revision_id: string | null;
+  processing_run_id: string | null;
   created_at: string;
   application_version: number;
 }
@@ -117,4 +119,140 @@ export interface SubmitResult {
   status: "submitted";
   revision_id: string;
   processing_run_id: string;
+}
+
+export type ApplicationStatus =
+  | "draft"
+  | "submitted"
+  | "processing"
+  | "needs_info"
+  | "manual_review"
+  | "counteroffer"
+  | "approved"
+  | "rejected";
+export type ProcessingStatus =
+  "pending" | "running" | "succeeded" | "failed" | "interrupted";
+export type Action =
+  | "edit_draft"
+  | "upload_document"
+  | "submit"
+  | "respond_information"
+  | "accept_offer"
+  | "decline_offer"
+  | "request_information"
+  | "make_offer"
+  | "approve"
+  | "reject"
+  | "retry_processing";
+export interface InformationRequest {
+  id: string;
+  revision_id: string;
+  application_version: number;
+  status: "open" | "answered";
+  message: string;
+  requested_fields: string[];
+  requested_document_types: DocumentType[];
+  created_at: string;
+  response_message: string | null;
+  responded_by: string | null;
+  responded_at: string | null;
+  response_revision_id: string | null;
+}
+export interface Offer {
+  id: string;
+  version: number;
+  revision_id: string;
+  application_version: number;
+  status: "active" | "accepted" | "declined" | "superseded";
+  product_code: ProductCode;
+  amount_kopecks: number;
+  term_months: number;
+  monthly_payment_kopecks: number;
+  total_payment_kopecks: number;
+  annual_rate_bps: number;
+  reason: string;
+  created_at: string;
+}
+export interface CommandResult {
+  application_id: string;
+  version: number;
+  status: ApplicationStatus;
+  revision_id: string;
+}
+export interface Assessment {
+  application_id: string;
+  revision_id: string | null;
+  risk_assessment: null;
+  runs: {
+    id: string;
+    revision_id: string;
+    status: ProcessingStatus;
+    catalog_version: string;
+    policy_version: string;
+    source_version: string;
+    created_at: string;
+    started_at: string | null;
+    finished_at: string | null;
+    error_code: string | null;
+    checks: {
+      id: string;
+      kind: "registry" | "tax" | "bki";
+      source_version: string;
+      status: "succeeded";
+      data:
+        | { registered_at: string; liquidated: boolean }
+        | { expected_monthly_revenue_kopecks: number | null }
+        | { overdue_days: number };
+      created_at: string;
+    }[];
+    calculation: {
+      months: number;
+      monthly_revenue_kopecks: string;
+      monthly_operating_expenses_kopecks: string;
+      monthly_debt_kopecks: string;
+      available_flow_kopecks: string;
+      monthly_payment_kopecks: number;
+      coverage_ratio: string | null;
+      policy_version: string;
+    } | null;
+    decision: {
+      id: string;
+      outcome:
+        | "needs_info"
+        | "manual_review"
+        | "counteroffer"
+        | "approved"
+        | "rejected";
+      public_reason_codes: string[];
+      public_reasons: string[];
+      internal_reason: string;
+      created_at: string;
+    } | null;
+  }[];
+}
+
+export interface InformationRequestBody {
+  expected_version: number;
+  message: string;
+  requested_fields: Exclude<keyof DraftFields, "product_code">[];
+  requested_document_types: DocumentType[];
+}
+export interface InformationResponseBody extends SubmitBody {
+  request_id: string;
+  message: string;
+}
+export interface CreateOfferBody {
+  expected_version: number;
+  amount_kopecks: number;
+  term_months: number;
+  reason: string;
+}
+export interface DecisionBody {
+  expected_version: number;
+  outcome: "approved" | "rejected";
+  reason: string;
+}
+export interface OfferActionBody {
+  expected_version: number;
+  offer_version: number;
 }

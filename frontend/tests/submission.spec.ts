@@ -154,7 +154,7 @@ for (const product of ["working_capital", "equipment"]) {
       .getByRole("button", { name: "Отправить заявку", exact: true })
       .click();
     await expect(page.locator(".page-heading .status")).toHaveText(
-      "Отправлена",
+      "Одобрена",
     );
     await expect(
       page.getByRole("link", { name: "Редактировать", exact: true }),
@@ -164,7 +164,7 @@ for (const product of ["working_capital", "equipment"]) {
     ).toBeVisible();
     await page.reload();
     await expect(page.locator(".page-heading .status")).toHaveText(
-      "Отправлена",
+      "Одобрена",
     );
     const downloadPromise = page.waitForEvent("download");
     await page
@@ -182,7 +182,7 @@ for (const product of ["working_capital", "equipment"]) {
     await openQueuedApplication(staff, id);
     await expect(staff).toHaveURL(new RegExp(`/staff/applications/${id}$`));
     await expect(staff.locator(".page-heading .status")).toHaveText(
-      "Отправлена",
+      "Одобрена",
     );
     await expect(
       staff.getByRole("button", { name: /Загрузить|Удалить|Отправить/ }),
@@ -318,7 +318,7 @@ test("equipment_needs_invoice_and_open_card_polls_submission", async ({
     },
   });
   expect(result.status()).toBe(202);
-  await expect(page.locator(".page-heading .status")).toHaveText("Отправлена", {
+  await expect(page.locator(".page-heading .status")).toHaveText("Одобрена", {
     timeout: 8000,
   });
   await expect(

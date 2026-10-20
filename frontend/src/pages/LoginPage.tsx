@@ -12,6 +12,7 @@ export default function LoginPage() {
     error: sessionError,
     refresh,
     expired,
+    loginPath,
     login,
     recovery,
   } = useSession();
@@ -25,11 +26,12 @@ export default function LoginPage() {
     return (
       <Navigate
         to={
-          recovery.current?.owner === user.id
+          loginPath ||
+          (recovery.current?.owner === user.id
             ? recovery.current.path
             : user.role === "staff"
               ? "/staff/applications"
-              : "/applications"
+              : "/applications")
         }
         replace
       />

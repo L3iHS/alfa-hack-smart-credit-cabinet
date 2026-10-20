@@ -3,6 +3,8 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { api, errorMessage } from "../api/client";
 import { useSession } from "../auth/session";
 import ApplicationDocuments from "../components/ApplicationDocuments";
+import ReviewActions from "../components/ReviewActions";
+import AssessmentPanel from "../components/AssessmentPanel";
 import SubmissionPanel from "../components/SubmissionPanel";
 import type {
   Application,
@@ -26,6 +28,7 @@ import {
 export default function ApplicationDetailsPage() {
   const { id } = useParams();
   const { state } = useLocation();
+  const { user } = useSession();
   const { data, error, reload } = useResource(async () => {
     const [application, catalog] = await Promise.all([
       api<Application>(`/applications/${id}`),
@@ -37,7 +40,7 @@ export default function ApplicationDetailsPage() {
   if (!data) return <Loading />;
   return (
     <Details
-      key={id}
+      key={`${user!.id}:${id}`}
       initial={data.application}
       catalog={data.catalog}
       saved={state?.saved === true}
@@ -56,7 +59,9 @@ function Details({
   const { user } = useSession();
   const staff = user!.role === "staff";
   const [item, setItem] = useState(initial);
-  const [locked, setLocked] = useState(false);
+  const [submissionLocked, setSubmissionLocked] = useState(false);
+  const [reviewLocked, setReviewLocked] = useState(false);
+  const locked = submissionLocked || reviewLocked;
   const [refreshError, setRefreshError] = useState("");
   const id = item.id;
   const {
@@ -125,11 +130,14 @@ function Details({
       <div className="details-layout">
         <div className="details-main">
           <section className="panel details-panel">
-            {saved && item.status === "draft" && (
-              <div className="notice success" role="status">
-                Черновик сохранён. Вы можете вернуться к нему в любой момент.
-              </div>
-            )}
+            {saved &&
+              (item.status === "draft" || item.status === "needs_info") && (
+                <div className="notice success" role="status">
+                  {item.status === "needs_info"
+                    ? "Дополнения сохранены. Отправьте ответ отдельно, чтобы продолжить рассмотрение."
+                    : "Черновик сохранён. Вы можете вернуться к нему в любой момент."}
+                </div>
+              )}
             <div className="section-top">
               <h2>{staff ? "Данные заявки" : "Ваша заявка"}</h2>
               {!locked && item.available_actions.includes("edit_draft") && (
@@ -138,7 +146,12 @@ function Details({
                   to={`/applications/${id}/edit`}
                   aria-label="Редактировать"
                 >
-                  <svg className="edit-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <svg
+                    className="edit-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
                     <path
                       d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15l-1 5Z"
                       stroke="currentColor"
@@ -197,6 +210,15 @@ function Details({
               </div>
             </dl>
           </section>
+          <ReviewActions
+            application={item}
+            owner={user!.id}
+            staff={staff}
+            policy={policy}
+            changed={refresh}
+            lock={setReviewLocked}
+          />
+          {staff && <AssessmentPanel id={id} version={item.version} />}
           <ApplicationDocuments
             application={item}
             required={product?.required_document_types || []}
@@ -215,7 +237,7 @@ function Details({
             owner={user!.id}
             staff={staff}
             changed={refresh}
-            lock={setLocked}
+            lock={setSubmissionLocked}
             submitted={(result) => {
               setItem((current) => ({
                 ...current,
@@ -256,14 +278,37 @@ function History({ id, version }: { id: string; version: number }) {
                 <span className="history-dot" />
                 <div>
                   <strong>
-                    {{
-                      draft_created: "Черновик создан",
-                      draft_updated: "Черновик обновлён",
-                      document_uploaded: "Документ добавлен",
-                      document_deleted: "Документ удалён",
-                      application_submitted: "Заявка отправлена",
-                    }[item.event_type] || "Заявка обновлена"}
+                    {(
+                      {
+                        draft_created: "Черновик создан",
+                        draft_updated: "Черновик обновлён",
+                        document_uploaded: "Документ добавлен",
+                        document_deleted: "Документ удалён",
+                        application_submitted: "Заявка отправлена",
+                        processing_started: "Проверка началась",
+                        processing_completed: "Проверка завершена",
+                        processing_failed: "Технический сбой обработки",
+                        processing_interrupted: "Обработка прервана",
+                        processing_retried: "Обработка запущена повторно",
+                        information_requested: "Запрошены уточнения",
+                        information_responded: "Отправлен ответ на запрос",
+                        working_copy_updated: "Дополнения сохранены",
+                        offer_created: "Предложены другие условия",
+                        offer_accepted: "Предложение принято клиентом",
+                        offer_declined: "Предложение отклонено клиентом",
+                        staff_approved: "Заявка одобрена сотрудником",
+                        staff_rejected: "Отказ по решению сотрудника",
+                        auto_approved: "Заявка одобрена",
+                        auto_rejected: "Отказ по правилам",
+                      } as Record<string, string>
+                    )[item.event_type] || "Заявка обновлена"}
                   </strong>
+                  <small>
+                    {item.actor_type === "system"
+                      ? "Система"
+                      : `Пользователь ${item.actor_id?.slice(0, 8) || ""}`}{" "}
+                    · версия {item.application_version}
+                  </small>
                   <time dateTime={item.created_at}>
                     {dateTime(item.created_at)}
                   </time>
