@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.applications.models import Application, ApplicationEvent
-from app.applications.schemas import DraftCreate, DraftFields, DraftPatch
+from app.applications.schemas import ApplicationOutput, DraftCreate, DraftFields, DraftPatch
 from app.auth.models import User
 from app.products.catalog import CATALOG_VERSION, PRODUCTS
 
@@ -21,18 +21,25 @@ def application_query(user: User):
     query = select(Application)
     if user.role == 'client':
         return query.where(Application.company_id == user.company_id)
-    # До реализации отправки очередь сотрудника пуста.
+    # Сотрудник получает только отправленные заявки.
     return query.where(Application.status != 'draft')
 
 
 def get_application(db: Session, user: User, application_id: uuid.UUID, *, lock=False) -> Application:
     query = application_query(user).where(Application.id == application_id)
     if lock:
-        query = query.with_for_update()
+        query = query.with_for_update().execution_options(populate_existing=True)
     application = db.scalar(query)
     if application is None:
         raise HTTPException(404, {'code': 'application_not_found', 'message': 'Заявка не найдена'})
     return application
+
+
+def application_output(application: Application, user: User) -> ApplicationOutput:
+    result = ApplicationOutput.model_validate(application)
+    if user.role == 'client' and application.status == 'draft':
+        result.available_actions = ['edit_draft', 'upload_document', 'submit']
+    return result
 
 
 def validate_draft(values: dict) -> None:

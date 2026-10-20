@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from app.products.schemas import ProductCode
@@ -45,18 +45,18 @@ class DraftPatch(DraftFields):
 class ApplicationOutput(DraftFields):
     id: uuid.UUID
     version: int
-    status: Literal['draft']
+    status: Literal['draft', 'submitted']
     updated_at: datetime
     catalog_version: str
     public_reasons: list[str] = Field(default_factory=list)
-    available_actions: list[Literal['edit_draft']] = Field(default_factory=lambda: ['edit_draft'])
+    available_actions: list[Literal['edit_draft', 'upload_document', 'submit']] = Field(default_factory=list)
 
 
 class EventOutput(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    event_type: Literal['draft_created', 'draft_updated']
+    event_type: Literal['draft_created', 'draft_updated', 'document_uploaded', 'document_deleted', 'application_submitted']
     created_at: datetime
     application_version: int
 
@@ -73,3 +73,20 @@ class EventPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class SubmissionInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    expected_version: Annotated[StrictInt, Field(ge=1, le=2_147_483_647)]
+    data_confirmed: StrictBool
+    bki_consent: StrictBool
+    consent_version: str = Field(min_length=1, max_length=40)
+
+
+class SubmissionOutput(BaseModel):
+    application_id: uuid.UUID
+    version: int
+    status: Literal['submitted']
+    revision_id: uuid.UUID
+    processing_run_id: uuid.UUID

@@ -17,6 +17,7 @@ test_database_name = f"test_credit_{uuid.uuid4().hex}"
 os.environ["DATABASE_URL"] = application_url.set(database=test_database_name).render_as_string(hide_password=False)
 
 from app.core.db import SessionLocal, engine  # noqa: E402
+from app.core.config import settings  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed import seed  # noqa: E402
 
@@ -49,3 +50,9 @@ def db(migrated_database):
 def client(db):
     with TestClient(app, raise_server_exceptions=False) as http:
         yield http
+
+
+@pytest.fixture(autouse=True)
+def document_storage(tmp_path, monkeypatch):
+    # Файлы интеграционных тестов не попадают в том документов приложения.
+    monkeypatch.setattr(settings, 'document_storage_path', tmp_path)

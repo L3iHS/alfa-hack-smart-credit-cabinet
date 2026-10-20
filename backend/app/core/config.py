@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,6 +12,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     session_ttl_seconds: int = Field(default=28800, ge=60, le=604800)
     session_cookie_name: str = "credit_session"
+    document_storage_path: Path = Path("/tmp/credit-documents")
 
 
 settings = Settings()

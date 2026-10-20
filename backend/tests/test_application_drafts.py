@@ -34,7 +34,7 @@ def test_draft_survives_new_db_session(client):
     draft = create(client, headers, purpose='Закупка сырья', amount_kopecks=10_000_001)
     assert draft['version'] == 1 and draft['status'] == 'draft'
     assert draft['catalog_version'] == 'demo-v1'
-    assert draft['public_reasons'] == [] and draft['available_actions'] == ['edit_draft']
+    assert draft['public_reasons'] == [] and draft['available_actions'] == ['edit_draft', 'upload_document', 'submit']
     assert set(draft) == {'id', 'version', 'status', 'updated_at', 'catalog_version', 'product_code', 'purpose', 'description', 'amount_kopecks', 'term_months', 'period_start', 'period_end', 'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks', 'public_reasons', 'available_actions'}
     uuid.UUID(draft['id'])
     with SessionLocal() as fresh:
