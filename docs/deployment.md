@@ -10,7 +10,7 @@
 2. На Linux с systemd включите автозапуск Docker: `sudo systemctl enable --now docker`. Проверьте `docker version` и `docker compose version`.
 3. Разрешите входящие TCP 80/443 в межсетевом экране VPS и панели провайдера, а также SSH для администрирования. Порты 80/443 должны быть свободны; исходящие DNS и HTTPS необходимы для получения образов и сертификатов.
 4. Создайте A-запись `biom.cloud-path.ru`, указывающую на будущий публичный IPv4 сервера. AAAA добавляйте только при работающем IPv6 и открытых портах по IPv6; удалите неверную AAAA. Дождитесь обновления DNS.
-5. Получите конкретную проверенную ревизию проекта из репозитория или проверенного архива. Запишите SHA полученной версии и работайте из корня проекта.
+5. Получите конкретную проверенную ревизию проекта из репозитория. Запишите SHA полученной версии и работайте из корня проекта.
 
 ## Настройка окружения
 
@@ -78,15 +78,34 @@ docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml res
 
 ## Обновление и резервная копия
 
-Перед обновлением согласуйте окно недоступности, запишите текущую ревизию (`git rev-parse HEAD`) и подготовьте конкретную следующую проверенную ревизию. Не обновляйтесь вслепую до вершины ветки. При изменениях схемы учитывайте совместимость и прекратите запись, остановив frontend, Caddy и backend перед резервным копированием; БД продолжает работать:
+### Обновление из main
+
+На VPS используется ветка `main`, куда публикуются проверенные версии. Изменения из `dev` появятся на сервере после переноса в `main` и выполнения обновления. Перед обновлением проверьте состав следующей версии; если она меняет схему БД, сначала выполните резервное копирование по разделу ниже.
+
+Выполните на VPS единым блоком. Команды соединены через `&&`: при ошибке следующие шаги не выполняются. Для Docker используется `sudo`, Git запускается от текущего пользователя.
 
 ```sh
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml stop caddy frontend backend
+cd /srv/credit-cabinet &&
+git pull --ff-only origin main &&
+sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml config --quiet &&
+sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml up --build -d --wait &&
+sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps &&
+curl --fail --silent --show-error https://biom.cloud-path.ru/api/v1/health
+```
+
+`up --build` пересобирает образы из полученного кода и пересоздаёт изменившиеся контейнеры. Backend применяет миграции при запуске. Сохраняйте существующий `.env.deploy`, имя Compose-проекта и тома с данными. После успешного выполнения проверьте нужный сценарий в браузере; один ответ health не подтверждает работу всего приложения.
+
+### Резервная копия перед изменением схемы БД
+
+Перед обновлением согласуйте окно недоступности, запишите текущую ревизию (`git rev-parse HEAD`) и подготовьте конкретную следующую проверенную ревизию. При изменениях схемы учитывайте совместимость и прекратите запись, остановив frontend, Caddy и backend перед резервным копированием; БД продолжает работать:
+
+```sh
+sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml stop caddy frontend backend
 umask 077
-mkdir -p /srv/credit-cabinet-backups
-chmod 700 /srv/credit-cabinet-backups
-backup_file="/srv/credit-cabinet-backups/database-$(date -u +%Y%m%dT%H%M%SZ).dump"
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_file" || {
+mkdir -p "$HOME/credit-cabinet-backups"
+chmod 700 "$HOME/credit-cabinet-backups"
+backup_file="$HOME/credit-cabinet-backups/database-$(date -u +%Y%m%dT%H%M%SZ).dump"
+sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_file" || {
   echo "Ошибка pg_dump: обновление остановлено" >&2
   exit 1
 }
@@ -97,13 +116,7 @@ test -s "$backup_file" || exit 1
 
 Это логическая копия БД, а не резервная копия всего сервера: она не включает `.env.deploy`, сертификаты Caddy, код или файлы из тома `document_data`. Копию этого тома нужно сохранять вместе с копией БД, пока backend остановлен: метаданные БД ссылаются на конкретные файлы. Закрытую копию окружения, постоянных файлов и необходимые серверные настройки храните отдельно. Резервную копию БД делайте до запуска новой версии, потому что backend автоматически применяет миграции.
 
-Получите заранее проверенный SHA из опубликованного репозитория или проверенного архива. Для Git после получения нужной ревизии выполните `git checkout <проверенный-SHA>`, затем:
-
-```sh
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml config --quiet
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml up --build -d --wait
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps
-```
+После успешного резервного копирования выполните блок «Обновление из main» выше: получите проверенную версию и пересоберите контейнеры.
 
 Повторите HTTPS-сценарий и проверку сохранённых данных. Не удаляйте тома при обновлении. Возврат к старому коду не гарантирует совместимость с новой схемой БД; автоматический безопасный откат миграций не предусмотрен. При неудаче остановите запись, сохраните логи и решите, нужна ли исправленная версия или проверенное восстановление backup с потерей изменений после его создания.
 
