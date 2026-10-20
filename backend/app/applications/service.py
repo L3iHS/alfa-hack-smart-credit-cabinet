@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.applications.models import Application, ApplicationEvent
 from app.applications.schemas import ApplicationOutput, DraftCreate, DraftFields, DraftPatch
@@ -36,9 +36,32 @@ def get_application(db: Session, user: User, application_id: uuid.UUID, *, lock=
 
 
 def application_output(application: Application, user: User) -> ApplicationOutput:
+    from app.processing.models import Decision, InformationRequest, Offer
+    from app.processing.schemas import InformationRequestOutput, OfferOutput
+    from app.processing.service import latest_revision
+    from app.applications.submission_models import ProcessingRun
+
     result = ApplicationOutput.model_validate(application)
-    if user.role == 'client' and application.status == 'draft':
-        result.available_actions = ['edit_draft', 'upload_document', 'submit']
+    db = object_session(application)
+    revision = latest_revision(db, application.id)
+    run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id)) if revision else None
+    result.processing_status = run.status if run else None
+    decision = db.scalar(select(Decision).where(Decision.application_id == application.id).order_by(Decision.application_version.desc()).limit(1))
+    if decision and revision and decision.revision_id == revision.id:
+        result.public_reasons = decision.public_reasons
+    result.information_requests = [InformationRequestOutput.model_validate(item) for item in db.scalars(select(InformationRequest).where(InformationRequest.application_id == application.id).order_by(InformationRequest.created_at))]
+    result.offers = [OfferOutput.model_validate(item) for item in db.scalars(select(Offer).where(Offer.application_id == application.id).order_by(Offer.created_at))]
+    if user.role == 'client':
+        if application.status == 'draft':
+            result.available_actions = ['edit_draft', 'upload_document', 'submit']
+        elif application.status == 'needs_info':
+            result.available_actions = ['upload_document', 'respond_information']
+        elif application.status == 'counteroffer':
+            result.available_actions = ['accept_offer', 'decline_offer']
+    elif application.status == 'manual_review':
+        result.available_actions = ['request_information', 'make_offer', 'approve', 'reject']
+    elif run and run.status in ('failed', 'interrupted') and application.status in ('submitted', 'processing'):
+        result.available_actions = ['retry_processing']
     return result
 
 

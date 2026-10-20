@@ -10,6 +10,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 # Отдельная база для тестов: данные приложения не очищаются.
+os.environ["PROCESSING_WORKER_ENABLED"] = "false"
 application_url = make_url(os.environ["DATABASE_URL"])
 if application_url.get_backend_name() != "postgresql":
     raise RuntimeError("Auth integration tests require PostgreSQL")

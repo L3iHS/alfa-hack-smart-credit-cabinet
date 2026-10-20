@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_
 from pydantic.json_schema import SkipJsonSchema
 
 from app.products.schemas import ProductCode
+from app.processing.schemas import ApplicationStatus, ProcessingStatus, Action, InformationRequestOutput, OfferOutput
 
 Money = Annotated[StrictInt, Field(ge=0, le=9_007_199_254_740_991)]
 Months = Annotated[StrictInt, Field(ge=1, le=36)]
@@ -45,18 +46,25 @@ class DraftPatch(DraftFields):
 class ApplicationOutput(DraftFields):
     id: uuid.UUID
     version: int
-    status: Literal['draft', 'submitted']
+    status: ApplicationStatus
     updated_at: datetime
     catalog_version: str
     public_reasons: list[str] = Field(default_factory=list)
-    available_actions: list[Literal['edit_draft', 'upload_document', 'submit']] = Field(default_factory=list)
+    processing_status: ProcessingStatus | None = None
+    information_requests: list[InformationRequestOutput] = Field(default_factory=list)
+    offers: list[OfferOutput] = Field(default_factory=list)
+    available_actions: list[Action] = Field(default_factory=list)
 
 
 class EventOutput(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    event_type: Literal['draft_created', 'draft_updated', 'document_uploaded', 'document_deleted', 'application_submitted']
+    actor_type: Literal['user', 'system']
+    actor_id: uuid.UUID | None
+    revision_id: uuid.UUID | None
+    processing_run_id: uuid.UUID | None
+    event_type: str
     created_at: datetime
     application_version: int
 

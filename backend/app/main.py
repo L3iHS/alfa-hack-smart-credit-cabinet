@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -14,8 +17,25 @@ from app.auth.router import router as auth_router
 from app.auth.schemas import ErrorOutput
 from app.auth.service import require_csrf
 from app.core.db import get_db
+from app.core.config import settings
+from app.processing.router import router as processing_router
+from app.processing.worker import ProcessingWorker
+
+
+@asynccontextmanager
+async def lifespan(app):
+    worker = ProcessingWorker() if settings.processing_worker_enabled else None
+    if worker:
+        await asyncio.to_thread(worker.start)
+    try:
+        yield
+    finally:
+        if worker:
+            await asyncio.to_thread(worker.stop)
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title="Умный кредитный кабинет", version="0.1.0",
     openapi_url="/api/v1/openapi.json", docs_url="/api/v1/docs", redoc_url=None,
     dependencies=[Depends(require_csrf)],
@@ -26,6 +46,7 @@ app.include_router(products_router, prefix="/api/v1")
 app.include_router(companies_router, prefix="/api/v1")
 app.include_router(applications_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
+app.include_router(processing_router, prefix="/api/v1")
 
 
 @app.middleware("http")

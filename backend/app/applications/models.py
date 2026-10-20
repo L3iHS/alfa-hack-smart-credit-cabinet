@@ -47,7 +47,10 @@ class ApplicationEvent(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     application_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('applications.id', ondelete='CASCADE'), index=True)
-    actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('users.id'))
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('users.id'))
+    actor_type: Mapped[str] = mapped_column(String(10), default='user', server_default='user')
+    revision_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('application_revisions.id'))
+    processing_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('processing_runs.id'))
     event_type: Mapped[str] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     application_version: Mapped[int]

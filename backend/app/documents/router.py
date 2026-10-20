@@ -42,7 +42,7 @@ async def upload(application_id: uuid.UUID, document_type: DocumentType, expecte
     content = bytearray()
     async for chunk in request.stream():
         if len(content) + len(chunk) > MAX_FILE_SIZE:
-            raise HTTPException(413, {'code': 'file_too_large', 'message': 'Размер файла не должен превышать 10 МиБ'})
+            raise HTTPException(413, {'code': 'file_too_large', 'message': 'Размер файла не должен превышать 10 МБ'})
         content.extend(chunk)
     return await run_in_threadpool(upload_document, db, user, application_id, expected_version,
                                    document_type, filename, content_type, bytes(content))

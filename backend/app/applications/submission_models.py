@@ -35,6 +35,10 @@ class ProcessingRun(Base):
     catalog_version: Mapped[str] = mapped_column(String(30))
     policy_version: Mapped[str] = mapped_column(String(40))
     source_version: Mapped[str] = mapped_column(String(40))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error_code: Mapped[str | None] = mapped_column(String(60))
+    attempt: Mapped[int] = mapped_column(default=0, server_default='0')
     scorer_version: Mapped[str | None] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

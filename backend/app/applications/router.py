@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy import func, select
@@ -14,6 +14,7 @@ from app.auth.models import User
 from app.auth.schemas import ErrorOutput
 from app.auth.service import get_current_user
 from app.core.db import get_db
+from app.processing.schemas import ApplicationStatus
 
 router = APIRouter(tags=['Заявки'], responses={status: {'model': ErrorOutput} for status in (404, 409)})
 Limit = Annotated[int, Query(ge=1, le=100)]
@@ -26,7 +27,7 @@ def create(body: DraftCreate, user: User = Depends(get_current_user), db: Sessio
 
 
 @router.get('/applications', response_model=ApplicationPage)
-def applications(limit: Limit = 20, offset: Offset = 0, status: Literal['draft', 'submitted'] | None = None,
+def applications(limit: Limit = 20, offset: Offset = 0, status: ApplicationStatus | None = None,
                  user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     query = application_query(user)
     if status:

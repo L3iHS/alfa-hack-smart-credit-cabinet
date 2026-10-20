@@ -43,7 +43,7 @@ def validate_file(content: bytes, filename: str, content_type: str) -> str:
     if content_type not in ACCEPTED_CONTENT_TYPES:
         raise HTTPException(415, {'code': 'unsupported_media_type', 'message': 'Разрешены только PDF, PNG и JPEG'})
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(413, {'code': 'file_too_large', 'message': 'Размер файла не должен превышать 10 МиБ'})
+        raise HTTPException(413, {'code': 'file_too_large', 'message': 'Размер файла не должен превышать 10 МБ'})
     filename = PurePosixPath(filename.replace('\\', '/')).name
     filename = ''.join(char for char in filename if char.isprintable()).strip()[:200]
     extensions = {'application/pdf': {'.pdf'}, 'image/png': {'.png'}, 'image/jpeg': {'.jpg', '.jpeg'}}

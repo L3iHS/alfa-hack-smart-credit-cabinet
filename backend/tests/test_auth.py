@@ -125,8 +125,8 @@ def test_db_failure_does_not_authenticate(client):
 
 
 def test_seed_is_idempotent(db):
-    assert db.scalar(select(func.count()).select_from(User)) == 3
-    assert db.scalar(select(func.count()).select_from(Company)) == 2
+    assert db.scalar(select(func.count()).select_from(User)) == 8
+    assert db.scalar(select(func.count()).select_from(Company)) == 7
     user = db.scalar(select(User).where(User.email == CLIENT_EMAIL))
     user.display_name = "Сохранённое имя"
     original_password_hash = user.password_hash
@@ -135,8 +135,8 @@ def test_seed_is_idempotent(db):
     seed(db)
     seed(db)
     db.expire_all()
-    assert db.scalar(select(func.count()).select_from(User)) == 4
-    assert db.scalar(select(func.count()).select_from(Company)) == 2
+    assert db.scalar(select(func.count()).select_from(User)) == 9
+    assert db.scalar(select(func.count()).select_from(Company)) == 7
     user = db.scalar(select(User).where(User.email == CLIENT_EMAIL))
     assert user.display_name == "Сохранённое имя"
     assert user.password_hash == original_password_hash

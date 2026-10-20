@@ -7,6 +7,7 @@ from app.documents.models import Document  # noqa: F401
 from app.auth.models import AuthSession, User  # noqa: F401
 from app.companies.models import Company  # noqa: F401
 from app.core.config import settings
+from app.processing.models import CheckResult, Calculation, Decision, InformationRequest, Offer  # noqa: F401
 from app.core.db import Base
 
 

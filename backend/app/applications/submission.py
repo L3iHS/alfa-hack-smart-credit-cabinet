@@ -15,6 +15,7 @@ from app.auth.models import User
 from app.companies.models import Company
 from app.companies.schemas import CompanyOutput
 from app.core.config import settings
+from app.demo.profiles import SOURCE_VERSION
 from app.documents.schemas import DocumentOutput
 from app.documents.service import active_documents, require_editable
 from app.products.catalog import CATALOG_VERSION, PRODUCTS
@@ -81,7 +82,7 @@ def submit_application(db: Session, user: User, application_id: uuid.UUID, body:
     db.flush()
     run = ProcessingRun(
         id=uuid.uuid4(), application_id=application.id, revision_id=revision.id, status='pending',
-        catalog_version=application.catalog_version, policy_version=POLICY_VERSION, source_version='demo-profiles-v1',
+        catalog_version=application.catalog_version, policy_version=POLICY_VERSION, source_version=SOURCE_VERSION,
     )
     db.add(run)
     add_event(db, application, user, 'application_submitted')

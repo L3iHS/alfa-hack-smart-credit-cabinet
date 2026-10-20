@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     database_url: str
     demo_password: str = Field(min_length=12)
+    processing_worker_enabled: bool = True
     cookie_secure: bool = False
     session_ttl_seconds: int = Field(default=28800, ge=60, le=604800)
     session_cookie_name: str = "credit_session"

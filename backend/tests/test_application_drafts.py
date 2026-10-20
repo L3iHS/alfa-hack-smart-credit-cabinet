@@ -35,7 +35,7 @@ def test_draft_survives_new_db_session(client):
     assert draft['version'] == 1 and draft['status'] == 'draft'
     assert draft['catalog_version'] == 'demo-v1'
     assert draft['public_reasons'] == [] and draft['available_actions'] == ['edit_draft', 'upload_document', 'submit']
-    assert set(draft) == {'id', 'version', 'status', 'updated_at', 'catalog_version', 'product_code', 'purpose', 'description', 'amount_kopecks', 'term_months', 'period_start', 'period_end', 'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks', 'public_reasons', 'available_actions'}
+    assert set(draft) == {'id', 'version', 'status', 'updated_at', 'catalog_version', 'product_code', 'purpose', 'description', 'amount_kopecks', 'term_months', 'period_start', 'period_end', 'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks', 'public_reasons', 'available_actions', 'processing_status', 'information_requests', 'offers'}
     uuid.UUID(draft['id'])
     with SessionLocal() as fresh:
         row = fresh.execute(text('SELECT version, amount_kopecks FROM applications WHERE id=:id'), {'id': draft['id']}).one()
@@ -47,7 +47,7 @@ def test_draft_survives_new_db_session(client):
     assert history['total'] == 1
     assert history['items'][0]['event_type'] == 'draft_created'
     assert history['items'][0]['application_version'] == 1
-    assert set(history['items'][0]) == {'id', 'event_type', 'created_at', 'application_version'}
+    assert set(history['items'][0]) == {'id', 'event_type', 'created_at', 'application_version', 'actor_type', 'actor_id', 'revision_id', 'processing_run_id'}
 
 
 def test_foreign_draft_is_404(client):

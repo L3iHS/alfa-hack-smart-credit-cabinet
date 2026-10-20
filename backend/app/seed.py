@@ -9,6 +9,7 @@ from app.auth.service import password_hash
 from app.companies.models import Company
 from app.core.config import settings
 from app.core.db import SessionLocal
+from app.demo.profiles import company_profiles
 
 
 def seed(db: Session) -> None:
@@ -16,6 +17,7 @@ def seed(db: Session) -> None:
         {"inn": "990000000001", "name": "Демо Пекарня", "industry": "Производство продуктов", "registered_at": date(2019, 3, 15)},
         {"inn": "990000000002", "name": "Демо Мастерская", "industry": "Ремонт оборудования", "registered_at": date(2021, 6, 10)},
     ]
+    companies.extend(company_profiles())
     company_ids = []
     for company in companies:
         db.execute(insert(Company).values(**company).on_conflict_do_nothing(index_elements=["inn"]))
@@ -25,6 +27,7 @@ def seed(db: Session) -> None:
         ("client2@example.test", "Представитель Демо Мастерской", "client", company_ids[1]),
         ("staff@example.test", "Демонстрационный сотрудник", "staff", None),
     ]
+    users.extend((f'demo-{letter}@example.test', f'Синтетический профиль {letter.upper()}', 'client', company_ids[index+2]) for index, letter in enumerate('abcde'))
     for email, display_name, role, company_id in users:
         if db.scalar(select(User.id).where(User.email == email)) is None:
             db.execute(insert(User).values(

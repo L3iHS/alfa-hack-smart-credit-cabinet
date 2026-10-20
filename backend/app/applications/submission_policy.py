@@ -1,5 +1,6 @@
+from app.processing.policy import POLICY_VERSION
+
 CONSENT_VERSION = 'demo-consent-v1'
-POLICY_VERSION = 'demo-policy-v1'
 MAX_FILE_SIZE = 10 * 1024 * 1024
 ACCEPTED_CONTENT_TYPES = ('application/pdf', 'image/png', 'image/jpeg')
 DATA_CONFIRMATION_TEXT = 'Подтверждаю, что проверил данные демонстрационной заявки.'
