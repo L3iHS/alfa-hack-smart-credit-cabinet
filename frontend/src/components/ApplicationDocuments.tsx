@@ -164,7 +164,7 @@ export default function ApplicationDocuments({
     }
     if (!policy) return;
     if (file.size > policy.max_file_size_bytes) {
-      setMutationError("Размер файла не должен превышать 10 МиБ");
+      setMutationError("Размер файла не должен превышать 10 МБ");
       return;
     }
     if (!policy.accepted_content_types.includes(file.type)) {
@@ -206,7 +206,7 @@ export default function ApplicationDocuments({
     >
       <div className="section-top">
         <h2 id="documents-title">Документы</h2>
-        <span className="muted">PDF, PNG, JPEG · до 10 МиБ</span>
+        <span className="muted">PDF, PNG, JPEG · до 10 МБ</span>
       </div>
       {downloadError && (
         <div className="notice error download-error" role="alert">

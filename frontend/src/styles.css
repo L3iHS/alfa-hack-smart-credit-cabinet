@@ -221,14 +221,22 @@ svg {
   min-width: 0;
 }
 .topbar {
-  height: 93px;
+  height: 68px;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 40px;
+  padding: 12px 40px;
   border-bottom: 1px solid #e8eaed;
 }
+.account-menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-left: auto;
+}
 .company-avatar {
+  flex-shrink: 0;
   height: 39px;
   width: 39px;
   background: #ffe2b8;
@@ -254,7 +262,7 @@ svg {
   margin-top: 3px;
 }
 .logout {
-  margin-left: auto;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -268,10 +276,10 @@ svg {
   color: #242426;
 }
 .workspace main {
-  padding: 34px 40px 40px;
+  padding: 24px 40px 40px;
   max-width: 1370px;
   margin: auto;
-  min-height: calc(100vh - 149px);
+  min-height: calc(100vh - 124px);
   outline: none;
 }
 .workspace-footer {
@@ -284,22 +292,28 @@ svg {
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 .page-heading p {
   color: var(--muted);
   font-size: 15px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 .page-heading > .button {
   white-space: nowrap;
   flex-shrink: 0;
 }
+.edit-icon {
+  display: none;
+}
 .back-link {
-  display: inline-block;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 44px;
   color: var(--muted);
   font-size: 14px;
-  margin-bottom: 20px;
+  flex-shrink: 0;
 }
 .back-link:hover {
   color: #242426;
@@ -511,6 +525,7 @@ dd {
 }
 .save-actions {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 20px;
 }
@@ -954,7 +969,7 @@ dd {
     margin-left: 260px;
   }
   .workspace main {
-    padding: 44px 50px;
+    padding: 24px 50px 44px;
   }
   .form-layout {
     grid-template-columns: minmax(0, 1fr) 330px;
@@ -976,7 +991,7 @@ dd {
     margin-left: 200px;
   }
   .topbar {
-    padding: 20px 28px;
+    padding: 12px 28px;
   }
   .workspace main {
     padding: 28px;
@@ -1129,9 +1144,9 @@ dd {
   }
   .topbar {
     height: auto;
-    padding: 19px 20px;
-    gap: 9px;
-    margin-top: 4px;
+    padding: 10px 20px;
+    gap: 6px;
+    flex-wrap: wrap;
   }
   .company-avatar {
     width: 32px;
@@ -1139,8 +1154,33 @@ dd {
     font-size: 13px;
     border-radius: 10px;
   }
+  .account-menu {
+    gap: 9px;
+    max-width: 100%;
+  }
+  .shell-inner .sidebar nav {
+    display: none;
+  }
+  .topbar .back-link {
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    font-size: 28px;
+  }
+  .topbar .back-label {
+    display: none;
+  }
+  .topbar:has(.back-link) .account-menu {
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .shell-inner .page-heading {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
   .company-name {
     font-size: 12px;
+    overflow-wrap: anywhere;
   }
   .company-name > span {
     font-size: 10px;
@@ -1155,7 +1195,7 @@ dd {
     height: 18px;
   }
   .workspace main {
-    padding: 25px 20px 32px;
+    padding: 20px 20px 32px;
     min-height: calc(100vh - 240px);
   }
   .workspace-footer {
@@ -1286,7 +1326,7 @@ dd {
     font-size: 13px;
   }
   .back-link {
-    margin-bottom: 17px;
+    margin-bottom: 0;
   }
   .empty-state {
     padding: 28px 23px;
@@ -1560,6 +1600,13 @@ dd {
   margin: 1px 0 0;
   accent-color: var(--red);
 }
+.submission-panel > .button {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  padding-inline: 18px;
+}
 .submission-panel > .text-link {
   display: block;
   text-align: center;
@@ -1584,6 +1631,27 @@ dd {
 }
 
 @media (max-width: 650px) {
+  .details-panel > .section-top {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .details-panel > .section-top .edit-draft {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    gap: 6px;
+    padding: 10px;
+    font-size: 13px;
+    margin-left: auto;
+  }
+  .edit-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+  }
+  .submission-panel > .button {
+    width: 100%;
+  }
   .documents-panel {
     padding: 22px 18px;
   }
@@ -1599,5 +1667,11 @@ dd {
   }
   .document-upload .button {
     width: 100%;
+  }
+}
+
+@media (max-width: 360px) {
+  .edit-draft .edit-label {
+    display: none;
   }
 }

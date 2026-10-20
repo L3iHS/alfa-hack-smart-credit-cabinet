@@ -111,23 +111,12 @@ function Details({
   );
   return (
     <>
-      <Link
-        className="back-link"
-        to={staff ? "/staff/applications" : "/applications"}
-      >
-        ‹ {staff ? "Очередь заявок" : "Мои заявки"}
-      </Link>
       <PageHeading
         title={product?.name || "Кредитная заявка"}
         subtitle={`Заявка № ${item.id.slice(0, 8)} · ${dateTime(item.updated_at)}`}
       >
         <Status status={item.status} />
       </PageHeading>
-      {saved && item.status === "draft" && (
-        <div className="notice success" role="status">
-          Черновик сохранён. Вы можете вернуться к нему в любой момент.
-        </div>
-      )}
       {refreshError && (
         <div className="notice error" role="status">
           Не удалось обновить статус. {refreshError}
@@ -136,11 +125,28 @@ function Details({
       <div className="details-layout">
         <div className="details-main">
           <section className="panel details-panel">
+            {saved && item.status === "draft" && (
+              <div className="notice success" role="status">
+                Черновик сохранён. Вы можете вернуться к нему в любой момент.
+              </div>
+            )}
             <div className="section-top">
               <h2>{staff ? "Данные заявки" : "Ваша заявка"}</h2>
               {!locked && item.available_actions.includes("edit_draft") && (
-                <Link className="text-link" to={`/applications/${id}/edit`}>
-                  Редактировать
+                <Link
+                  className="button secondary edit-draft"
+                  to={`/applications/${id}/edit`}
+                  aria-label="Редактировать"
+                >
+                  <svg className="edit-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15l-1 5Z"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="edit-label">Редактировать</span>
                 </Link>
               )}
             </div>
