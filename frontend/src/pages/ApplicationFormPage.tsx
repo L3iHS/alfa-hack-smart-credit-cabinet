@@ -260,6 +260,17 @@ function DraftEditor({
       setBusy(false);
     }
   }
+  if (record && !record.available_actions.includes("edit_draft")) {
+    return (
+      <section className="panel state-panel">
+        <h1>Редактирование недоступно</h1>
+        <p>Заявка уже отправлена. Её сохранённые данные доступны в карточке.</p>
+        <Link to={`/applications/${record.id}`} className="button secondary">
+          Открыть заявку
+        </Link>
+      </section>
+    );
+  }
   return (
     <>
       <Link

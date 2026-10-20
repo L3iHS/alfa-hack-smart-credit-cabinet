@@ -64,6 +64,10 @@ export default function App() {
               </Route>
               <Route element={<Protected role="staff" />}>
                 <Route
+                  path="/staff/applications/:id"
+                  element={<ApplicationDetailsPage />}
+                />
+                <Route
                   path="/staff/applications"
                   element={<StaffApplicationsPage />}
                 />

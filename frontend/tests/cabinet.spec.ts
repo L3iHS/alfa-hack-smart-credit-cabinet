@@ -55,11 +55,17 @@ test("other_client_cannot_open_draft", async ({ page, browser }) => {
   ).toBeVisible();
   await context.close();
 });
-test("staff_sees_empty_queue", async ({ page }) => {
+test("staff_queue_does_not_include_drafts", async ({ page }) => {
+  await login(page);
+  const id = await createDraft(page);
+  await page.getByRole("button", { name: "Выйти" }).click();
   await login(page, "staff@example.test");
   await expect(
-    page.getByRole("heading", { name: "Заявок на рассмотрение пока нет" }),
+    page.getByRole("heading", { name: "Заявки на рассмотрение", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.locator(".application-row").filter({ hasText: id.slice(0, 8) }),
+  ).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Новая заявка" })).toHaveCount(0);
 });
 test("expired_session_returns_to_login", async ({ page }) => {
@@ -280,7 +286,10 @@ for (const viewport of [
     await page.getByRole("button", { name: "Выйти" }).click();
     await login(page, "staff@example.test");
     await expect(
-      page.getByRole("heading", { name: "Заявок на рассмотрение пока нет" }),
+      page.getByRole("heading", {
+        name: "Заявки на рассмотрение",
+        exact: true,
+      }),
     ).toBeVisible();
     await page.screenshot({
       path: `${screenshotDir}/staff-${viewport.width}.png`,

@@ -38,7 +38,11 @@ export function ErrorPanel({
     </section>
   );
 }
-export function useResource<T>(load: () => Promise<T>, key: string) {
+export function useResource<T>(
+  load: () => Promise<T>,
+  key: string,
+  pollMilliseconds?: number,
+) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [generation, setGeneration] = useState(0);
@@ -46,17 +50,27 @@ export function useResource<T>(load: () => Promise<T>, key: string) {
     let active = true;
     setData(null);
     setError(null);
-    load()
-      .then((value) => {
-        if (active) setData(value);
-      })
-      .catch((value) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function update() {
+      try {
+        const value = await load();
+        if (active) {
+          setData(value);
+          setError(null);
+        }
+      } catch (value) {
         if (active) setError(value);
-      });
+      } finally {
+        if (active && pollMilliseconds)
+          timer = setTimeout(update, pollMilliseconds);
+      }
+    }
+    void update();
     return () => {
       active = false;
+      clearTimeout(timer);
     };
-  }, [key, generation]);
+  }, [key, generation, pollMilliseconds]);
   return { data, error, reload: () => setGeneration((value) => value + 1) };
 }
 export function PageHeading({
@@ -78,11 +92,15 @@ export function PageHeading({
     </div>
   );
 }
-export function Status() {
+export function Status({
+  status = "draft",
+}: {
+  status?: "draft" | "submitted";
+}) {
   return (
-    <span className="status">
+    <span className={`status status-${status}`}>
       <span />
-      Черновик
+      {status === "submitted" ? "Отправлена" : "Черновик"}
     </span>
   );
 }

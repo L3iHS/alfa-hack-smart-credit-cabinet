@@ -15,13 +15,17 @@ import {
 
 export default function ApplicationsPage() {
   const [offset, setOffset] = useState(0);
-  const { data, error, reload } = useResource(async () => {
-    const [applications, catalog] = await Promise.all([
-      api<PageResult<Application>>(`/applications?limit=20&offset=${offset}`),
-      api<Catalog>("/products"),
-    ]);
-    return { applications, catalog };
-  }, String(offset));
+  const { data, error, reload } = useResource(
+    async () => {
+      const [applications, catalog] = await Promise.all([
+        api<PageResult<Application>>(`/applications?limit=20&offset=${offset}`),
+        api<Catalog>("/products"),
+      ]);
+      return { applications, catalog };
+    },
+    String(offset),
+    3000,
+  );
   return (
     <>
       <PageHeading
@@ -77,7 +81,7 @@ export default function ApplicationsPage() {
                   <small>№ {item.id.slice(0, 8)}</small>
                 </div>
                 <span className="amount">{money(item.amount_kopecks)}</span>
-                <Status />
+                <Status status={item.status} />
                 <time dateTime={item.updated_at}>
                   {dateTime(item.updated_at)}
                 </time>
@@ -91,8 +95,8 @@ export default function ApplicationsPage() {
         </>
       )}
       <div className="quiet-note">
-        Черновики доступны только вашей компании. Отправка на рассмотрение
-        появится на следующем этапе.
+        Черновики доступны только вашей компании. После отправки заявку увидит
+        сотрудник банка.
       </div>
     </>
   );

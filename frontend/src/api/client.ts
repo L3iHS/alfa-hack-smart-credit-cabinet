@@ -106,7 +106,12 @@ async function csrf(): Promise<CsrfBinding> {
 }
 export async function api<T>(
   path: string,
-  options: { method?: string; body?: unknown } = {},
+  options: {
+    method?: string;
+    body?: unknown;
+    rawBody?: Blob;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<T> {
   const method = options.method || "GET";
   const login = path === "/auth/login" && method === "POST";
@@ -114,7 +119,9 @@ export async function api<T>(
   const started = generation;
   const unchanged = () =>
     identity === expectedIdentity && generation === started;
-  const headers: Record<string, string> = {};
+  const headers = new Headers(options.headers);
+  // Произвольные заголовки не могут подменить токен текущего владельца формы.
+  headers.delete("X-CSRF-Token");
   if (method !== "GET") {
     if (!login && expectedIdentity === null) {
       expire();
@@ -132,13 +139,21 @@ export async function api<T>(
       expire();
       throw sessionChanged();
     }
-    headers["X-CSRF-Token"] = current.csrf_token;
+    headers.set("X-CSRF-Token", current.csrf_token);
   }
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  if (options.rawBody !== undefined) {
+    headers.set(
+      "Content-Type",
+      options.rawBody.type || "application/octet-stream",
+    );
+  } else if (options.body !== undefined)
+    headers.set("Content-Type", "application/json");
   const response = await raw(path, {
     method,
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body:
+      options.rawBody ??
+      (options.body === undefined ? undefined : JSON.stringify(options.body)),
   });
   const body = await decode(response);
   if (!response.ok) {

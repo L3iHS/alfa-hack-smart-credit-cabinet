@@ -42,15 +42,20 @@ export interface DraftFields {
 export interface Application extends DraftFields {
   id: string;
   version: number;
-  status: "draft";
+  status: "draft" | "submitted";
   updated_at: string;
   catalog_version: string;
   public_reasons: string[];
-  available_actions: "edit_draft"[];
+  available_actions: ("edit_draft" | "upload_document" | "submit")[];
 }
 export interface HistoryEvent {
   id: string;
-  event_type: "draft_created" | "draft_updated";
+  event_type:
+    | "draft_created"
+    | "draft_updated"
+    | "document_uploaded"
+    | "document_deleted"
+    | "application_submitted";
   created_at: string;
   application_version: number;
 }
@@ -82,4 +87,34 @@ export interface Recovery {
 export interface CsrfBinding {
   csrf_token: string;
   user_id: string | null;
+}
+
+export type DocumentType = "financial_statement" | "equipment_invoice";
+export interface ApplicationDocument {
+  id: string;
+  document_type: DocumentType;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+export interface SubmissionPolicy {
+  consent_version: string;
+  data_confirmation_text: string;
+  bki_consent_text: string;
+  max_file_size_bytes: number;
+  accepted_content_types: string[];
+}
+export interface SubmitBody {
+  expected_version: number;
+  data_confirmed: boolean;
+  bki_consent: boolean;
+  consent_version: string;
+}
+export interface SubmitResult {
+  application_id: string;
+  version: number;
+  status: "submitted";
+  revision_id: string;
+  processing_run_id: string;
 }
