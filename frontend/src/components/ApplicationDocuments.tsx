@@ -12,6 +12,63 @@ export const documentLabels: Record<DocumentType, string> = {
   financial_statement: "Финансовая отчётность",
   equipment_invoice: "Счёт на оборудование",
 };
+function DocumentUpload({
+  documentType,
+  acceptedContentTypes,
+  busy,
+  disabled,
+  onSubmit,
+}: {
+  documentType: DocumentType;
+  acceptedContentTypes: string[];
+  busy: boolean;
+  disabled: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  // Имя сбрасывается вместе с нативным полем при обновлении списка документов.
+  const [selectedName, setSelectedName] = useState("");
+  const label = documentLabels[documentType];
+  return (
+    <form
+      className="document-upload"
+      onSubmit={onSubmit}
+      onReset={() => setSelectedName("")}
+    >
+      <label
+        className="document-picker"
+        htmlFor={`file-${documentType}`}
+        data-selected={Boolean(selectedName)}
+      >
+        <span className="file-picker-button" aria-hidden="true">
+          Выбрать файл
+        </span>
+        <span className="file-picker-name" aria-hidden="true">
+          {selectedName || "Файл не выбран"}
+        </span>
+        <input
+          id={`file-${documentType}`}
+          name="file"
+          type="file"
+          aria-label={`Файл: ${label}`}
+          onChange={(event) =>
+            setSelectedName(event.currentTarget.files?.[0]?.name || "")
+          }
+          accept={acceptedContentTypes.join(",")}
+          disabled={disabled}
+        />
+      </label>
+      <button
+        className="button secondary"
+        type="submit"
+        aria-label={`Загрузить: ${label}`}
+        disabled={disabled}
+      >
+        {busy ? "Сохраняем…" : "Загрузить"}
+      </button>
+    </form>
+  );
+}
+
 export default function ApplicationDocuments({
   application,
   required,
@@ -36,9 +93,6 @@ export default function ApplicationDocuments({
   const [mutationError, setMutationError] = useState("");
   const [conflict, setConflict] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<
-    Partial<Record<DocumentType, string>>
-  >({});
   const [downloadError, setDownloadError] = useState<{
     document: ApplicationDocument;
     message: string;
@@ -131,7 +185,6 @@ export default function ApplicationDocuments({
         rawBody: file,
       });
       form.reset();
-      setSelectedFiles((current) => ({ ...current, [type]: "" }));
       return result.application_version;
     });
   }
@@ -244,47 +297,15 @@ export default function ApplicationDocuments({
                     </ul>
                   )}
                   {editable && policy && (
-                    <form
-                      className="document-upload"
+                    <DocumentUpload
+                      documentType={type as DocumentType}
+                      acceptedContentTypes={policy.accepted_content_types}
+                      busy={busy}
+                      disabled={busy || conflict}
                       onSubmit={(event) =>
                         void upload(event, type as DocumentType)
                       }
-                    >
-                      <label
-                        className="document-picker"
-                        htmlFor={`file-${type}`}
-                        data-selected={Boolean(selectedFiles[type as DocumentType])}
-                      >
-                        <span className="file-picker-button" aria-hidden="true">
-                          Выбрать файл
-                        </span>
-                        <span className="file-picker-name" aria-hidden="true">
-                          {selectedFiles[type as DocumentType] || "Файл не выбран"}
-                        </span>
-                        <input
-                          id={`file-${type}`}
-                          name="file"
-                          type="file"
-                          aria-label={`Файл: ${label}`}
-                          onChange={(event) =>
-                            setSelectedFiles((current) => ({
-                              ...current,
-                              [type]: event.target.files?.[0]?.name || "",
-                            }))
-                          }
-                          accept={policy.accepted_content_types.join(",")}
-                          disabled={busy || conflict}
-                        />
-                      </label>
-                      <button
-                        className="button secondary"
-                        type="submit"
-                        aria-label={`Загрузить: ${label}`}
-                        disabled={busy || conflict}
-                      >
-                        {busy ? "Сохраняем…" : "Загрузить"}
-                      </button>
-                    </form>
+                    />
                   )}
                 </div>
               );

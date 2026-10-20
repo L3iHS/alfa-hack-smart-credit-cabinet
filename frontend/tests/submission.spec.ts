@@ -84,6 +84,46 @@ async function confirm(page: Page) {
   await page.locator("#data-confirmed").check();
   await page.locator("#bki-consent").check();
 }
+test("upload_refresh_keeps_selected_file_names_in_sync", async ({ page }) => {
+  await login(page);
+  await draft(page, "equipment");
+  const financial = page.getByLabel("Файл: Финансовая отчётность", {
+    exact: true,
+  });
+  const invoice = page.getByLabel("Файл: Счёт на оборудование", { exact: true });
+  const invoicePicker = page.locator(".document-picker").filter({ has: invoice });
+  await financial.setInputFiles({
+    name: "financial.png",
+    mimeType: "image/png",
+    buffer: png,
+  });
+  await invoice.setInputFiles({
+    name: "invoice.png",
+    mimeType: "image/png",
+    buffer: png,
+  });
+  await expect(
+    invoicePicker.getByText("invoice.png", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Загрузить: Финансовая отчётность", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Скачать financial.png", exact: true }),
+  ).toBeVisible();
+  await expect(invoice).toBeEnabled();
+  expect(
+    await invoice.evaluate((input: HTMLInputElement) => input.files?.length),
+  ).toBe(0);
+  await expect(
+    invoicePicker.getByText("Файл не выбран", { exact: true }),
+  ).toBeVisible();
+  await upload(page, "Счёт на оборудование");
+  await expect(
+    page.getByText("Выберите непустой файл", { exact: true }),
+  ).toHaveCount(0);
+});
+
 for (const product of ["working_capital", "equipment"]) {
   test(`submits_${product}_and_staff_reads_same_application`, async ({
     page,
