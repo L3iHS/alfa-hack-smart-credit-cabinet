@@ -192,3 +192,20 @@ def test_fit_rejects_non_training_split_before_accessing_features_or_target(name
 
     with pytest.raises(ValueError, match='train'):
         api.fit_candidate(spec_for(family), HeldOutSplit(name))
+
+
+def test_catboost_probability_limits_native_threads_and_preserves_positive_class(monkeypatch):
+    api = importlib.import_module('app.risk.estimators')
+    train = small_train()
+    candidate = api.fit_candidate(spec_for('catboost'), train)
+    native = candidate.estimator.predict_proba
+    expected = native(train.X)[:, list(candidate.estimator.classes_).index(1)]
+
+    def bounded_prediction(X, **kwargs):
+        assert kwargs.get('thread_count') == 2, 'Нужен явный лимит native CatBoost inference'
+        return native(X, **kwargs)
+
+    monkeypatch.setattr(candidate.estimator, 'predict_proba', bounded_prediction)
+    probability = api.predict_probability(candidate, train.X)
+    assert probability.shape == (24,) and np.isfinite(probability).all()
+    np.testing.assert_allclose(probability, expected, rtol=0, atol=1e-10)

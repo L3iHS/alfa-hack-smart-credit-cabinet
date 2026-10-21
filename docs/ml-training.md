@@ -41,7 +41,7 @@ Log loss штрафует уверенные неверные вероятнос
 
 - Constant baseline: частота события в train.
 - LogisticRegression: `C=0.1/1/10`, `solver=lbfgs`, `max_iter=2000`, `tol=1e-6`. Численные признаки: train-медиана и стандартизация; продукт: one-hot; девять явных масок: passthrough.
-- CatBoost CPU: `depth=4/6`, `iterations=400`, `learning_rate=0.05`, `l2_leaf_reg=5`, `loss_function=Logloss`, `random_seed=20261021`, `thread_count=2`. Категория продукта нативная, численные NaN разрешены. Без `eval_set`, early stopping, `use_best_model`, class weights и oversampling.
+- CatBoost CPU: `depth=4/6`, `iterations=400`, `learning_rate=0.05`, `l2_leaf_reg=5`, `loss_function=Logloss`, `random_seed=20261021`, `thread_count=2` при fit. Категория продукта нативная, численные NaN разрешены. Без `eval_set`, early stopping, `use_best_model`, class weights и oversampling.
 
 Внутри каждого семейства берётся минимальный validation Brier; при точном равенстве — меньший C/depth. Среди победителей семейств находится глобальный минимум. Среди вариантов с Brier не хуже `min + 0.001` порядок предпочтения: constant → logistic → catboost. Это заданное предпочтение простоты, а не статистическое равенство моделей. Сохраняются метрики всех шести кандидатов и только три модели — победители семейств. Переобучения на train+validation перед test нет.
 
@@ -55,7 +55,9 @@ Log loss штрафует уверенные неверные вероятнос
 | Logistic C=1 | 0.012596 | 0.002011 | 0.002276 | 5.786 |
 | CatBoost depth=4 | 0.401171 | 0.001478 | 0.002362 | 141.496 |
 
-Окружение: Linux Docker на macOS, aarch64, Python 3.12.10, CPU quota 2, threads=2; видимые процессу 6 логических CPU не означают квоту 6. Версии: numpy 2.2.6, pandas 2.3.3, scikit-learn 1.7.2, CatBoost 1.2.8, Matplotlib 3.10.7, joblib 1.5.2, threadpoolctl 3.6.0.
+Окружение: Linux Docker на macOS, aarch64, Python 3.12.10, CPU quota 2, fit и BLAS ограничены двумя потоками; видимые процессу 6 логических CPU не означают квоту 6. Версии: numpy 2.2.6, pandas 2.3.3, scikit-learn 1.7.2, CatBoost 1.2.8, Matplotlib 3.10.7, joblib 1.5.2, threadpoolctl 3.6.0.
+
+В историческом запуске 21 октября, к которому относятся приведённые метрики, времена и сохранённые артефакты, CatBoost `predict_proba` использовал native auto (`thread_count=-1`). Docker ограничивал контейнер квотой 2 CPU, но `threadpoolctl` ограничивал BLAS, а не собственный пул CatBoost. Поэтому эти timings не являются бенчмарком ровно двух native-потоков. Текущий код явно передаёт `thread_count=2` для будущих CatBoost-прогнозов; native SHAP и raw predict уже имели явный лимит 2. Это исправление не меняет сохранённые результаты и не переизмеряет их.
 
 Функция эксперимента train/validation заняла 1,016038 с без импортов и запуска Docker. Пик RSS процесса — 236,73 МБ (236 732 416 байт), включая импорты. Функция отдельной итоговой оценки — 0,084875 с, пик RSS её процесса — 199,74 МБ (199 741 440 байт). Времена fit/predict измерены `time.perf_counter`, RSS — `resource.getrusage`. Запуск контейнера не входит в эти времена; это разовые наблюдения данной платформы, не оценка пропускной способности VPS. Единицы десятичные: КБ = 1000 байт, МБ = 1 000 000 байт. Объяснения имеют отдельный замер в `analysis/explanations.json`, размеры графиков — в файловой системе; они не прибавляются к fit.
 

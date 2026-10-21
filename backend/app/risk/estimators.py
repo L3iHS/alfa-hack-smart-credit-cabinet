@@ -121,7 +121,9 @@ def predict_probability(candidate: FittedCandidate, X: pd.DataFrame) -> np.ndarr
     if classes.ndim != 1 or len(positive) != 1:
         raise ValueError('Модель должна предоставлять вероятность класса 1')
     with threadpool_limits(limits=2):
-        probabilities = np.asarray(candidate.estimator.predict_proba(X), dtype=float)
+        prediction = (candidate.estimator.predict_proba(X, thread_count=2)
+                      if candidate.spec.family == 'catboost' else candidate.estimator.predict_proba(X))
+        probabilities = np.asarray(prediction, dtype=float)
     if probabilities.ndim != 2 or probabilities.shape != (len(X), len(classes)):
         raise ValueError('Модель вернула неверную форму вероятностей')
     probability = probabilities[:, positive[0]]

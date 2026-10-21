@@ -83,3 +83,35 @@ def test_inconsistent_shap_is_rejected(examples, monkeypatch):
     monkeypatch.setattr(candidate.estimator, 'get_feature_importance', inconsistent)
     with pytest.raises(ValueError, match='не восстанавливают'):
         module.explain_catboost(candidate, X)
+
+
+def test_catboost_native_explanations_limit_threads_and_preserve_probability(examples, monkeypatch):
+    module = importlib.import_module('app.risk.explanations')
+    _, train, X = examples
+    candidate = fit_candidate(next(spec for spec in default_candidates() if spec.family == 'catboost'), train)
+    native_shap = candidate.estimator.get_feature_importance
+    native_raw = candidate.estimator.predict
+    native_probability = candidate.estimator.predict_proba
+    expected = native_probability(X)[:, list(candidate.estimator.classes_).index(1)]
+
+    def bounded_shap(*args, **kwargs):
+        assert kwargs.get('thread_count') == 2, 'Нужен явный лимит native SHAP'
+        return native_shap(*args, **kwargs)
+
+    def bounded_raw(*args, **kwargs):
+        assert kwargs.get('thread_count') == 2, 'Нужен явный лимит native raw predict'
+        return native_raw(*args, **kwargs)
+
+    def bounded_probability(*args, **kwargs):
+        assert kwargs.get('thread_count') == 2, 'Нужен явный лимит native probability predict'
+        return native_probability(*args, **kwargs)
+
+    monkeypatch.setattr(candidate.estimator, 'get_feature_importance', bounded_shap)
+    monkeypatch.setattr(candidate.estimator, 'predict', bounded_raw)
+    monkeypatch.setattr(candidate.estimator, 'predict_proba', bounded_probability)
+    result = module.explain_catboost(candidate, X)
+    np.testing.assert_allclose(result['probabilities'], expected, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(np.asarray(result['base_values']) + np.asarray(result['contributions']).sum(axis=1),
+                               result['raw_predictions'], rtol=0, atol=1e-8)
+    np.testing.assert_allclose(1 / (1 + np.exp(-np.asarray(result['raw_predictions']))),
+                               result['probabilities'], rtol=0, atol=1e-8)

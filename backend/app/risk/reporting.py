@@ -204,7 +204,9 @@ def _comparison(selection, validation, evaluation, explanations, run_manifest):
             f'{evaluation["models"][name]["predict_seconds"]:.6f} | {record["size_bytes"] / 1000:.3f} |')
     measured = run_manifest['resources']
     lines.extend(['', f'Среда: Python {run_manifest["python"]}, {measured["platform"]}; '
-        f'CPU quota {measured["cpu_quota"]}, threads={measured["threads"]}. '
+        f'CPU quota {measured["cpu_quota"]}, setting fit/BLAS threads={measured["threads"]}. '
+        'Потоки native inference не зафиксированы отдельно в манифесте этого запуска; '
+        'сохранённые timings не являются бенчмарком ровно двух native-потоков. '
         f'Функция train/validation без импортов и запуска Docker: {measured["runtime_seconds"]:.6f} с; '
         f'пик RSS процесса {measured["max_rss_bytes"] / 1e6:.2f} МБ (включая импорты). '
         'Fit не включает запуск Docker. КБ = 1000 байт, МБ = 1 000 000 байт. Значения относятся к одному замеру на этой платформе.', '',
