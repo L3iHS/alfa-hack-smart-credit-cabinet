@@ -22,6 +22,7 @@ export function useReviewCommand(
   owner: string,
   id: string,
   changed: () => Promise<void>,
+  refreshAssessment: () => void = () => {},
 ) {
   const storageKey = `credit-command:v1:${owner}:${id}`;
   const [pending, setPending] = useState<Command | null>(() => {
@@ -83,7 +84,14 @@ export function useReviewCommand(
           !uncertainSession
         )
           remember(null);
-        if (value.status === 409) setConflict(true);
+        if (
+          value.code === "risk_acknowledgement_required" ||
+          value.code === "risk_model_unavailable"
+        ) {
+          // Эти ответы не сохраняют действие, но сохраняют оценку без смены версии заявки.
+          remember(null);
+          refreshAssessment();
+        } else if (value.status === 409) setConflict(true);
       }
     } finally {
       setBusy(false);

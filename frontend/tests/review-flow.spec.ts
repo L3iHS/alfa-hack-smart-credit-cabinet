@@ -91,7 +91,7 @@ test("staff_reason_survives_poll_and_unknown_command_reuses_key_and_body", async
   });
   await page.goto(`/staff/applications/${id}`);
   await expect(
-    page.getByText("Не рассчитывалась", { exact: true }),
+    page.getByText("Обработка ещё не запускалась", { exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Одобрить заявку", exact: true })
@@ -138,6 +138,7 @@ test("staff_reason_survives_poll_and_unknown_command_reuses_key_and_body", async
   expect(commands[0].body).toEqual({
     expected_version: 7,
     outcome: "approved",
+    risk_acknowledged: false,
     reason: "Проверены дополнительные сведения",
   });
 });
@@ -487,7 +488,7 @@ test("real_information_working_copy_and_extra_document_wait_for_explicit_respons
     await login(staff, true);
     await staff.goto(`/staff/applications/${draft.id}`);
     await expect(
-      staff.getByText("Не рассчитывалась", { exact: true }),
+      staff.locator(".assessment-run .risk-assessment").first(),
     ).toBeVisible();
     await expect(
       staff.getByText("Коэффициент покрытия", { exact: true }),
@@ -656,6 +657,7 @@ async function preparedReview(page: Page) {
   await login(page, true);
   const owner = await (await page.request.get("/api/v1/me")).json();
   await page.goto(`/staff/applications/${item.id}`);
+  await page.getByRole("checkbox", { name: "Изучена оценка риска исходных условий", exact: true }).check();
   return {
     id: item.id as string,
     storageKey: `credit-command:v1:${owner.id}:${item.id}`,

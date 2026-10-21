@@ -179,10 +179,46 @@ export interface CommandResult {
   status: ApplicationStatus;
   revision_id: string;
 }
+export interface RiskFactor {
+  feature_name: string;
+  label: string;
+  contribution: number;
+}
+export interface RiskAssessment {
+  assessment_id: string;
+  revision_id: string;
+  processing_run_id: string;
+  status: "succeeded" | "failed" | "not_applicable";
+  reason_code: string | null;
+  scorer_kind: string;
+  scorer_version: string | null;
+  feature_schema_version: string | null;
+  target_event: string;
+  horizon_months: number;
+  data_kind: string;
+  prediction_scope: "requested_terms" | "offered_terms";
+  offer_version: number | null;
+  terms_fingerprint: string;
+  terms: {
+    product_code: string;
+    amount_kopecks: number;
+    term_months: number;
+    annual_rate_bps: number;
+  };
+  probability: number | null;
+  risk_band: "low" | "elevated" | "high" | null;
+  explanation_method: string | null;
+  explanation_scale: string | null;
+  base_value: number | null;
+  raw_prediction: number | null;
+  contributions: RiskFactor[];
+  top_increasing_factors: RiskFactor[];
+  top_decreasing_factors: RiskFactor[];
+}
 export interface Assessment {
   application_id: string;
   revision_id: string | null;
-  risk_assessment: null;
+  risk_assessment: RiskAssessment | null;
   runs: {
     id: string;
     revision_id: string;
@@ -190,6 +226,8 @@ export interface Assessment {
     catalog_version: string;
     policy_version: string;
     source_version: string;
+    scorer_version: string | null;
+    risk_assessments: RiskAssessment[];
     created_at: string;
     started_at: string | null;
     finished_at: string | null;
@@ -242,12 +280,14 @@ export interface InformationResponseBody extends SubmitBody {
   message: string;
 }
 export interface CreateOfferBody {
+  risk_acknowledged: boolean;
   expected_version: number;
   amount_kopecks: number;
   term_months: number;
   reason: string;
 }
 export interface DecisionBody {
+  risk_acknowledged: boolean;
   expected_version: number;
   outcome: "approved" | "rejected";
   reason: string;

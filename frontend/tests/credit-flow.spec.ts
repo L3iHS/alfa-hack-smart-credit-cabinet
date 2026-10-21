@@ -5,7 +5,7 @@ const baseURL = process.env.BASE_URL || "http://localhost:8080";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN4b6gCAANXAUWe8DG4AAAAAElFTkSuQmCC", "base64");
 type Profile = "a" | "b" | "c" | "d" | "e";
 const profiles = {
-  a: { equipment: true, amount: "2000000", term: "24", revenue: "2400000", expenses: "1500000", debt: "150000" },
+  a: { equipment: true, amount: "2000000", term: "24", revenue: "2400000", expenses: "300000", debt: "150000" },
   b: { equipment: false, amount: "5000000", term: "12", revenue: "2100000", expenses: "1500000", debt: "90000" },
   c: { equipment: true, amount: "2000000", term: "24", revenue: "2100000", expenses: "1500000", debt: "150000" },
   d: { equipment: false, amount: "500000", term: "12", revenue: "1200000", expenses: "900000", debt: "30000" },
@@ -72,8 +72,26 @@ async function staffPage(browser: Browser, id: string) {
   await login(page, "staff@example.test");
   await page.goto(`/staff/applications/${id}`);
   await expect(page.getByRole("heading", { name: "Проверки и расчёт", exact: true })).toBeVisible();
-  await expect(page.getByText("Не рассчитывалась", { exact: true })).toBeVisible();
+  await expect(page.locator(".assessment-run").last().locator(".risk-assessment").first()).toBeVisible();
   return { page, context };
+}
+async function staffOffer(page: Page, amount: string, term: string) {
+  await page.getByLabel("Основание решения или предложения").fill("Новые условия рассмотрены сотрудником");
+  await page.getByText("Предложить другие условия", { exact: true }).click();
+  await page.getByLabel("Предлагаемая сумма, ₽", { exact: true }).fill(amount);
+  await page.getByLabel("Предлагаемый срок, месяцев", { exact: true }).fill(term);
+  const response = page.waitForResponse(r => r.url().endsWith("/offers") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Отправить предложение", exact: true }).click();
+  const result = await response;
+  if (result.status() === 409) {
+    expect((await result.json()).code).toBe("risk_acknowledgement_required");
+    const score = page.locator(".review-form .risk-assessment");
+    await expect(score).toContainText("Расчёт выполнен");
+    await page.getByRole("checkbox", { name: "Изучена оценка риска новых условий", exact: true }).check();
+    const confirmed = page.waitForResponse(r => r.url().endsWith("/offers") && r.request().method() === "POST");
+    await page.getByRole("button", { name: "Отправить предложение", exact: true }).click();
+    expect((await confirmed).status()).toBe(201);
+  } else expect(result.status()).toBe(201);
 }
 async function evidence(page: Page, id: string) {
   const response = await page.request.get(`/api/v1/applications/${id}`);
@@ -91,12 +109,17 @@ test("profile_A_equipment_approves_and_staff_sees_calculation", async ({ page, b
   const assessment = await (await staff.page.request.get(`/api/v1/applications/${id}/assessment`)).json();
   expect(assessment.runs[0].revision_id).toBe(submission.revision_id);
   expect(assessment.runs[0].checks).toHaveLength(3);
-  expect(assessment.risk_assessment).toBeNull();
+  expect(assessment.risk_assessment.status).toBe("succeeded");
+  expect(assessment.risk_assessment.risk_band).toBe("low");
+  expect(assessment.risk_assessment.probability).toBeLessThan(.1);
   await staff.context.close();
 });
 
-test("profile_B_client_accepts_automatic_offer", async ({ page }) => {
+test("profile_B_client_accepts_staff_offer_after_risk_review", async ({ page, browser }) => {
   const { id } = await createAndSubmit(page, "b");
+  await status(page, "На рассмотрении сотрудника");
+  const staff = await staffPage(browser, id);
+  await staffOffer(staff.page, "2342000", "24");
   await status(page, "Предложены другие условия");
   await expect(page.getByRole("cell", { name: "2 342 000 ₽", exact: true })).toBeVisible();
   await expect(page.getByText("123 824,11 ₽", { exact: true })).toBeVisible();
@@ -105,10 +128,15 @@ test("profile_B_client_accepts_automatic_offer", async ({ page }) => {
   const item = await evidence(page, id);
   expect(item.amount_kopecks).toBe(500000000);
   expect(item.offers.find((o: { status: string }) => o.status === "accepted").amount_kopecks).toBe(234200000);
+  await staff.context.close();
 });
 
 test("profile_B_decline_returns_to_staff_then_staff_rejects", async ({ page, browser }) => {
   const { id } = await createAndSubmit(page, "b");
+  await status(page, "На рассмотрении сотрудника");
+  const offerStaff = await staffPage(browser, id);
+  await staffOffer(offerStaff.page, "2342000", "24");
+  await offerStaff.context.close();
   await status(page, "Предложены другие условия");
   await page.getByRole("button", { name: "Отклонить предложение", exact: true }).click();
   await status(page, "На рассмотрении сотрудника");
@@ -139,7 +167,7 @@ test("profile_C_correction_creates_new_revision_and_keeps_first_run", async ({ p
   expect(answered.status()).toBe(202);
   const newSubmission = await answered.json();
   expect(newSubmission.revision_id).not.toBe(submission.revision_id);
-  await status(page, "Одобрена");
+  await status(page, "На рассмотрении сотрудника");
   const staff = await staffPage(browser, id);
   await page.getByText("Отправленные ответы", { exact: true }).click();
   await staff.page.getByText("Отправленные ответы", { exact: true }).click();
@@ -165,6 +193,7 @@ test("profile_D_short_history_staff_approves", async ({ page, browser }) => {
   await status(page, "На рассмотрении сотрудника");
   const staff = await staffPage(browser, id);
   await staff.page.getByLabel("Основание решения или предложения").fill("Синтетические данные нового бизнеса рассмотрены");
+  await staff.page.getByRole("checkbox", { name: "Изучена оценка риска исходных условий", exact: true }).check();
   await staff.page.getByRole("button", { name: "Одобрить заявку", exact: true }).click();
   await status(staff.page, "Одобрена");
   await status(page, "Одобрена");
@@ -198,11 +227,7 @@ test("profile_D_staff_offer_is_accepted_by_client", async ({ page, browser }) =>
   const { id } = await createAndSubmit(page, "d");
   await status(page, "На рассмотрении сотрудника");
   const staff = await staffPage(browser, id);
-  await staff.page.getByLabel("Основание решения или предложения").fill("Меньшая сумма для нового бизнеса");
-  await staff.page.getByText("Предложить другие условия", { exact: true }).click();
-  await staff.page.getByLabel("Предлагаемая сумма, ₽", { exact: true }).fill("400000");
-  await staff.page.getByLabel("Предлагаемый срок, месяцев", { exact: true }).fill("12");
-  await staff.page.getByRole("button", { name: "Отправить предложение", exact: true }).click();
+  await staffOffer(staff.page, "400000", "12");
   await status(page, "Предложены другие условия");
   await page.getByRole("button", { name: "Принять условия", exact: true }).click();
   await status(page, "Одобрена");

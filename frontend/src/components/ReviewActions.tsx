@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   Application,
+  Assessment,
   CreateOfferBody,
   DecisionBody,
   DocumentType,
@@ -11,6 +12,7 @@ import type {
   OfferActionBody,
   SubmissionPolicy,
 } from "../api/types";
+import RiskAssessmentPanel from "./RiskAssessmentPanel";
 import { documentLabels } from "./ApplicationDocuments";
 import { dateTime, money, statusLabels } from "./shared";
 import { readStored, useReviewCommand, writeStored } from "./useReviewCommand";
@@ -76,6 +78,8 @@ export default function ReviewActions({
   staff,
   policy,
   changed,
+  assessment,
+  refreshAssessment,
   lock,
 }: {
   application: Application;
@@ -83,6 +87,8 @@ export default function ReviewActions({
   staff: boolean;
   policy: SubmissionPolicy | null;
   changed: () => Promise<void>;
+  assessment: Assessment | null;
+  refreshAssessment: () => void;
   lock: (locked: boolean) => void;
 }) {
   const draftKey = `credit-review-form:v1:${owner}:${item.id}`;
@@ -90,7 +96,44 @@ export default function ReviewActions({
     readStored(draftKey, emptyDraft),
   );
   const [validation, setValidation] = useState("");
-  const command = useReviewCommand(owner, item.id, changed);
+  const command = useReviewCommand(owner, item.id, changed, refreshAssessment);
+  const [requestedAck, setRequestedAck] = useState(false);
+  const [offeredAck, setOfferedAck] = useState(false);
+  const requestedRisk = assessment?.risk_assessment;
+  const latestRun = assessment?.runs
+    .filter((run) => run.revision_id === assessment.revision_id)
+    .at(-1);
+  const offeredRisk = latestRun?.risk_assessments
+    ?.filter(
+      (risk) =>
+        risk.revision_id === assessment?.revision_id &&
+        risk.processing_run_id === latestRun.id &&
+        risk.prediction_scope === "offered_terms" &&
+        risk.terms.product_code === item.product_code &&
+        risk.terms.amount_kopecks === parseAmount(draft.amount) &&
+        risk.terms.term_months === Number(draft.term),
+    )
+    .at(-1);
+  const requestedNeedsAck =
+    requestedRisk?.status === "succeeded" &&
+    requestedRisk.probability !== null &&
+    requestedRisk.probability >= 0.1;
+  const offeredNeedsAck =
+    offeredRisk?.status === "succeeded" &&
+    offeredRisk.probability !== null &&
+    offeredRisk.probability >= 0.1;
+  useEffect(() => {
+    setRequestedAck(false);
+    setOfferedAck(false);
+  }, [
+    item.id,
+    item.version,
+    assessment?.revision_id,
+    requestedRisk?.assessment_id,
+  ]);
+  useEffect(() => {
+    setOfferedAck(false);
+  }, [draft.amount, draft.term, offeredRisk?.assessment_id]);
   const disabled = command.busy || !!command.pending || command.conflict;
   const can = (action: Application["available_actions"][number]) =>
     item.available_actions.includes(action);
@@ -108,6 +151,10 @@ export default function ReviewActions({
   }, [command.busy, command.pending, lock]);
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+    if (key === "amount" || key === "term") {
+      setRequestedAck(false);
+      setOfferedAck(false);
+    }
     setValidation("");
   }
   function toggle(key: "fields" | "documents", value: string) {
@@ -187,8 +234,13 @@ export default function ReviewActions({
         );
         return;
       }
+      if (offeredNeedsAck && !offeredAck) {
+        setValidation("Подтвердите изучение оценки риска новых условий");
+        return;
+      }
       path += "offers";
       Object.assign(body, {
+        risk_acknowledged: !!offeredNeedsAck && offeredAck,
         amount_kopecks: amount,
         term_months: term,
         reason: draft.reason.trim(),
@@ -198,8 +250,14 @@ export default function ReviewActions({
         setValidation("Укажите основание решения");
         return;
       }
+      if (action === "approve" && requestedNeedsAck && !requestedAck) {
+        setValidation("Подтвердите изучение оценки риска исходных условий");
+        return;
+      }
       path += "decisions";
       Object.assign(body, {
+        risk_acknowledged:
+          action === "approve" && !!requestedNeedsAck && requestedAck,
         outcome: action === "approve" ? "approved" : "rejected",
         reason: draft.reason.trim(),
       } satisfies Omit<DecisionBody, "expected_version">);
@@ -495,6 +553,17 @@ export default function ReviewActions({
             />
             <small>Обязательно. Публичная причина будет видна клиенту</small>
           </label>
+          {can("approve") && requestedNeedsAck && (
+            <label className="risk-acknowledgement">
+              <input
+                type="checkbox"
+                checked={requestedAck}
+                disabled={disabled}
+                onChange={(event) => setRequestedAck(event.target.checked)}
+              />
+              <span>Изучена оценка риска исходных условий</span>
+            </label>
+          )}
           {can("make_offer") && (
             <details>
               <summary>Предложить другие условия</summary>
@@ -520,6 +589,18 @@ export default function ReviewActions({
                   />
                 </label>
               </div>
+              {offeredRisk && <RiskAssessmentPanel assessment={offeredRisk} />}
+              {offeredNeedsAck && (
+                <label className="risk-acknowledgement">
+                  <input
+                    type="checkbox"
+                    checked={offeredAck}
+                    disabled={disabled}
+                    onChange={(event) => setOfferedAck(event.target.checked)}
+                  />
+                  <span>Изучена оценка риска новых условий</span>
+                </label>
+              )}
               <div className="review-buttons">
                 <button
                   className="button secondary"

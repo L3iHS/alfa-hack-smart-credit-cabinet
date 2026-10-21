@@ -1,13 +1,6 @@
-import { api } from "../api/client";
+import RiskAssessmentPanel from "./RiskAssessmentPanel";
 import type { Assessment } from "../api/types";
-import {
-  date,
-  dateTime,
-  ErrorPanel,
-  Loading,
-  money,
-  useResource,
-} from "./shared";
+import { date, dateTime, ErrorPanel, Loading, money } from "./shared";
 
 const runLabels = {
   pending: "Ожидает запуска",
@@ -21,16 +14,14 @@ function average(value: string) {
   return `${(Number(value) / 100).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽`;
 }
 export default function AssessmentPanel({
-  id,
-  version,
+  data,
+  error,
+  reload,
 }: {
-  id: string;
-  version: number;
+  data: Assessment | null;
+  error: unknown;
+  reload: () => void;
 }) {
-  const { data, error, reload } = useResource(
-    () => api<Assessment>(`/applications/${id}/assessment`),
-    `${id}:${version}`,
-  );
   return (
     <section
       className="panel assessment-panel"
@@ -40,12 +31,6 @@ export default function AssessmentPanel({
       <p className="muted">
         Синтетические источники и демонстрационные правила
       </p>
-      <dl className="financial-details">
-        <div>
-          <dt>Оценка риска</dt>
-          <dd>Не рассчитывалась</dd>
-        </div>
-      </dl>
       {error ? (
         <ErrorPanel error={error} retry={reload} />
       ) : !data ? (
@@ -63,9 +48,26 @@ export default function AssessmentPanel({
               {runLabels[run.status]} · {dateTime(run.created_at)}
             </summary>
             <p className="muted">
-              Версия отправки {run.revision_id.slice(0, 8)} · Правила{" "}
-              {run.policy_version} · Источник {run.source_version}
+              {run.revision_id === data.revision_id
+                ? "Текущая отправка"
+                : "Предыдущая отправка"}{" "}
+              {run.revision_id.slice(0, 8)} · Правила {run.policy_version} ·
+              Источник {run.source_version}
             </p>
+            {(run.risk_assessments || []).map((risk) => (
+              <RiskAssessmentPanel key={risk.assessment_id} assessment={risk} />
+            ))}
+            {!run.risk_assessments?.length && (
+              <p className="muted">
+                {!run.scorer_version
+                  ? "Историческая политика без ML"
+                  : run.status === "pending" || run.status === "running"
+                    ? "Ожидается расчёт риска"
+                    : run.status === "failed" || run.status === "interrupted"
+                      ? "Оценка риска недоступна: обработка не завершена"
+                      : "Оценка риска не сохранена"}
+              </p>
+            )}
             {run.error_code && (
               <div className="notice error">
                 Обработка не завершена: {run.error_code}. Это технический сбой,
@@ -146,7 +148,7 @@ export default function AssessmentPanel({
                 </div>
               </dl>
             ) : (
-              <p className="muted">Расчёт для этого запуска отсутствует</p>
+              <p className="muted">Финансовый расчёт для этого запуска отсутствует</p>
             )}
             {run.decision && (
               <div className="assessment-decision">

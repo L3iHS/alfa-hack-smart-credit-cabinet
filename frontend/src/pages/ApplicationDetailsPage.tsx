@@ -8,6 +8,7 @@ import AssessmentPanel from "../components/AssessmentPanel";
 import SubmissionPanel from "../components/SubmissionPanel";
 import type {
   Application,
+  Assessment,
   Catalog,
   HistoryEvent,
   PageResult,
@@ -64,6 +65,13 @@ function Details({
   const locked = submissionLocked || reviewLocked;
   const [refreshError, setRefreshError] = useState("");
   const id = item.id;
+  const assessment = useResource(
+    () =>
+      staff
+        ? api<Assessment>(`/applications/${id}/assessment`)
+        : Promise.resolve(null),
+    `${id}:${item.version}:${staff}`,
+  );
   const {
     data: policy,
     error: policyError,
@@ -210,15 +218,23 @@ function Details({
               </div>
             </dl>
           </section>
+          {staff && (
+            <AssessmentPanel
+              data={assessment.data}
+              error={assessment.error}
+              reload={assessment.reload}
+            />
+          )}
           <ReviewActions
             application={item}
             owner={user!.id}
             staff={staff}
             policy={policy}
             changed={refresh}
+            assessment={assessment.error ? null : assessment.data}
+            refreshAssessment={assessment.reload}
             lock={setReviewLocked}
           />
-          {staff && <AssessmentPanel id={id} version={item.version} />}
           <ApplicationDocuments
             application={item}
             required={product?.required_document_types || []}
