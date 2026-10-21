@@ -74,6 +74,8 @@ def _check_estimator_features(candidate):
 
 
 def fit_candidate(spec: CandidateSpec, train: DataSplit, *, seed=20261021, threads=2) -> FittedCandidate:
+    if train.name != 'train':
+        raise ValueError('Обучение разрешено только на части train')
     _check_columns(train.X)
     y = np.asarray(train.y)
     if y.ndim != 1 or len(y) != len(train.X) or set(y.tolist()) != {0, 1}:

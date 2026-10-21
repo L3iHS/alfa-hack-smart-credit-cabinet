@@ -171,3 +171,24 @@ def test_catboost_does_not_create_training_files(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     api.fit_candidate(spec_for('catboost'), small_train())
     assert not (tmp_path / 'catboost_info').exists()
+
+
+@pytest.mark.parametrize('name', ['validation', 'test'])
+@pytest.mark.parametrize('family', ['constant', 'logistic', 'catboost'])
+def test_fit_rejects_non_training_split_before_accessing_features_or_target(name, family):
+    api = importlib.import_module('app.risk.estimators')
+
+    class HeldOutSplit:
+        def __init__(self, name):
+            self.name = name
+
+        @property
+        def X(self):
+            raise AssertionError('Нельзя читать признаки отложенной части при обучении')
+
+        @property
+        def y(self):
+            raise AssertionError('Нельзя читать метки отложенной части при обучении')
+
+    with pytest.raises(ValueError, match='train'):
+        api.fit_candidate(spec_for(family), HeldOutSplit(name))
