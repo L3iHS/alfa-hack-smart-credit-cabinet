@@ -215,5 +215,10 @@ def test_cli_runs_without_application_environment_and_rejects_overwrite(tmp_path
     assert repeat.returncode != 0
     assert 'Ошибка' in repeat.stderr and 'Traceback' not in repeat.stderr
     assert files(tmp_path / 'data') == before
-    invalid = subprocess.run(command[:-4] + ['--rows', '0'], capture_output=True, text=True, env=env)
+    invalid_output = tmp_path / 'invalid-size'
+    invalid_command = [sys.executable, '-m', 'app.risk', 'build-data', '--output', str(invalid_output),
+                       '--rows', '0', '--seed', '20261021']
+    invalid = subprocess.run(invalid_command, capture_output=True, text=True, env=env)
     assert invalid.returncode != 0
+    assert 'count' in invalid.stderr and 'положительное целое число' in invalid.stderr
+    assert not invalid_output.exists()
