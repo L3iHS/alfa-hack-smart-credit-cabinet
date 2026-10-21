@@ -101,6 +101,11 @@ def test_candidate_recomputed_for_exact_amount_and_term(client, db, monkeypatch,
     assert seen[1]['requested_amount_rub'] == 2342000 and seen[1]['term_months'] == 24
     assert seen[0]['coverage_ratio'] != seen[1]['coverage_ratio']
     assert db.execute(text('SELECT count(*) FROM risk_assessments')).scalar_one() == 2
+    linked = db.execute(text('SELECT r.prediction_scope, r.probability FROM decisions d JOIN risk_assessments r ON r.id=d.risk_assessment_id')).one()
+    assert linked.prediction_scope == 'offered_terms' and linked.probability == probability
+    if outcome == 'manual_review':
+        assert db.execute(text('SELECT public_reason_codes FROM decisions')).scalar_one() == ['offered_risk_review_required']
+        assert db.execute(text('SELECT count(*) FROM offers')).scalar_one() == 0
 
 
 @pytest.mark.parametrize('endpoint', ['decisions','offers'])

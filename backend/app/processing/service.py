@@ -256,7 +256,7 @@ def process_next() -> bool:
             system_event(db, application, run, 'processing_completed')
             if result.calculation:
                 db.add(Calculation(run_id=run.id, revision_id=revision.id, data=result.calculation.model_dump()))
-            linked_risk = offered_risk if result.offer else requested_risk
+            linked_risk = offered_risk if offered_risk is not None else requested_risk
             db.add(Decision(application_id=application.id, revision_id=revision.id, run_id=run.id, actor_id=None,
                             risk_assessment_id=linked_risk.id if linked_risk else None,
                             application_version=application.version, outcome=result.outcome, public_reason_codes=[result.reason_code],
