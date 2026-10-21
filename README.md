@@ -43,6 +43,7 @@ Backend применяет миграции при запуске. PostgreSQL х
 
 - [Архитектура, модель данных и переходы состояний](docs/architecture.md)
 - [Примеры HTTP-запросов](docs/api-examples.http); полная схема формируется самим API по ссылке OpenAPI выше
+- [Подготовка синтетических данных для ML](docs/ml-data.md)
 - [Сторонние компоненты и лицензии](THIRD_PARTY_NOTICES.md)
 - [Серверный запуск с HTTPS и обновление](docs/deployment.md)
 
