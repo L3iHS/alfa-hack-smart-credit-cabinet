@@ -38,12 +38,14 @@ class InformationResponseInput(SubmissionInput):
 
 
 class CreateOfferInput(CommandInput):
+    risk_acknowledged: bool = False
     amount_kopecks: Money
     term_months: Months
     reason: Message
 
 
 class DecisionInput(CommandInput):
+    risk_acknowledged: bool = False
     outcome: Literal['approved', 'rejected']
     reason: Message
 

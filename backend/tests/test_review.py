@@ -50,7 +50,9 @@ def test_information_response_creates_new_snapshot_only_on_explicit_send(client,
     assert rows[1]['confirmations']['bki_consent_text'] == old['confirmations']['bki_consent_text']
     assert db.execute(text('SELECT response_revision_id FROM information_requests')).scalar_one() == uuid.UUID(result.json()['revision_id'])
     process()
-    assert current(client, identifier)['status'] == 'approved'
+    # Новая отправка уточнений использует текущую политику с обязательным ML.
+    assert db.execute(text('SELECT policy_version FROM processing_runs WHERE id=:id'), {'id':result.json()['processing_run_id']}).scalar_one() == 'demo-policy-0.3'
+    assert current(client, identifier)['status'] == 'manual_review'
 
 
 def test_manual_request_and_response_keep_old_documents(client, db):

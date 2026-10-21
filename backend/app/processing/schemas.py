@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from app.products.schemas import ProductCode, DocumentType
+from app.risk.schemas import RiskAssessmentOutput
 
 ApplicationStatus = Literal['draft', 'submitted', 'processing', 'needs_info', 'manual_review', 'counteroffer', 'approved', 'rejected']
 ProcessingStatus = Literal['pending', 'running', 'succeeded', 'failed', 'interrupted']
@@ -104,6 +105,8 @@ class RunOutput(BaseModel):
     started_at: datetime | None
     finished_at: datetime | None
     error_code: str | None
+    scorer_version: str | None = None
+    risk_assessments: list[RiskAssessmentOutput] = Field(default_factory=list)
     checks: list[CheckOutput] = Field(default_factory=list)
     calculation: CalculationOutput | None = None
     decision: DecisionOutput | None = None
@@ -113,7 +116,7 @@ class AssessmentOutput(BaseModel):
     application_id: uuid.UUID
     revision_id: uuid.UUID | None
     runs: list[RunOutput]
-    risk_assessment: None = None
+    risk_assessment: RiskAssessmentOutput | None = None
 
 
 class RetryInput(BaseModel):

@@ -9,6 +9,7 @@ from app.companies.models import Company  # noqa: F401
 from app.core.config import settings
 from app.processing.models import CheckResult, Calculation, Decision, InformationRequest, Offer  # noqa: F401
 from app.core.db import Base
+from app.risk.models import RiskAssessment, RiskOverride  # noqa: F401
 
 
 def run_migrations_offline():

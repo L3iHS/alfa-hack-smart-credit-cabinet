@@ -16,7 +16,10 @@ from app.core.db import SessionLocal
 from app.demo.profiles import SOURCE_VERSION
 from app.processing import providers
 from app.processing.models import Calculation, CheckResult, Decision, InformationRequest, Offer
-from app.processing.policy import SUPPORTED_POLICY_VERSIONS, evaluate
+from app.processing.policy import POLICY_VERSION, SUPPORTED_POLICY_VERSIONS, evaluate
+from app.risk.assessments import assess, assessment_output, terms_for
+from app.risk.models import RiskAssessment
+from app.risk.runtime import RiskModelError
 from app.processing.schemas import AssessmentOutput, CalculationOutput, CheckOutput, DecisionOutput, RetryInput, RunOutput
 from app.products.catalog import CATALOG_VERSION
 
@@ -57,8 +60,12 @@ def assessment(db: Session, user: User, application_id: uuid.UUID) -> Assessment
         output.calculation = CalculationOutput.model_validate(calculation.data) if calculation else None
         decision = db.scalar(select(Decision).where(Decision.run_id == run.id))
         output.decision = DecisionOutput.model_validate(decision) if decision else None
+        output.risk_assessments = [assessment_output(item) for item in db.scalars(select(RiskAssessment).where(
+            RiskAssessment.processing_run_id==run.id).order_by(RiskAssessment.created_at, RiskAssessment.id))]
         outputs.append(output)
-    return AssessmentOutput(application_id=application_id, revision_id=revision.id if revision else None, runs=outputs)
+    current = next((run for run in reversed(outputs) if revision and run.revision_id==revision.id), None)
+    risk = next((item for item in reversed(current.risk_assessments) if item.prediction_scope=='requested_terms'), None) if current else None
+    return AssessmentOutput(application_id=application_id, revision_id=revision.id if revision else None, runs=outputs, risk_assessment=risk)
 
 
 def retry_processing(db: Session, user: User, application_id: uuid.UUID, body: RetryInput, key: uuid.UUID) -> dict:
@@ -114,10 +121,12 @@ def recover_interrupted() -> int:
     return count
 
 
-def current_locked(db: Session, run_id: uuid.UUID):
+def current_locked(db: Session, run_id: uuid.UUID, attempt: int | None = None):
     candidate = db.get(ProcessingRun, run_id)
     application = db.scalar(select(Application).where(Application.id == candidate.application_id).with_for_update())
     run = db.scalar(select(ProcessingRun).where(ProcessingRun.id == run_id).with_for_update().execution_options(populate_existing=True))
+    if attempt is not None and run.attempt != attempt:
+        return None
     revision = latest_revision(db, application.id)
     valid = run.status == 'running' and revision is not None and revision.id == run.revision_id and application.status == 'processing'
     if not valid:
@@ -130,7 +139,7 @@ def current_locked(db: Session, run_id: uuid.UUID):
     return application, run, revision
 
 
-def claim_next() -> uuid.UUID | None:
+def claim_next(*, with_attempt=False):
     with SessionLocal() as db:
         candidate = db.scalar(select(ProcessingRun).where(ProcessingRun.status == 'pending').order_by(ProcessingRun.created_at).limit(1))
         if candidate is None:
@@ -151,37 +160,40 @@ def claim_next() -> uuid.UUID | None:
             application.status = 'processing'
             system_event(db, application, run, 'processing_started')
         db.commit()
-        return run.id
+        return (run.id, run.attempt) if with_attempt else run.id
 
 
 def process_next() -> bool:
-    run_id = claim_next()
-    if run_id is None:
+    claimed = claim_next(with_attempt=True)
+    if claimed is None:
         return False
+    run_id, attempt = claimed
     stage = 'initialization'
     try:
         with SessionLocal() as db:
-            state = current_locked(db, run_id)
+            state = current_locked(db, run_id, attempt)
             if state is None:
                 return True
             _, run, revision = state
             if run.policy_version not in SUPPORTED_POLICY_VERSIONS or run.source_version != SOURCE_VERSION or run.catalog_version != CATALOG_VERSION:
                 raise providers.UnsupportedVersion('Версия расчёта не поддерживается')
             snapshot, submitted_at = revision.snapshot, revision.created_at.date()
-            source_version = run.source_version
-            policy_version = run.policy_version
+            source_version, policy_version = run.source_version, run.policy_version
             db.commit()
         checks = {}
         for kind in ('registry','tax','bki'):
             stage = f'check_{kind}'
             with SessionLocal() as db:
+                state = current_locked(db, run_id, attempt)
+                if state is None:
+                    return True
                 cached = db.scalar(select(CheckResult).where(CheckResult.run_id == run_id, CheckResult.kind == kind))
                 if cached:
                     checks[kind] = cached.data
                     continue
             data = providers.check(kind, snapshot, source_version)
             with SessionLocal() as db:
-                state = current_locked(db, run_id)
+                state = current_locked(db, run_id, attempt)
                 if state is None:
                     return True
                 _, run, _ = state
@@ -189,12 +201,54 @@ def process_next() -> bool:
                 db.commit()
                 checks[kind] = data
         stage = 'policy'
-        result = evaluate(snapshot['application'], registered_at=date.fromisoformat(checks['registry']['registered_at']),
-                          submitted_at=submitted_at, liquidated=checks['registry']['liquidated'], overdue_days=checks['bki']['overdue_days'],
-                          expected_monthly_revenue_kopecks=checks['tax']['expected_monthly_revenue_kopecks'], policy_version=policy_version)
+        kwargs = dict(registered_at=date.fromisoformat(checks['registry']['registered_at']), submitted_at=submitted_at,
+                      liquidated=checks['registry']['liquidated'], overdue_days=checks['bki']['overdue_days'],
+                      expected_monthly_revenue_kopecks=checks['tax']['expected_monthly_revenue_kopecks'], policy_version=policy_version)
+        result = evaluate(snapshot['application'], **kwargs)
+        requested_risk = offered_risk = None
+        if policy_version == POLICY_VERSION:
+            stage = 'risk'
+            with SessionLocal() as db:
+                state = current_locked(db, run_id, attempt)
+                if state is None:
+                    return True
+                _, run, revision = state
+                db.commit()
+                # Внешний расчёт выполняется без блокировки; перед commit сверяем попытку заново.
+                requested_risk = assess(db, run, revision, checks, terms_for(revision), 'requested_terms',
+                                      not_applicable=result.reason_code if result.outcome in ('needs_info','rejected') else None, persist=False)
+                state = current_locked(db, run_id, attempt)
+                if state is None:
+                    db.rollback()
+                    return True
+                db.add(requested_risk)
+                db.commit()
+                if requested_risk.status == 'failed':
+                    raise RiskModelError('Не удалось выполнить обязательную оценку риска')
+            if requested_risk.status == 'succeeded':
+                result = evaluate(snapshot['application'], probability=requested_risk.probability, **kwargs)
+                if result.offer:
+                    with SessionLocal() as db:
+                        state = current_locked(db, run_id, attempt)
+                        if state is None:
+                            return True
+                        _, run, revision = state
+                        db.commit()
+                        offered_risk = assess(db, run, revision, checks,
+                            terms_for(revision,result.offer.amount_kopecks,result.offer.term_months), 'offered_terms', persist=False)
+                        if current_locked(db, run_id, attempt) is None:
+                            db.rollback()
+                            return True
+                        db.add(offered_risk)
+                        db.commit()
+                        if offered_risk.status == 'failed':
+                            raise RiskModelError('Не удалось оценить предложенные условия')
+                        if offered_risk.probability >= .10:
+                            result = result.model_copy(update=dict(outcome='manual_review', offer=None,
+                                reason_code='offered_risk_review_required', reason='Новые условия требуют рассмотрения сотрудника'))
         stage = 'persist_result'
         with SessionLocal() as db:
-            state = current_locked(db, run_id)
+            state = current_locked(db, run_id, attempt)
             if state is None:
                 return True
             application, run, revision = state
@@ -202,7 +256,9 @@ def process_next() -> bool:
             system_event(db, application, run, 'processing_completed')
             if result.calculation:
                 db.add(Calculation(run_id=run.id, revision_id=revision.id, data=result.calculation.model_dump()))
+            linked_risk = offered_risk if result.offer else requested_risk
             db.add(Decision(application_id=application.id, revision_id=revision.id, run_id=run.id, actor_id=None,
+                            risk_assessment_id=linked_risk.id if linked_risk else None,
                             application_version=application.version, outcome=result.outcome, public_reason_codes=[result.reason_code],
                             public_reasons=[result.reason], internal_reason=result.reason, policy_version=run.policy_version))
             if result.outcome == 'needs_info':
@@ -211,22 +267,21 @@ def process_next() -> bool:
                                           requested_fields=result.requested_fields, requested_document_types=[]))
             if result.offer:
                 db.add(Offer(application_id=application.id, revision_id=revision.id, run_id=run.id,
+                             risk_assessment_id=offered_risk.id if offered_risk else None,
                              application_version=application.version, reason=result.reason, **result.offer.model_dump()))
-            run.status = 'succeeded'
-            run.finished_at = now()
-            run.error_code = None
+            run.status, run.finished_at, run.error_code = 'succeeded', now(), None
             db.commit()
     except Exception as exc:
         # Не пишем входные сведения и текст исключения: источник может включить их в ошибку.
-        if not isinstance(exc, providers.UnsupportedVersion):
+        if not isinstance(exc, (providers.UnsupportedVersion, RiskModelError)):
             logger.error('Unexpected processing failure', extra={'run_id': str(run_id), 'stage': stage, 'exception_type': type(exc).__name__})
         with SessionLocal() as db:
-            state = current_locked(db, run_id)
+            state = current_locked(db, run_id, attempt)
             if state:
                 application, run, _ = state
-                run.status = 'failed'
-                run.finished_at = now()
-                run.error_code = 'unsupported_version' if isinstance(exc, providers.UnsupportedVersion) else 'check_failed'
+                run.status, run.finished_at = 'failed', now()
+                run.error_code = ('unsupported_version' if isinstance(exc, providers.UnsupportedVersion) else
+                                  'risk_model_failed' if isinstance(exc, RiskModelError) else 'check_failed')
                 system_event(db, application, run, 'processing_failed')
                 db.commit()
     return True

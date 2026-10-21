@@ -10,7 +10,7 @@ def calculate(**changes):
                 period_start='2026-07-01', period_end='2026-09-30', revenue_kopecks=240_000_000,
                 operating_expenses_kopecks=150_000_000, existing_debt_payments_kopecks=15_000_000)
     data.update(changes)
-    return evaluate(data, registered_at=date(2024, 10, 20), submitted_at=date(2026, 10, 20), overdue_days=0, liquidated=False)
+    return evaluate(data, registered_at=date(2024, 10, 20), submitted_at=date(2026, 10, 20), overdue_days=0, liquidated=False, policy_version='demo-policy-0.2')
 
 
 def test_profile_a_payment():
@@ -34,7 +34,7 @@ def test_full_month_boundary(age, outcome):
     result = evaluate(dict(product_code='equipment', amount_kopecks=200_000_000, term_months=24,
                            period_start='2026-07-01', period_end='2026-09-30', revenue_kopecks=240_000_000,
                            operating_expenses_kopecks=150_000_000, existing_debt_payments_kopecks=15_000_000),
-                      registered_at=date(2026, 10-age, 20), submitted_at=date(2026, 10, 20), overdue_days=0, liquidated=False)
+                      registered_at=date(2026, 10-age, 20), submitted_at=date(2026, 10, 20), overdue_days=0, liquidated=False, policy_version='demo-policy-0.2')
     assert result.outcome == outcome
 
 
@@ -44,7 +44,7 @@ def test_overdue_boundaries(days, outcome):
     data = dict(product_code='equipment', amount_kopecks=200_000_000, term_months=24,
                 period_start='2026-07-01', period_end='2026-09-30', revenue_kopecks=240_000_000,
                 operating_expenses_kopecks=150_000_000, existing_debt_payments_kopecks=15_000_000)
-    assert evaluate(data, registered_at=date(2024, 1, 1), submitted_at=date(2026, 10, 20), overdue_days=days, liquidated=False).outcome == outcome
+    assert evaluate(data, registered_at=date(2024, 1, 1), submitted_at=date(2026, 10, 20), overdue_days=days, liquidated=False, policy_version='demo-policy-0.2').outcome == outcome
 
 
 def test_exact_coverage_boundary():

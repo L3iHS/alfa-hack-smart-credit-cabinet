@@ -1,13 +1,15 @@
 import calendar
+import math
 from datetime import date
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR, localcontext
 
 from app.processing.schemas import CalculationOutput, OfferTerms, PolicyResult
 from app.products.catalog import PRODUCTS
 
-POLICY_VERSION = 'demo-policy-0.2'
+POLICY_VERSION = 'demo-policy-0.3'
+LEGACY_POLICY_VERSIONS = frozenset(('demo-policy-0.2', 'demo-policy-v1'))
 # В первом срезе отправки те же утверждённые условия записывались под этим именем.
-SUPPORTED_POLICY_VERSIONS = frozenset((POLICY_VERSION, 'demo-policy-v1'))
+SUPPORTED_POLICY_VERSIONS = LEGACY_POLICY_VERSIONS | {POLICY_VERSION}
 COVERAGE = Decimal('1.30')
 
 
@@ -61,7 +63,8 @@ def find_offer(data: dict, flow: Decimal, debt: Decimal, months: int = 1) -> Off
 
 
 def evaluate(data: dict, *, registered_at: date, submitted_at: date, overdue_days: int, liquidated: bool,
-             expected_monthly_revenue_kopecks: int | None = None, policy_version: str = POLICY_VERSION) -> PolicyResult:
+             expected_monthly_revenue_kopecks: int | None = None, policy_version: str = POLICY_VERSION,
+             probability: float | None = None) -> PolicyResult:
     with localcontext() as ctx:
         ctx.prec = 50
         try:
@@ -87,12 +90,19 @@ def evaluate(data: dict, *, registered_at: date, submitted_at: date, overdue_day
             return result('rejected', 'company_liquidated', 'Синтетический реестр подтверждает ликвидацию компании')
         if overdue_days >= 90:
             return result('rejected', 'overdue_90_plus', 'Текущая просрочка по демонстрационной проверке БКИ составляет 90 дней или более')
+        if policy_version == POLICY_VERSION and probability is None:
+            return result('manual_review', 'risk_required', 'Для решения требуется оценка риска')
+        if policy_version == POLICY_VERSION and (type(probability) not in (float,int)
+                or not math.isfinite(probability) or not 0<=probability<=1):
+            raise ValueError('Нужна конечная вероятность от нуля до единицы')
         if full_months(registered_at, submitted_at) < 6:
             return result('manual_review', 'short_business_history', 'Компания работает менее 6 полных месяцев; требуется рассмотрение сотрудника')
         if overdue_days > 0:
             return result('manual_review', 'current_overdue', 'Есть текущая просрочка; требуется рассмотрение сотрудника')
         if flow <= 0:
             return result('manual_review', 'nonpositive_flow', 'Доход после операционных расходов недостаточен; требуется рассмотрение сотрудника')
+        if policy_version == POLICY_VERSION and probability >= .10:
+            return result('manual_review', 'risk_review_required', 'Оценка риска требует рассмотрения сотрудником')
         if covered(flow_total, debt_total, monthly, months):
             return result('approved', 'coverage_sufficient', 'Запрошенные условия соответствуют демонстрационным правилам покрытия платежей')
         offer = find_offer(data, flow_total, debt_total, months)

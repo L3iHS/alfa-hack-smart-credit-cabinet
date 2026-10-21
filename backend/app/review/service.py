@@ -20,7 +20,9 @@ from app.demo.profiles import SOURCE_VERSION
 from app.documents.models import Document
 from app.documents.service import active_documents
 from app.processing.models import CheckResult, Decision, InformationRequest, Offer
-from app.processing.policy import SUPPORTED_POLICY_VERSIONS, covered, evaluate, payment, period_months
+from app.processing.policy import POLICY_VERSION, SUPPORTED_POLICY_VERSIONS, covered, evaluate, payment, period_months
+from app.risk.assessments import assess, exact_assessment, record_override, terms_for
+from app.risk.models import RiskOverride
 from app.processing.schemas import InformationRequestOutput, OfferOutput
 from app.processing.service import latest_revision, require_staff
 from app.products.catalog import CATALOG_VERSION, PRODUCTS
@@ -186,10 +188,41 @@ def safe_terms(db, application, revision, amount=None, term=None):
                 total_payment_kopecks=monthly*term, annual_rate_bps=product.annual_rate_bps), run
 
 
-def add_decision(db, application, revision, user, outcome, reason, policy_version, code):
+def guard_risk(db, run, revision, terms, *, offered, user=None, reason=None, acknowledged=False, offer=None):
+    if run.policy_version != POLICY_VERSION:
+        return None
+    checks = {item.kind:item.data for item in db.scalars(select(CheckResult).where(CheckResult.run_id==run.id))}
+    scope = 'offered_terms' if offered else 'requested_terms'
+    canonical = terms_for(revision, terms['amount_kopecks'], terms['term_months'])
+    if offer is not None:
+        row = exact_assessment(db, offer.risk_assessment_id, run, revision, checks, canonical, scope)
+        if (row is None or row.offer_version != offer.version
+                or offer.product_code != canonical['product_code'] or offer.annual_rate_bps != canonical['annual_rate_bps']
+                or offer.monthly_payment_kopecks != terms['monthly_payment_kopecks']
+                or offer.total_payment_kopecks != terms['total_payment_kopecks']):
+            conflict('Оценка предложенных условий отсутствует или устарела')
+        if row.probability >= .10 and not db.scalar(select(RiskOverride.id).where(RiskOverride.assessment_id==row.id)):
+            conflict('Не сохранено подтверждение сотрудником повышенного риска')
+        return row
+    row = assess(db, run, revision, checks, canonical, scope)
+    if row.status != 'succeeded':
+        # До этого места команда ничего не меняла: коммитим только проверенную оценку.
+        db.commit()
+        raise HTTPException(503, {'code':'risk_model_unavailable', 'message':'Не удалось оценить риск этих условий. Повторите позже'})
+    if row.probability >= .10 and not acknowledged:
+        db.commit()
+        raise HTTPException(409, {'code':'risk_acknowledgement_required',
+                                 'message':'Изучите оценку этих условий и подтвердите рассмотрение повышенного риска'})
+    if row.probability >= .10:
+        record_override(db,row,user,reason)
+    return row
+
+
+def add_decision(db, application, revision, user, outcome, reason, policy_version, code, risk=None):
     decision = Decision(id=uuid.uuid4(), application_id=application.id, revision_id=revision.id, actor_id=user.id,
                         application_version=application.version, outcome=outcome, public_reason_codes=[code],
-                        public_reasons=[reason], internal_reason=reason, policy_version=policy_version)
+                        public_reasons=[reason], internal_reason=reason, policy_version=policy_version,
+                        risk_assessment_id=risk.id if risk else None)
     db.add(decision)
     return decision
 
@@ -200,11 +233,13 @@ def decide(db, user, application_id, body, key):
         if application.status != 'manual_review':
             conflict('Решение сотрудника сейчас недоступно')
         run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id))
+        risk = None
         if body.outcome == 'approved':
-            _, run = safe_terms(db, application, revision)
+            terms, run = safe_terms(db, application, revision)
+            risk = guard_risk(db,run,revision,terms,offered=False,user=user,reason=body.reason,acknowledged=body.risk_acknowledged)
         supersede_offers(db, application)
         event(db, application, user, revision, 'staff_approved' if body.outcome == 'approved' else 'staff_rejected', body.outcome)
-        decision = add_decision(db, application, revision, user, body.outcome, body.reason, run.policy_version, 'staff_decision')
+        decision = add_decision(db, application, revision, user, body.outcome, body.reason, run.policy_version, 'staff_decision',risk)
         return output(application, revision, decision_id=str(decision.id))
     return execute(db, user, application_id, body, key, 'staff_decision', action)
 
@@ -215,12 +250,14 @@ def create_offer(db, user, application_id, body, key):
         if application.status != 'manual_review':
             conflict('Предложение сотрудника сейчас недоступно')
         terms, run = safe_terms(db, application, revision, body.amount_kopecks, body.term_months)
+        risk = guard_risk(db,run,revision,terms,offered=True,user=user,reason=body.reason,acknowledged=body.risk_acknowledged)
         supersede_offers(db, application)
         event(db, application, user, revision, 'offer_created', 'counteroffer')
         offer = Offer(id=uuid.uuid4(), application_id=application.id, revision_id=revision.id, actor_id=user.id,
-                      application_version=application.version, status='active', version=1, reason=body.reason, **terms)
+                      application_version=application.version, status='active', version=1, reason=body.reason,
+                      risk_assessment_id=risk.id if risk else None, **terms)
         db.add(offer)
-        add_decision(db, application, revision, user, 'counteroffer', body.reason, run.policy_version, 'staff_offer')
+        add_decision(db, application, revision, user, 'counteroffer', body.reason, run.policy_version, 'staff_offer',risk)
         db.flush()
         return output(application, revision, offer=OfferOutput.model_validate(offer).model_dump(mode='json'))
     return execute(db, user, application_id, body, key, 'create_offer', action)
@@ -236,8 +273,10 @@ def offer_action(db, user, offer_id, body, key, accept):
         if (application.status != 'counteroffer' or current.status != 'active'
                 or current.revision_id != revision.id or current.version != body.offer_version):
             conflict('Предложение устарело, обновите заявку')
+        risk = None
         if accept:
-            _, run = safe_terms(db, application, revision, current.amount_kopecks, current.term_months)
+            terms, run = safe_terms(db, application, revision, current.amount_kopecks, current.term_months)
+            risk = guard_risk(db,run,revision,terms,offered=True,offer=current)
         else:
             run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id))
         current.status = 'accepted' if accept else 'declined'
@@ -245,7 +284,7 @@ def offer_action(db, user, offer_id, body, key, accept):
         status = 'approved' if accept else 'manual_review'
         event(db, application, user, revision, 'offer_accepted' if accept else 'offer_declined', status)
         reason = 'Клиент принял предложенные условия' if accept else 'Клиент отклонил предложение; требуется рассмотрение сотрудника'
-        add_decision(db, application, revision, user, status, reason, run.policy_version, 'offer_accepted' if accept else 'offer_declined')
+        add_decision(db, application, revision, user, status, reason, run.policy_version, 'offer_accepted' if accept else 'offer_declined',risk)
         return output(application, revision, offer=OfferOutput.model_validate(current).model_dump(mode='json'))
     # Идентификатор предложения входит в отпечаток повтора команды.
     operation = 'accept_offer' if accept else 'decline_offer'

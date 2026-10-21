@@ -40,6 +40,7 @@ class Decision(Base):
     application_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('applications.id'), index=True)
     revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('application_revisions.id'))
     run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('processing_runs.id'), unique=True)
+    risk_assessment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('risk_assessments.id'))
     actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('users.id'))
     application_version: Mapped[int]
     outcome: Mapped[str] = mapped_column(String(30))
@@ -77,6 +78,7 @@ class Offer(Base):
     application_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('applications.id'), index=True)
     revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('application_revisions.id'))
     run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('processing_runs.id'), unique=True)
+    risk_assessment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('risk_assessments.id'))
     actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('users.id'))
     version: Mapped[int] = mapped_column(default=1, server_default='1')
     application_version: Mapped[int]

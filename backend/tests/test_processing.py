@@ -14,7 +14,7 @@ from test_documents import attach
 from test_submission import submit
 
 
-def prepared(client, profile='a'):
+def prepared(client, profile='a', *, legacy=True):
     from app.demo.profiles import application_fields
     headers = authenticate(client, f'demo-{profile}@example.test')
     draft = create(client, headers, **application_fields(profile))
@@ -23,6 +23,11 @@ def prepared(client, profile='a'):
         draft, _ = attach(client, headers, draft, 'equipment_invoice')
     response = submit(client, headers, draft)
     assert response.status_code == 202, response.text
+    if legacy:
+        # Эти сценарии фиксируют принятую историческую политику до появления ML.
+        with SessionLocal() as historical:
+            historical.execute(text("UPDATE processing_runs SET policy_version='demo-policy-0.2', scorer_version=NULL WHERE id=:id"), {'id': response.json()['processing_run_id']})
+            historical.commit()
     return headers, draft['id'], response.json()
 
 

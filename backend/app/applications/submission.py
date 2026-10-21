@@ -20,6 +20,7 @@ from app.demo.profiles import SOURCE_VERSION
 from app.documents.schemas import DocumentOutput
 from app.documents.service import active_documents, require_editable
 from app.products.catalog import CATALOG_VERSION, PRODUCTS
+from app.risk.runtime import MODEL_VERSION
 
 
 def submit_application(db: Session, user: User, application_id: uuid.UUID, body: SubmissionInput, key: uuid.UUID) -> dict:
@@ -96,7 +97,7 @@ def create_submission(db: Session, user: User, application: Application, body: S
     db.flush()
     run = ProcessingRun(
         id=uuid.uuid4(), application_id=application.id, revision_id=revision.id, status='pending',
-        catalog_version=application.catalog_version, policy_version=POLICY_VERSION, source_version=SOURCE_VERSION,
+        catalog_version=application.catalog_version, policy_version=POLICY_VERSION, source_version=SOURCE_VERSION, scorer_version=MODEL_VERSION,
     )
     db.add(run)
     db.flush()
