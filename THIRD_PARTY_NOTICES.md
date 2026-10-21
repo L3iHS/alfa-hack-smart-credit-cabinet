@@ -1,6 +1,6 @@
 # Сторонние компоненты
 
-Инвентаризация на 20 октября 2026 года. Версии Python сверены с `backend/uv.lock`, лицензии — с метаданными установленных locked-пакетов; версии и SPDX-обозначения npm взяты из `frontend/package-lock.json`. Ссылки PyPI ведут на конкретные выпуски. Исходные LICENSE/NOTICE компонентов остаются частью их пакетов; этот перечень не заменяет их тексты.
+Инвентаризация базовых компонентов на 20 октября 2026 года; ML extra дополнен 22 октября 2026 года. Версии Python сверены с `backend/uv.lock`, лицензии — с метаданными установленных locked-пакетов; версии и SPDX-обозначения npm взяты из `frontend/package-lock.json`. Ссылки PyPI ведут на конкретные выпуски. Исходные LICENSE/NOTICE компонентов остаются частью их пакетов; этот перечень не заменяет их тексты.
 
 ## Backend и инструменты проверки
 
@@ -45,6 +45,35 @@
 | [uvicorn](https://pypi.org/project/uvicorn/0.34.2/) | 0.34.2 | BSD-3-Clause |
 
 Pillow использует [MIT-CMU](https://github.com/python-pillow/Pillow/blob/main/LICENSE), а не обычную MIT: PIL © 1997–2011 Secret Labs AB, © 1995–2011 Fredrik Lundh and contributors; Pillow © 2010 Jeffrey 'Alex' Clark and contributors. Psycopg и бинарный пакет используют [LGPLv3](https://github.com/psycopg/psycopg/blob/3.2.6/psycopg/LICENSE.txt). Бинарные колёса Pillow и psycopg-binary также включают нативные компоненты. Лицензионные файлы самих пакетов установлены в `pillow-13.0.0.dist-info/licenses/LICENSE` и `psycopg_binary-3.2.6.dist-info/LICENSE.txt`; состав нативных компонентов зависит от платформенного колеса. При отдельном распространении таких колёс нужно учитывать их вложенные компоненты и сохранять исходные уведомления поставки. Certifi содержит набор сертификатов Mozilla под MPL-2.0.
+
+## Offline ML и построение отчётов
+
+Эти пакеты устанавливаются только с extra `ml` / `INSTALL_ML=true`. Обычный backend использует собственный JSON и stdlib inference; numpy, scikit-learn и CatBoost для обработки заявок не требуются. Версии сверены с lock-файлом и метаданными установленного Linux/aarch64-образа; ссылки ведут на официальные лицензии проектов. Для четырёх основных пакетов проверены закреплённые релизы, для остальных — исходные лицензии и метаданные соответствующих установленных версий.
+
+| Компонент | Версия | Основная лицензия / официальный источник |
+| --- | --- | --- |
+| NumPy | 2.2.6 | [BSD-3-Clause](https://github.com/numpy/numpy/blob/v2.2.6/LICENSE.txt) |
+| pandas | 2.3.3 | [BSD-3-Clause](https://github.com/pandas-dev/pandas/blob/v2.3.3/LICENSE) |
+| scikit-learn | 1.7.2 | [BSD-3-Clause](https://github.com/scikit-learn/scikit-learn/blob/1.7.2/COPYING) |
+| CatBoost | 1.2.8 | [Apache-2.0](https://github.com/catboost/catboost/blob/v1.2.8/LICENSE) |
+| Matplotlib | 3.10.7 | [Matplotlib License, основана на PSF; включены исторические лицензии](https://github.com/matplotlib/matplotlib/blob/v3.10.7/LICENSE/LICENSE) |
+| joblib | 1.5.2 | [BSD-3-Clause](https://github.com/joblib/joblib/blob/1.5.2/LICENSE.txt) |
+| threadpoolctl | 3.6.0 | [BSD-3-Clause](https://github.com/joblib/threadpoolctl/blob/3.6.0/LICENSE) |
+| SciPy | 1.18.1 | [BSD-3-Clause](https://github.com/scipy/scipy/blob/v1.18.1/LICENSE.txt) |
+| contourpy | 1.4.0 | [BSD-3-Clause](https://github.com/contourpy/contourpy/blob/v1.4.0/LICENSE) |
+| cycler | 0.12.1 | [BSD-3-Clause](https://github.com/matplotlib/cycler/blob/v0.12.1/LICENSE) |
+| fonttools | 4.67.0 | [MIT](https://github.com/fonttools/fonttools/blob/4.67.0/LICENSE) |
+| graphviz, Python-пакет | 0.21 | [MIT](https://github.com/xflr6/graphviz/blob/0.21/LICENSE.txt) |
+| kiwisolver | 1.5.1 | [BSD-3-Clause](https://github.com/nucleic/kiwi/blob/1.5.1/LICENSE) |
+| narwhals | 2.27.1 | [MIT](https://github.com/narwhals-dev/narwhals/blob/main/LICENSE.md) |
+| plotly | 7.1.0 | [MIT](https://github.com/plotly/plotly.py/blob/v7.1.0/LICENSE.txt) |
+| pyparsing | 3.3.3 | [MIT](https://github.com/pyparsing/pyparsing/blob/master/LICENSE) |
+| python-dateutil | 2.9.0.post0 | [Apache-2.0 и BSD-3-Clause для исторических частей](https://github.com/dateutil/dateutil/blob/2.9.0.post0/LICENSE) |
+| pytz | 2026.5 | [MIT](https://github.com/stub42/pytz/blob/master/LICENSE.txt) |
+| six | 1.17.0 | [MIT](https://github.com/benjaminp/six/blob/1.17.0/LICENSE) |
+| tzdata | 2026.5 | [Apache-2.0 для пакета; данные IANA в общественном достоянии](https://github.com/python/tzdata/blob/master/LICENSE) |
+
+NumPy/SciPy и другие бинарные колёса могут содержать дополнительные библиотеки с отдельными лицензиями (например BLAS/LAPACK, runtime компилятора). Matplotlib также поставляет шрифты и вспомогательные материалы с отдельными уведомлениями. Полные `LICENSE`/`NOTICE`, лицензии вложенных компонентов и copyright сохраняются в исходных пакетах и `.dist-info/licenses`; этот перечень основной лицензии Python-пакета не заменяет их. Python-пакет graphviz не означает поставку системного Graphviz. Платформенные колёса и их состав могут различаться.
 
 ## Frontend и инструменты сборки/браузерной проверки
 
@@ -145,4 +174,4 @@ Playwright устанавливает браузер отдельно от npm-�
 
 ## Данные и визуальные материалы
 
-Компании, профили, показатели и проверочные документы демонстрационные. Обученные модели, их веса, внешние датасеты, реальные банковские данные и LLM API не поставляются. Интерфейс использует системные шрифты; импортированных шрифтов, стоковых фотографий и сторонних наборов иконок в frontend нет.
+Компании, профили, показатели и проверочные документы демонстрационные. Поставляется собственная модель команды `logistic-risk-v1`: JSON коэффициентов LogisticRegression и train-преобразований в `backend/app/risk/models/logistic-risk-v1.json`. Она обучена командой на собственных 10 000 синтетических компаний, без внешних pretrained-весов и реальных банковских данных. Её происхождение, схема и контрольная сумма зафиксированы в поставке; качество описано в [ML-эксперименте](docs/ml-training.md). Данные обучения и альтернативные offline-модели не входят в обычный образ. Реальные внешние ФНС/БКИ, OCR, LLM-модели и LLM API не поставляются. Интерфейс использует системные шрифты; импортированных шрифтов, стоковых фотографий и сторонних наборов иконок в frontend нет.

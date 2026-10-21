@@ -146,20 +146,38 @@ Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79003
 {"expected_version":{{review.response.body.$.version}},"message":"Уточните выручку за период","requested_fields":["revenue_kopecks"],"requested_document_types":[]}
 
 ### Альтернатива в manual_review: решение approved или rejected, причина обязательна
+# Для одобрения при p >= 0.10 сначала прочитайте assessment и подтвердите риск.
+# risk_acknowledged относится к показанной оценке; отказ не требует этого флага.
 POST {{base}}/applications/{{reviewId}}/decisions
 Content-Type: application/json
 X-CSRF-Token: {{staffLogin.response.body.$.csrf_token}}
 Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79004
 
-{"expected_version":{{review.response.body.$.version}},"outcome":"approved","reason":"Синтетические данные рассмотрены сотрудником"}
+{"expected_version":{{review.response.body.$.version}},"outcome":"approved","reason":"Синтетический риск рассмотрен сотрудником","risk_acknowledged":true}
 
 ### Альтернатива в manual_review: предложить допустимые условия того же продукта
+# Первый запрос намеренно без подтверждения. При повышенном риске новых условий
+# получите 409 risk_acknowledgement_required: version прежняя, предложения ещё нет.
+# При 201 предложение уже создано; второй POST ниже НЕ выполняйте.
+# Потеря ответа на уже отправленную команду: сохраняйте ТОЧНОЕ тело и ключ, не меняйте их.
 POST {{base}}/applications/{{reviewId}}/offers
 Content-Type: application/json
 X-CSRF-Token: {{staffLogin.response.body.$.csrf_token}}
 Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79005
 
-{"expected_version":{{review.response.body.$.version}},"amount_kopecks":40000000,"term_months":12,"reason":"Предлагается меньшая сумма финансирования"}
+{"expected_version":{{review.response.body.$.version}},"amount_kopecks":40000000,"term_months":12,"reason":"Предлагается меньшая сумма после оценки синтетического риска"}
+
+### Только после известного 409: изучите offered_terms и риск именно новых условий
+GET {{base}}/applications/{{reviewId}}/assessment
+
+### После изучения повышенного риска: новая осознанная команда с подтверждением
+# Это новое тело после ПОЛУЧЕННОГО 409, а не повтор неизвестного исхода.
+POST {{base}}/applications/{{reviewId}}/offers
+Content-Type: application/json
+X-CSRF-Token: {{staffLogin.response.body.$.csrf_token}}
+Idempotency-Key: 01780f01-1051-4a58-9e82-40cb50d79009
+
+{"expected_version":{{review.response.body.$.version}},"amount_kopecks":40000000,"term_months":12,"reason":"Риск новых условий изучен, предлагается меньшая сумма","risk_acknowledged":true}
 
 ### Только после failed/interrupted: сотрудник повторяет обработку
 POST {{base}}/applications/{{reviewId}}/processing-retries
