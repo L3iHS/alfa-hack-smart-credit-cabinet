@@ -21,10 +21,18 @@ def main() -> int:
     evaluate = subparsers.add_parser('evaluate-models', help='Один раз оценить сохранённый выбор на test')
     evaluate.add_argument('--data', type=Path, default=Path('artifacts/risk-data'), help='Исходный набор данных')
     evaluate.add_argument('--run', type=Path, default=Path('artifacts/risk-models'), help='Сохранённый эксперимент')
+    report = subparsers.add_parser('report-models', help='Собрать отчёт из сохранённых моделей и evaluation')
+    report.add_argument('--data', type=Path, default=Path('artifacts/risk-data'), help='Исходный набор данных')
+    report.add_argument('--run', type=Path, default=Path('artifacts/risk-models'), help='Сохранённый эксперимент')
     args = parser.parse_args()
     try:
         if args.command != 'build-data':
             try:
+                if args.command == 'report-models':
+                    from app.risk.reporting import build_report
+                    result = build_report(args.data, args.run)
+                    print(f'Отчёт: {result["analysis_dir"]}; выбранная модель {result["selected_candidate_id"]}')
+                    return 0
                 from app.risk.experiment import evaluate_experiment, train_experiment
             except ImportError:
                 parser.exit(1, 'Ошибка: нужны ML-зависимости; выполните uv sync --extra ml\n')
