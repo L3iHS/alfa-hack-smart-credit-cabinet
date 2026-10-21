@@ -11,3 +11,4 @@ node_modules/
 dist/
 *.tsbuildinfo
 /backend/artifacts/risk-data/
+/backend/artifacts/risk-models/
