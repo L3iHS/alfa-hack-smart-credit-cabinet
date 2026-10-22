@@ -27,6 +27,99 @@ export interface Catalog {
   catalog_version: string;
   items: Product[];
 }
+export type RecommendationPurpose =
+  | "working_capital"
+  | "cash_gap"
+  | "equipment"
+  | "investment"
+  | "real_estate"
+  | "tender_guarantee";
+export type RecommendationCollateral =
+  | "real_estate"
+  | "equipment"
+  | "vehicle"
+  | "none";
+export interface RecommendationRequest {
+  purpose: RecommendationPurpose;
+  amount_kopecks: number;
+  term_months: number;
+  urgency: "high" | "normal";
+  has_collateral?: boolean | null;
+  collateral_type?: RecommendationCollateral | null;
+  supplier_invoice_attached?: boolean | null;
+  down_payment_pct?: number | null;
+  business_plan_attached?: boolean | null;
+  tender_number?: string | null;
+  revenue_total_kopecks?: number | null;
+  expenses_total_kopecks?: number | null;
+  existing_debt_payments_kopecks?: number | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  period_months?: number | null;
+}
+export interface RecommendationOption {
+  code: string;
+  label: string;
+}
+export interface RecommendationOptions {
+  purposes: { code: RecommendationPurpose; label: string }[];
+  collateral_types: RecommendationOption[];
+  urgency_levels: RecommendationOption[];
+  config_version: string;
+}
+export interface RecommendationAction {
+  kind:
+    | "change_purpose"
+    | "change_amount"
+    | "change_term"
+    | "change_collateral"
+    | "attach_document"
+    | "offer_choice"
+    | "open_cabinet";
+  code: string;
+  label: string;
+  product_id: string | null;
+}
+export interface RecommendationItem {
+  offer_id: string;
+  product_id: string;
+  product_name: string;
+  product_type: string;
+  cabinet_product_code: ProductCode | null;
+  is_available_in_cabinet: boolean;
+  rank: number;
+  score: number;
+  purpose_match: boolean;
+  approved_amount_kopecks: number;
+  term_months: number;
+  term_days: number | null;
+  base_rate_pct: number | null;
+  commission_year_pct: number | null;
+  effective_annual_cost_pct: number;
+  monthly_payment_kopecks: number | null;
+  total_cost_kopecks: number | null;
+  approval_likelihood: number;
+  approval_time_hours: number;
+  client_reasons: string[];
+  missing_data: string[];
+  next_action: string | null;
+}
+export type RecommendationStatus =
+  | "ok"
+  | "counter_offer"
+  | "request_data"
+  | "alternative_product"
+  | "no_match";
+export interface RecommendationResponse {
+  status: RecommendationStatus;
+  message: string;
+  items: RecommendationItem[];
+  alternatives: RecommendationItem[];
+  actions: RecommendationAction[];
+  config_version: string;
+  trace_id: string;
+  staff_trace: Record<string, unknown>[] | null;
+}
 export interface DraftFields {
   product_code: ProductCode;
   purpose: string | null;

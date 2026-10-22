@@ -1,0 +1,25 @@
+purposes:
+  working_capital:
+    label: "Пополнение оборотных средств"
+    primary: [working_capital_loan, credit_line_smb]
+    secondary: [overdraft_smb]
+  cash_gap:
+    label: "Кассовый разрыв"
+    primary: [overdraft_smb]
+    secondary: [credit_line_smb]
+  equipment:
+    label: "Покупка оборудования"
+    primary: [equipment_loan]
+    secondary: [investment_loan]
+  investment:
+    label: "Запуск или развитие проекта"
+    primary: [investment_loan]
+    secondary: []
+  real_estate:
+    label: "Недвижимость"
+    primary: [investment_loan]
+    secondary: []
+  tender_guarantee:
+    label: "Участие в тендере"
+    primary: [tender_guarantee]
+    secondary: []

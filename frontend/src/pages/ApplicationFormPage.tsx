@@ -8,8 +8,10 @@ import type {
   DraftFields,
   FormValues,
   Product,
+  ProductCode,
 } from "../api/types";
 import { useSession } from "../auth/session";
+import { RecommendationPanel } from "../components/RecommendationPanel";
 import {
   ErrorPanel,
   Loading,
@@ -144,6 +146,30 @@ function DraftEditor({
   function change(name: keyof FormValues, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
     setFields((current) => ({ ...current, [name]: "" }));
+  }
+  function applyRecommendation(code: ProductCode, amount: number, term: number) {
+    const target = catalog.items.find((item) => item.code === code);
+    if (!target) return;
+    const safeAmount = Math.min(
+      Math.max(amount, target.min_amount_kopecks),
+      target.max_amount_kopecks,
+    );
+    const safeTerm = Math.min(
+      Math.max(term, target.min_term_months),
+      target.max_term_months,
+    );
+    setValues((current) => ({
+      ...current,
+      product_code: code,
+      amount_kopecks: amountInput(safeAmount),
+      term_months: String(safeTerm),
+    }));
+    setFields((current) => ({
+      ...current,
+      product_code: "",
+      amount_kopecks: "",
+      term_months: "",
+    }));
   }
   function field(
     name: keyof FormValues,
@@ -288,6 +314,9 @@ function DraftEditor({
         }
       />
       <form onSubmit={save} noValidate>
+        {(!record || record.status === "draft") && (
+          <RecommendationPanel form={values} onApply={applyRecommendation} />
+        )}
         <div className="form-layout">
           <div className="form-main">
             <section className="panel form-panel">

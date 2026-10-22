@@ -22,6 +22,29 @@ X-CSRF-Token: {{csrf.response.body.$.csrf_token}}
 ### Каталог и версия демонстрационных условий
 GET {{base}}/products
 
+### Подбор продуктов: цели и параметры
+GET {{base}}/product-recommendations/options
+
+### Подбор продуктов по параметрам заявки
+POST {{base}}/product-recommendations
+Content-Type: application/json
+X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
+
+{
+  "purpose":"working_capital",
+  "amount_kopecks":200000000,
+  "term_months":12,
+  "urgency":"normal",
+  "has_collateral":false,
+  "collateral_type":"none",
+  "supplier_invoice_attached":true,
+  "down_payment_pct":10,
+  "revenue_total_kopecks":3000000000,
+  "expenses_total_kopecks":2000000000,
+  "existing_debt_payments_kopecks":10000000,
+  "period_months":1
+}
+
 ### Тексты и версия подтверждений
 # @name policy
 GET {{base}}/submission-policy

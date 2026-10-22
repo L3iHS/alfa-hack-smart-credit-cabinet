@@ -6,6 +6,7 @@ COPY pyproject.toml uv.lock ./
 ARG INSTALL_ML=false
 RUN if [ "$INSTALL_ML" = "true" ]; then uv sync --frozen --extra ml; else uv sync --frozen; fi && uv cache clean
 COPY app ./app
+COPY config ./config
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY tests ./tests
