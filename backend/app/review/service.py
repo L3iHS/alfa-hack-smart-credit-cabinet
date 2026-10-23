@@ -93,6 +93,18 @@ def request_information(db, user, application_id, body, key):
     def action(application, revision):
         if application.status != 'manual_review':
             conflict('Запрос уточнений сейчас недоступен')
+        run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id))
+        if run is None:
+            conflict('Рассмотрение отправленной версии не найдено')
+        try:
+            product = get_product(revision.snapshot['application']['product_code'], run.catalog_version)
+        except (KeyError, ValueError):
+            conflict('Условия отправленной версии не поддерживаются')
+        specific_fields = ('tender_number', 'beneficiary_name', 'project_description')
+        if any(name in specific_fields and name not in product.required_application_fields
+               for name in body.requested_fields):
+            raise HTTPException(422, {'code': 'validation_error', 'message': 'Нельзя запросить поле другого продукта',
+                                      'field_errors': {'requested_fields': 'Выберите общие поля или поля выбранного продукта'}})
         supersede_offers(db, application)
         event(db, application, user, revision, 'information_requested', 'needs_info')
         request = InformationRequest(id=uuid.uuid4(), application_id=application.id, revision_id=revision.id,

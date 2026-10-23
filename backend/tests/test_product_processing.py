@@ -354,3 +354,49 @@ def test_cached_historical_offer_response_restores_terms_without_repricing(clien
     assert restored['monthly_payment_kopecks'] == saved['offer']['monthly_payment_kopecks']
     assert restored['total_payment_kopecks'] == saved['offer']['total_payment_kopecks']
     assert db.execute(text("SELECT response FROM idempotency_records WHERE operation='create_offer'")).scalar_one() == saved
+
+
+@pytest.mark.parametrize('requested_field', ['tender_number', 'beneficiary_name', 'project_description'])
+def test_information_request_rejects_another_products_field_without_changes(client, db, requested_field):
+    _, identifier, _ = prepared(client, 'd')
+    process()
+    staff = authenticate(client, 'staff@example.test')
+    before = current(client, identifier)
+    history = client.get(f'{BASE}/{identifier}/history').json()
+    key = str(uuid.uuid4())
+    result = command(client, staff, f'{BASE}/{identifier}/information-requests', {
+        'expected_version': before['version'], 'message': 'Уточните сведения', 'requested_fields': [requested_field],
+    }, key)
+    assert result.status_code == 422, result.text
+    assert 'requested_fields' in result.json()['field_errors']
+    assert current(client, identifier) == before
+    assert client.get(f'{BASE}/{identifier}/history').json() == history
+    assert db.execute(text('SELECT count(*) FROM information_requests')).scalar_one() == 0
+    assert db.execute(text("SELECT count(*) FROM idempotency_records WHERE operation='request_information'")).scalar_one() == 0
+
+
+@pytest.mark.parametrize('case,requested_fields', [
+    (CASES[0], ['purpose', 'revenue_kopecks']),
+    (CASES[1], ['purpose', 'description']),
+    (CASES[2], ['project_description', 'purpose']),
+    (CASES[3], ['tender_number', 'beneficiary_name', 'purpose']),
+])
+def test_information_request_keeps_own_and_common_fields_answerable(client, db, case, requested_fields):
+    _, identifier, _ = new_submission(client, case)
+    staff = authenticate(client, 'staff@example.test')
+    result = command(client, staff, f'{BASE}/{identifier}/information-requests', {
+        'expected_version': current(client, identifier)['version'], 'message': 'Уточните сведения',
+        'requested_fields': requested_fields,
+    })
+    assert result.status_code == 201, result.text
+    assert result.json()['information_request']['requested_fields'] == requested_fields
+    headers = authenticate(client)
+    detail = current(client, identifier)
+    if 'description' in requested_fields:
+        changed = patch(client, headers, detail, description='Дополнительные сведения о закупке')
+        assert changed.status_code == 200, changed.text
+        detail = changed.json()
+    response = command(client, headers, f'{BASE}/{identifier}/information-responses', response_body(detail))
+    assert response.status_code == 202, response.text
+    process()
+    assert current(client, identifier)['status'] == 'manual_review'
