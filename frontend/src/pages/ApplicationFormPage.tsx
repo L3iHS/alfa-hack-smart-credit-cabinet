@@ -487,6 +487,10 @@ function DraftEditor({
                     годовых
                   </dd>
                 </div>
+                {product.upfront_fee_bps > 0 && <div>
+                  <dt>Разовая комиссия</dt>
+                  <dd>{(product.upfront_fee_bps / 100).toLocaleString("ru-RU")}% {product.payment_kind === "guarantee" ? "от суммы гарантии" : product.payment_kind === "revolving" ? "от лимита" : "от суммы"}</dd>
+                </div>}
               </dl>
               <div className="terms-note">
                 Условия прототипа. Не являются действующим предложением

@@ -92,6 +92,23 @@ test("all six products can be selected directly and show only their specific fie
   }
 });
 
+for (const choice of [
+  { code: "credit_line", basis: "от лимита" },
+  { code: "investment", basis: "от суммы" },
+] as const) {
+  test(`${choice.code} direct choice shows catalog upfront fee and its basis`, async ({ page }) => {
+    await login(page);
+    const catalog = await (await page.request.get("/api/v1/products")).json();
+    const product = catalog.items.find((item: { code: string }) => item.code === choice.code);
+    expect(product.upfront_fee_bps).toBeGreaterThan(0);
+    await page.goto("/applications/new");
+    await page.locator(`input[name="product_code"][value="${choice.code}"]`).check();
+    const row = page.locator(".terms-panel .terms > div").filter({ has: page.getByText("Разовая комиссия", { exact: true }) });
+    await expect(row).toContainText(`${(product.upfront_fee_bps / 100).toLocaleString("ru-RU")}% ${choice.basis}`);
+    await expect(row).not.toContainText("годовых");
+  });
+}
+
 test("switching products clears incompatible fields and keeps financial input", async ({ page }) => {
   await login(page);
   await page.goto("/applications/new");

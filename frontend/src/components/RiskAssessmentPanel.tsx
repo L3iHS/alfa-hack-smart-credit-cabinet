@@ -41,6 +41,7 @@ export default function RiskAssessmentPanel({
 }) {
   const successful = risk.status === "succeeded" && risk.probability !== null;
   const unsupported = risk.status === "not_applicable" && risk.reason_code === "unsupported_product";
+  const hasModelTarget = risk.target_event === "loan_90dpd_12m" && risk.horizon_months === 12;
   const band = risk.risk_band;
   const labels = {
     low: "Низкий риск",
@@ -72,7 +73,7 @@ export default function RiskAssessmentPanel({
             ? "Расчёт до создания предложения"
             : `Версия предложения ${risk.offer_version}`}
       </p>
-      {!unsupported && <p className="risk-target">Просрочка 90+ дней в первые 12 месяцев</p>}
+      {hasModelTarget && <p className="risk-target">Просрочка 90+ дней в первые 12 месяцев</p>}
       {successful ? (
         <>
           <div className="risk-result">
@@ -156,10 +157,10 @@ export default function RiskAssessmentPanel({
           </p>
         </div>
       )}
-      {!unsupported && <p className="muted risk-model">
-        Модель: {risk.scorer_version || "Не определена"}
+      {risk.scorer_version !== null && <p className="muted risk-model">
+        Модель: {risk.scorer_version}
       </p>}
-      {!unsupported && <p className="muted">
+      {risk.scorer_version !== null && <p className="muted">
         Синтетические данные. Качество на них не подтверждает точность для
         реальных заёмщиков
       </p>}

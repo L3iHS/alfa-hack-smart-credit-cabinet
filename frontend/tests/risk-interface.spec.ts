@@ -136,6 +136,44 @@ test("historical calculation without payment terms retains saved monthly amount 
   await expect(page.getByText("7,394", { exact: true })).toBeVisible();
   await expect(page.locator(".assessment-run .payment-terms")).toHaveCount(0);
 });
+for (const scenario of [
+  { product: "tender_guarantee", status: "needs_info", reason: "revenue_mismatch", explanation: "Выручка не совпадает с источником", rate: null },
+  { product: "credit_line", status: "rejected", reason: "company_liquidated", explanation: "Компания ликвидирована", rate: 2000 },
+] as const) {
+  test(`${scenario.product} ${scenario.reason} keeps primary reason without model target`, async ({ page }) => {
+    const skipped = risk(0.15, {
+      status: "not_applicable", reason_code: scenario.reason,
+      scorer_version: null, feature_schema_version: null,
+      target_event: null, horizon_months: null,
+      probability: null, risk_band: null,
+      terms: { product_code: scenario.product, amount_kopecks: 100000000, term_months: 12, annual_rate_bps: scenario.rate },
+      top_increasing_factors: [], top_decreasing_factors: [],
+    });
+    const result = assessment([skipped]);
+    result.runs[0].decision.internal_reason = scenario.explanation;
+    await open(page, () => result, () => ({
+      ...app(), product_code: scenario.product, status: scenario.status,
+      public_reasons: [scenario.explanation], available_actions: [],
+    }));
+    const card = page.locator(".risk-assessment");
+    await expect(card).toContainText("Оценка неприменима");
+    await expect(card).not.toContainText("Просрочка 90+");
+    await expect(card).not.toContainText("Модель: Не определена");
+    await expect(card).not.toContainText("Заявку рассматривает сотрудник");
+    await expect(page.locator(".assessment-run")).toContainText(scenario.explanation);
+  });
+}
+test("equipment with applicable model metadata retains target on an early stop", async ({ page }) => {
+  const stopped = risk(0.15, {
+    status: "not_applicable", reason_code: "overdue_90_plus",
+    probability: null, risk_band: null,
+    terms: { product_code: "equipment", amount_kopecks: 100000000, term_months: 12, annual_rate_bps: 2200 },
+  });
+  await open(page, () => assessment([stopped]));
+  const card = page.locator(".risk-assessment");
+  await expect(card).toContainText("Просрочка 90+ дней в первые 12 месяцев");
+  await expect(card).toContainText("Модель: logistic-risk-v1");
+});
 for (const [p, label, display] of [
   [0.070751957, "Низкий риск", "7,08%"],
   [0.1, "Повышенный риск", "10,00%"],
