@@ -175,6 +175,91 @@ test("late recommendation A cannot replace B or clear B loading state", async ({
 });
 
 for (const product of [
+  { code: "tender_guarantee", amount: "500000", revised: "450000", term: "12", document: "Документы по тендеру", amountLabel: "Сумма гарантии", termLabel: "Срок" },
+  { code: "credit_line", amount: "1000000", revised: "900000", term: "12", document: "Выписка по счёту", amountLabel: "Лимит", termLabel: "Срок" },
+] as const) {
+  test(`${product.code} request and response use product amount and term labels`, async ({ page, browser }) => {
+    await login(page);
+    await page.goto("/applications/new");
+    await page.locator(`input[name="product_code"][value="${product.code}"]`).check();
+    await page.locator("#amount_kopecks").fill(product.amount);
+    await page.locator("#term_months").fill(product.term);
+    await page.locator("#purpose").fill(`Уточнение ${product.code}`);
+    await page.locator("#period_start").fill("2026-01");
+    await page.locator("#period_end").fill("2026-03");
+    await page.locator("#revenue_kopecks").fill("120000000");
+    await page.locator("#operating_expenses_kopecks").fill("3000000");
+    await page.locator("#existing_debt_payments_kopecks").fill("0");
+    if (product.code === "tender_guarantee") {
+      await page.locator("#tender_number").fill("T-2026-42");
+      await page.locator("#beneficiary_name").fill("Заказчик");
+    }
+    await page.getByRole("button", { name: "Сохранить черновик" }).click();
+    await expect(page).toHaveURL(/\/applications\/[a-f0-9-]+$/);
+    const id = page.url().split("/").at(-1)!;
+    await upload(page, "Финансовая отчётность");
+    await upload(page, product.document);
+    await page.getByRole("checkbox", { name: /Подтверждаю, что проверил данные/ }).check();
+    await page.getByRole("checkbox", { name: /Согласен на демонстрационную проверку/ }).check();
+    await page.getByRole("button", { name: "Отправить заявку" }).click();
+    await expect(page.locator(".page-heading .status")).toHaveText("На рассмотрении сотрудника", { timeout: 20000 });
+
+    const context = await browser.newContext({ baseURL: process.env.BASE_URL || "http://127.0.0.1:8086" });
+    const staff = await context.newPage();
+    try {
+      await login(staff, "staff@example.test");
+      await staff.goto(`/staff/applications/${id}`);
+      await staff.getByText("Запросить уточнения", { exact: true }).click();
+      const choices = staff.getByRole("group", { name: "Какие сведения нужны" });
+      await expect(choices.getByRole("checkbox", { name: product.amountLabel, exact: true })).toBeVisible();
+      await expect(choices.getByRole("checkbox", { name: product.termLabel, exact: true })).toBeVisible();
+      await choices.getByRole("checkbox", { name: product.amountLabel, exact: true }).check();
+      await choices.getByRole("checkbox", { name: product.termLabel, exact: true }).check();
+      await staff.getByLabel("Сообщение клиенту").fill("Уточните сумму и срок");
+      await staff.getByRole("button", { name: "Отправить запрос" }).click();
+      await expect(page.locator(".page-heading .status")).toHaveText("Нужны уточнения", { timeout: 15000 });
+      const request = page.locator(".information-request");
+      await expect(request).toContainText(product.amountLabel);
+      await expect(request).toContainText(product.termLabel);
+      await expect(request).not.toContainText("Сумма кредита");
+
+      await page.getByRole("link", { name: "Дополнить сведения" }).click();
+      await page.locator("#amount_kopecks").fill(product.revised);
+      await page.getByRole("button", { name: "Сохранить дополнения" }).click();
+      await expect(page).toHaveURL(new RegExp(`/applications/${id}$`));
+      await page.getByLabel("Сообщение к ответу").fill("Сумма и срок уточнены");
+      await page.getByRole("checkbox", { name: /Подтверждаю, что проверил данные/ }).check();
+      await page.getByRole("checkbox", { name: /Согласен на демонстрационную проверку/ }).check();
+      const response = page.waitForResponse((item) => item.url().endsWith(`/api/v1/applications/${id}/information-responses`));
+      await page.getByRole("button", { name: "Отправить ответ" }).click();
+      expect((await response).status()).toBe(202);
+      await page.getByText("Отправленные ответы", { exact: true }).click();
+      const answered = page.locator(".answered-requests");
+      await expect(answered).toContainText(product.amountLabel);
+      await expect(answered).toContainText(product.termLabel);
+      await expect(answered).not.toContainText("Сумма кредита");
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test("no-match change-amount action focuses the amount field", async ({ page }) => {
+  await login(page);
+  await page.goto("/applications/new");
+  await page.locator("#amount_kopecks").fill("2000000");
+  await page.locator("#term_months").fill("24");
+  await page.route("**/api/v1/product-recommendations", (route) => route.fulfill({ json: {
+    status: "no_match", message: "Измените сумму", items: [], missing_fields: [],
+    actions: [{ kind: "change_amount", label: "Изменить сумму", field: "amount_kopecks", product_code: null, recommendation_id: null }],
+    config_version: "test", trace_id: "test", catalog_version: "demo-v2", staff_trace: null,
+  } }));
+  await page.getByRole("button", { name: "Подобрать продукт" }).click();
+  await page.getByRole("button", { name: "Изменить сумму" }).click();
+  await expect(page.locator("#amount_kopecks")).toBeFocused();
+});
+
+for (const product of [
   { code: "working_capital", amount: "500000", term: "12" },
   { code: "equipment", amount: "1000000", term: "12" },
   { code: "overdraft", amount: "500000", term: "2" },

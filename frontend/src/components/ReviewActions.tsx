@@ -148,6 +148,16 @@ export default function ReviewActions({
     item.offers.find((offer) => offer.status === "active") ||
     item.offers.find((offer) => offer.status === "accepted");
   const productFields: RequestedField[] = item.product_code === "investment" ? ["project_description"] : item.product_code === "tender_guarantee" ? ["tender_number", "beneficiary_name"] : [];
+  const paymentKind = item.product_code === "tender_guarantee"
+    ? "guarantee"
+    : item.product_code === "overdraft" || item.product_code === "credit_line"
+      ? "revolving"
+      : "annuity";
+  const itemFieldLabels = {
+    ...fieldLabels,
+    amount_kopecks: amountLabel(paymentKind),
+    term_months: paymentKind === "annuity" ? "Срок кредита" : "Срок",
+  };
   useEffect(() => {
     writeStored(draftKey, draft);
   }, [draftKey, draft]);
@@ -319,7 +329,7 @@ export default function ReviewActions({
           <ul>
             {request.requested_fields.map((field) => (
               <li key={field}>
-                {fieldLabels[field as RequestedField] || field}
+                {itemFieldLabels[field as RequestedField] || field}
               </li>
             ))}
             {request.requested_document_types.map((type) => (
@@ -342,7 +352,7 @@ export default function ReviewActions({
                 <ul>
                   {request.requested_fields.map((field) => (
                     <li key={field}>
-                      {fieldLabels[field as RequestedField] || field}
+                      {itemFieldLabels[field as RequestedField] || field}
                     </li>
                   ))}
                   {request.requested_document_types.map((type) => (
@@ -495,7 +505,7 @@ export default function ReviewActions({
           </label>
           <fieldset className="request-options" disabled={disabled}>
             <legend>Какие сведения нужны</legend>
-            {Object.entries(fieldLabels).filter(([field]) => !(["tender_number", "beneficiary_name", "project_description"] as string[]).includes(field) || productFields.includes(field as RequestedField)).map(([field, label]) => (
+            {Object.entries(itemFieldLabels).filter(([field]) => !(["tender_number", "beneficiary_name", "project_description"] as string[]).includes(field) || productFields.includes(field as RequestedField)).map(([field, label]) => (
               <label key={field}>
                 <input
                   type="checkbox"
@@ -640,7 +650,7 @@ export default function ReviewActions({
           <p>{validation || command.error}</p>
           {Object.entries(command.fields).map(([field, message]) => (
             <p key={field}>
-              {fieldLabels[field as RequestedField] || field}: {message}
+              {itemFieldLabels[field as RequestedField] || field}: {message}
             </p>
           ))}
         </div>

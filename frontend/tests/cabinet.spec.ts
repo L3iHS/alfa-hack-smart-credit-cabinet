@@ -221,8 +221,12 @@ test("network_failure_can_be_retried_and_period_error_is_associated", async ({
     page.getByRole("heading", { name: "Не удалось загрузить данные" }),
   ).toBeVisible();
   await context.setOffline(false);
-  // После действия экран ошибки сразу заменяется формой; click ожидает старую кнопку повторно.
-  await page.getByRole("button", { name: "Повторить" }).dispatchEvent("click");
+  // Проверяем реальное нажатие указателем: экран может смениться сразу после него.
+  const retry = page.getByRole("button", { name: "Повторить" });
+  await expect(retry).toBeEnabled();
+  const bounds = await retry.boundingBox();
+  expect(bounds).not.toBeNull();
+  await page.mouse.click(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
   await expect(page.getByRole("heading", { name: "Выбор продукта" })).toBeVisible();
   await page.getByLabel("Начало периода").fill("2099-01");
   await page.getByLabel("Конец периода").fill("2099-02");
