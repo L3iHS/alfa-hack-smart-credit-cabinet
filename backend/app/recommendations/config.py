@@ -3,7 +3,7 @@
 import hashlib
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Literal, get_args
+from typing import Annotated, get_args
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError, model_validator
@@ -12,10 +12,10 @@ from app.products.catalog import CATALOG_VERSION, get_catalog
 from app.recommendations.schemas import PurposeCode
 
 DEFAULT_RULES_PATH = Path(__file__).resolve().parents[2] / 'config' / 'rules'
-_FILE_NAMES = ('products.yaml', 'purpose_map.yaml', 'ranking.yaml', 'reasons.yaml', 'stop_factors.yaml')
+_FILE_NAMES = ('products.yaml', 'purpose_map.yaml', 'ranking.yaml', 'reasons.yaml')
 _REASON_CODES = frozenset(('purpose_match', 'purpose_alternative', 'catalog_amount_adjusted',
     'financial_amount_adjusted', 'term_adjusted', 'amount_below_minimum', 'financial_no_match',
-    'company_status', 'overdue', 'company_data_missing'))
+    'company_liquidated', 'overdue_90_plus', 'company_data_missing'))
 Text = Annotated[str, Field(min_length=1, strict=True)]
 
 
@@ -25,22 +25,6 @@ class RecommendationConfigError(ValueError):
 
 class ConfigModel(BaseModel):
     model_config = ConfigDict(extra='forbid', frozen=True, allow_inf_nan=False)
-
-
-class Rule(ConfigModel):
-    id: Text
-    field: Literal['egrul_status', 'max_overdue_days']
-    op: Literal['eq', 'lt']
-    value: Text | StrictInt
-    reason_code: Text
-
-    @model_validator(mode='after')
-    def check_operand(self):
-        if self.field == 'egrul_status' and (self.op != 'eq' or not isinstance(self.value, str)):
-            raise ValueError('Статус компании сравнивается со строкой')
-        if self.field == 'max_overdue_days' and (self.op != 'lt' or type(self.value) is not int):
-            raise ValueError('Просрочка сравнивается с целым числом дней')
-        return self
 
 
 class Purpose(ConfigModel):
@@ -70,10 +54,6 @@ class PurposesFile(ConfigModel):
     purposes: dict[PurposeCode, Purpose]
 
 
-class StopsFile(ConfigModel):
-    global_stop_factors: list[Rule]
-
-
 class RecommendationConfig(ConfigModel):
     version: str
     fingerprint: str
@@ -81,7 +61,6 @@ class RecommendationConfig(ConfigModel):
     purposes: dict[str, Purpose]
     ranking: Ranking
     reasons: dict[str, str]
-    global_rules: tuple[Rule, ...]
 
     def purpose(self, code: str) -> Purpose:
         try:
@@ -94,6 +73,8 @@ class RecommendationConfig(ConfigModel):
 def load_config(path: str | None = None) -> RecommendationConfig:
     """Проверяет структуру, ссылки, повторы и отсутствие неисполняемых настроек."""
     directory = Path(path) if path is not None else DEFAULT_RULES_PATH
+    if {file.name for file in directory.glob('*.yaml')} != set(_FILE_NAMES):
+        raise RecommendationConfigError('Нужны только поддерживаемые файлы конфигурации подбора')
     raw = {}
     digest = hashlib.sha256()
     try:
@@ -107,7 +88,6 @@ def load_config(path: str | None = None) -> RecommendationConfig:
         products = ProductsFile.model_validate(raw['products.yaml'])
         purposes = PurposesFile.model_validate(raw['purpose_map.yaml']).purposes
         ranking = Ranking.model_validate(raw['ranking.yaml'])
-        stops = StopsFile.model_validate(raw['stop_factors.yaml']).global_stop_factors
     except (OSError, UnicodeError, yaml.YAMLError, ValidationError) as error:
         raise RecommendationConfigError('Не удалось прочитать конфигурацию подбора') from error
     catalog = get_catalog(CATALOG_VERSION)
@@ -127,8 +107,5 @@ def load_config(path: str | None = None) -> RecommendationConfig:
     reasons = raw['reasons.yaml']
     if set(reasons) != _REASON_CODES or any(not isinstance(text, str) or not text.strip() for text in reasons.values()):
         raise RecommendationConfigError('Нужны все исполняемые тексты причин')
-    if len({rule.id for rule in stops}) != len(stops) or any(rule.reason_code not in reasons for rule in stops):
-        raise RecommendationConfigError('Стоп-правила содержат повторный id или неизвестную причину')
     return RecommendationConfig(version=products.config_version, fingerprint=digest.hexdigest(),
-        products=tuple(products.products), purposes=purposes, ranking=ranking, reasons=reasons,
-        global_rules=tuple(stops))
+        products=tuple(products.products), purposes=purposes, ranking=ranking, reasons=reasons)

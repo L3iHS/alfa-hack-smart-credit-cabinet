@@ -101,3 +101,28 @@ def test_information_request_has_priority_over_stop_factor():
     assert result.outcome == 'needs_info'
     data['revenue_kopecks'] = 240000000
     assert evaluate(data,registered_at=date(2024,1,1),submitted_at=date(2026,10,20),overdue_days=0,liquidated=True).outcome == 'rejected'
+
+
+@pytest.mark.parametrize('version', ['demo-policy-v1', 'demo-policy-0.2', 'demo-policy-0.3', 'demo-policy-0.4'])
+@pytest.mark.parametrize('liquidated,overdue,outcome,code,reason', [
+    (True, 100, 'rejected', 'company_liquidated', 'Синтетический реестр подтверждает ликвидацию компании'),
+    (False, 90, 'rejected', 'overdue_90_plus', 'Текущая просрочка по демонстрационной проверке БКИ составляет 90 дней или более'),
+    (False, 89, 'manual_review', 'current_overdue', None),
+    (False, 0, 'approved', 'coverage_sufficient', None),
+])
+def test_company_stop_results_and_priority_stay_identical_for_historical_policies(version, liquidated, overdue, outcome, code, reason):
+    from app.processing.policy import evaluate
+    data = dict(product_code='equipment', amount_kopecks=200_000_000, term_months=24,
+                period_start='2026-07-01', period_end='2026-09-30', revenue_kopecks=240_000_000,
+                operating_expenses_kopecks=150_000_000, existing_debt_payments_kopecks=15_000_000)
+    result = evaluate(data, registered_at=date(2024, 1, 1), submitted_at=date(2026, 10, 20),
+                      liquidated=liquidated, overdue_days=overdue, policy_version=version, probability=.05)
+    assert (result.outcome, result.reason_code) == (outcome, code)
+    assert result.calculation.monthly_payment_kopecks == 10_574_220
+    if reason is not None:
+        assert result.reason == reason
+    # Несовпадение финансовых сведений по-прежнему проверяется до обоих стопов.
+    priority = evaluate(data, registered_at=date(2024, 1, 1), submitted_at=date(2026, 10, 20),
+        liquidated=True, overdue_days=100, policy_version=version, probability=.05,
+        expected_monthly_revenue_kopecks=1)
+    assert (priority.outcome, priority.reason_code) == ('needs_info', 'revenue_mismatch')

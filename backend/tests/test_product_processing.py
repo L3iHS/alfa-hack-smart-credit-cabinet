@@ -234,7 +234,7 @@ def test_expanded_catalog_does_not_expand_frozen_features_or_training_manifest()
 
 
 @pytest.mark.parametrize('case', CASES)
-@pytest.mark.parametrize('failure', ['incomplete', 'stop', 'source'])
+@pytest.mark.parametrize('failure', ['incomplete', 'stop', 'liquidation', 'source'])
 def test_new_products_keep_completeness_stop_and_source_priority(client, db, monkeypatch, case, failure):
     from app.processing import providers
     from app.risk import assessments
@@ -244,6 +244,8 @@ def test_new_products_keep_completeness_stop_and_source_priority(client, db, mon
             raise RuntimeError('Источник временно недоступен')
         if kind == 'tax' and failure == 'incomplete':
             return {'expected_monthly_revenue_kopecks': 1}
+        if kind == 'registry' and failure == 'liquidation':
+            return {**original(kind, snapshot, version), 'liquidated': True}
         if kind == 'bki':
             return {'overdue_days': 100}
         return original(kind, snapshot, version)
@@ -259,7 +261,9 @@ def test_new_products_keep_completeness_stop_and_source_priority(client, db, mon
         assert db.execute(text('SELECT count(*) FROM risk_assessments')).scalar_one() == 0
     else:
         assert detail['status'] == ('needs_info' if failure == 'incomplete' else 'rejected')
-        assert db.execute(text('SELECT reason_code FROM risk_assessments')).scalar_one() == ('revenue_mismatch' if failure == 'incomplete' else 'overdue_90_plus')
+        expected_reason = ('revenue_mismatch' if failure == 'incomplete' else
+                           'company_liquidated' if failure == 'liquidation' else 'overdue_90_plus')
+        assert db.execute(text('SELECT reason_code FROM risk_assessments')).scalar_one() == expected_reason
 
 
 @pytest.mark.parametrize('version', ['demo-policy-0.2', 'demo-policy-0.3'])

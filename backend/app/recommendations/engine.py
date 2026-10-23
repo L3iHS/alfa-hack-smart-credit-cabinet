@@ -3,6 +3,7 @@
 import uuid
 from decimal import Decimal
 
+from app.processing.policy import company_stop_reason
 from app.products.calculations import calculate_terms
 from app.products.catalog import CATALOG_VERSION, get_product
 from app.products.financial import financial_gate
@@ -77,16 +78,17 @@ def recommend(request: RecommendationRequest, company, *, role: str = 'client',
             catalog_version=CATALOG_VERSION, trace_id=uuid.uuid4().hex,
             staff_trace=trace if role == 'staff' else None)
 
-    stop_messages = []
-    for rule in config.global_rules:
-        actual = context.get(rule.field)
-        passed = actual is not None and (actual == rule.value if rule.op == 'eq' else actual < rule.value)
-        trace.append({'stage': 'company', 'rule_id': rule.id, 'actual': actual,
-                      'expected': rule.value, 'passed': passed})
-        if not passed:
-            stop_messages.append(config.reasons[rule.reason_code if actual is not None else 'company_data_missing'])
-    if stop_messages:
-        return response('no_match', ' '.join(dict.fromkeys(stop_messages)))
+    status, overdue = context.get('egrul_status'), context.get('max_overdue_days')
+    if status is None or overdue is None:
+        trace.append({'stage': 'company', 'rule_id': 'company_eligibility',
+                      'reason_code': 'company_data_missing', 'passed': False})
+        return response('no_match', config.reasons['company_data_missing'])
+    stop_reason = company_stop_reason(liquidated=status == 'liquidated', overdue_days=overdue)
+    trace.append({'stage': 'company', 'rule_id': 'company_eligibility',
+                  'liquidated': status == 'liquidated', 'overdue_days': overdue,
+                  'reason_code': stop_reason[0] if stop_reason else None, 'passed': stop_reason is None})
+    if stop_reason is not None:
+        return response('no_match', config.reasons[stop_reason[0]])
 
     missing = [name for name in MISSING_LABELS if context.get(name) is None]
     if missing:

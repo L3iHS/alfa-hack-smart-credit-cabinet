@@ -1,4 +1,4 @@
-config_version: rules-2026.10.2
+config_version: rules-2026.10.3
 products:
   - working_capital
   - equipment

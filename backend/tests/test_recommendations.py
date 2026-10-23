@@ -210,7 +210,7 @@ def test_no_fake_percent_or_approval_contract_is_exposed():
 def test_staff_trace_contains_real_checks_without_changing_result():
     staff = recommend(request(), COMPANY, role='staff')
     assert staff.staff_trace
-    assert any(row['rule_id'] == 'STOP_ACTIVE_OVERDUE' for row in staff.staff_trace)
+    assert any(row['rule_id'] == 'company_eligibility' for row in staff.staff_trace)
     assert any(row.get('product_code') == 'working_capital' and row['stage'] == 'financial_gate'
                for row in staff.staff_trace)
     assert [i.product_code for i in staff.items] == [i.product_code for i in recommend(request(), COMPANY).items]
@@ -222,6 +222,38 @@ def test_agreed_global_stop_factors_prevent_recommendations(field, value):
               'bki': {'overdue_days': 0}}
     checks['registry' if field == 'liquidated' else 'bki'][field] = value
     result = recommend(request(), COMPANY, source_checks=checks)
+    assert result.status == 'no_match'
+    assert result.items == []
+
+
+@pytest.mark.parametrize('mutation,liquidated,overdue', [
+    ('empty', True, 0), ('empty', False, 90),
+    ('overdue_threshold', False, 90), ('registry_status', True, 0),
+    ('missing', True, 0), ('missing', False, 90),
+])
+def test_configuration_cannot_disable_mandatory_company_checks(tmp_path, mutation, liquidated, overdue):
+    for source in DEFAULT_RULES_PATH.glob('*.yaml'):
+        (tmp_path / source.name).write_bytes(source.read_bytes())
+    target = tmp_path / 'stop_factors.yaml'
+    if mutation == 'missing':
+        target.unlink(missing_ok=True)
+    else:
+        rules = [] if mutation == 'empty' else [
+            {'id': 'STOP_LIQUIDATION', 'field': 'egrul_status', 'op': 'eq',
+             'value': 'liquidated' if mutation == 'registry_status' else 'active', 'reason_code': 'company_status'},
+            {'id': 'STOP_ACTIVE_OVERDUE', 'field': 'max_overdue_days', 'op': 'lt',
+             'value': 1000 if mutation == 'overdue_threshold' else 90, 'reason_code': 'overdue'},
+        ]
+        target.write_text(yaml.safe_dump({'global_stop_factors': rules}))
+    try:
+        config = load_config(str(tmp_path))
+    except RecommendationConfigError:
+        # Старый настраиваемый файл может отвергаться целиком; обход проверки невозможен.
+        return
+    result = recommend(request(), COMPANY, config=config, source_checks={
+        'registry': {'registered_at': '2019-03-15', 'liquidated': liquidated},
+        'bki': {'overdue_days': overdue},
+    })
     assert result.status == 'no_match'
     assert result.items == []
 
@@ -360,8 +392,8 @@ def test_api_rejects_forged_context_and_obsolete_unexecutable_inputs(client, ext
     ('purpose_map.yaml', lambda raw: raw['purposes']['equipment'].update(primary=['unknown'])),
     ('ranking.yaml', lambda raw: raw.update(show_top_n=0)),
     ('ranking.yaml', lambda raw: raw.update(approval_likelihood=0.2)),
-    ('stop_factors.yaml', lambda raw: raw.update(excluded_okved_prefixes=['64.99'])),
-    ('stop_factors.yaml', lambda raw: raw['global_stop_factors'][0].update(reason_code='unknown')),
+    ('ranking.yaml', lambda raw: raw.update(global_stop_factors=[])),
+    ('reasons.yaml', lambda raw: raw.update(excluded_okved_prefixes=['64.99'])),
 ])
 def test_configuration_rejects_bad_references_and_unexecutable_fields(tmp_path, file, change):
     for source in DEFAULT_RULES_PATH.glob('*.yaml'):

@@ -99,6 +99,15 @@ def find_offer(data: dict, flow: Decimal, debt: Decimal, months: int = 1, *, cat
     return None
 
 
+def company_stop_reason(*, liquidated: bool, overdue_days: int) -> tuple[str, str] | None:
+    """Общие обязательные стопы; ликвидация имеет приоритет перед просрочкой."""
+    if liquidated:
+        return 'company_liquidated', 'Синтетический реестр подтверждает ликвидацию компании'
+    if overdue_days >= 90:
+        return 'overdue_90_plus', 'Текущая просрочка по демонстрационной проверке БКИ составляет 90 дней или более'
+    return None
+
+
 def evaluate(data: dict, *, registered_at: date, submitted_at: date, overdue_days: int, liquidated: bool,
              expected_monthly_revenue_kopecks: int | None = None, policy_version: str = POLICY_VERSION,
              probability: float | None = None, catalog_version: str | None = None) -> PolicyResult:
@@ -135,10 +144,9 @@ def evaluate(data: dict, *, registered_at: date, submitted_at: date, overdue_day
                                         payment_terms=terms, financial_gate=gate)
         def result(outcome, code, reason, offer=None):
             return PolicyResult(outcome=outcome, reason_code=code, reason=reason, calculation=calculation, offer=offer)
-        if liquidated:
-            return result('rejected', 'company_liquidated', 'Синтетический реестр подтверждает ликвидацию компании')
-        if overdue_days >= 90:
-            return result('rejected', 'overdue_90_plus', 'Текущая просрочка по демонстрационной проверке БКИ составляет 90 дней или более')
+        stop_reason = company_stop_reason(liquidated=liquidated, overdue_days=overdue_days)
+        if stop_reason is not None:
+            return result('rejected', *stop_reason)
         if profile.uses_risk_assessments and not model_required:
             return result('manual_review', 'unsupported_product', 'Модель риска для этого продукта пока не применяется. Заявку рассматривает сотрудник')
         if model_required and probability is None:
