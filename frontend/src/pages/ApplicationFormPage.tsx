@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, errorMessage } from "../api/client";
 import type {
@@ -19,6 +19,8 @@ import {
   PageHeading,
   useResource,
 } from "../components/shared";
+
+import { beginJourney, linkJourney, linkedJourney, useVisibleObservation, viewStep } from "../analytics/observations";
 
 const moneyFields = [
   "amount_kopecks",
@@ -130,6 +132,12 @@ function DraftEditor({
   const [record, setRecord] = useState<Application | null>(
     () => restored?.application || application,
   );
+  const [journey, setJourney] = useState<string | null>(null);
+  const termsRef = useRef<HTMLElement>(null);
+  const financesRef = useRef<HTMLElement>(null);
+  useEffect(() => { setJourney(record ? linkedJourney(user!.id, record.id) : beginJourney(user!.id, values.product_code)); }, [user!.id, record?.id]);
+  useVisibleObservation(termsRef, journey ? () => viewStep(user!.id, journey, 'terms') : null, `${user!.id}:${journey}:terms`);
+  useVisibleObservation(financesRef, journey ? () => viewStep(user!.id, journey, 'finances') : null, `${user!.id}:${journey}:finances`);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState(false);
@@ -273,6 +281,7 @@ function DraftEditor({
             },
           })
         : await api<Application>("/applications", { method: "POST", body });
+      if (!record && journey) linkJourney(user!.id, journey, saved.id);
       recovery.current = null;
       navigate(`/applications/${saved.id}`, { state: { saved: true } });
     } catch (e) {
@@ -328,7 +337,7 @@ function DraftEditor({
       <form onSubmit={save} noValidate>
         <div className="form-layout">
           <div className="form-main">
-            <section className="panel form-panel">
+            <section className="panel form-panel" ref={termsRef}>
               <h2>Выбор продукта</h2>
               <fieldset className="product-options">
                 <legend className="sr-only">Кредитный продукт</legend>
@@ -404,7 +413,7 @@ function DraftEditor({
                 </small>
               </label>
             </section>
-            <section className="panel form-panel">
+            <section className="panel form-panel" ref={financesRef}>
               <h2>Финансы компании</h2>
               <p className="section-description">
                 Укажите суммы за один и тот же период из завершённых календарных
@@ -456,6 +465,9 @@ function DraftEditor({
                 },
               )}
             </section>
+        {(!record || record.status === "draft") && (
+          <RecommendationPanel form={values} onApply={applyRecommendation} />
+        )}
           </div>
           <aside className="form-aside">
             <section className="panel terms-panel">
@@ -501,9 +513,7 @@ function DraftEditor({
             </section>
           </aside>
         </div>
-        {(!record || record.status === "draft") && (
-          <RecommendationPanel form={values} onApply={applyRecommendation} />
-        )}
+
         <div className="save-area">
           {conflict ? (
             <div className="notice conflict" role="alert">

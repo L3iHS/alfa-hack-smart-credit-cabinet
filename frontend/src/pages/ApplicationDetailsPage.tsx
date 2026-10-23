@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, errorMessage } from "../api/client";
 import { useSession } from "../auth/session";
@@ -26,6 +26,8 @@ import {
   useResource,
 } from "../components/shared";
 import { amountLabel } from "../components/PaymentTermsView";
+
+import { linkedJourney, useVisibleObservation, viewStep } from "../analytics/observations";
 
 export default function ApplicationDetailsPage() {
   const { id } = useParams();
@@ -66,6 +68,11 @@ function Details({
   const locked = submissionLocked || reviewLocked;
   const [refreshError, setRefreshError] = useState("");
   const id = item.id;
+  const documentsRef = useRef<HTMLDivElement>(null);
+  const reviewRef = useRef<HTMLDivElement>(null);
+  const [journey] = useState(() => staff ? null : linkedJourney(user!.id, id));
+  useVisibleObservation(documentsRef, journey ? () => viewStep(user!.id, journey, 'documents') : null, `${journey}:documents`);
+  useVisibleObservation(reviewRef, journey && item.status === 'draft' ? () => viewStep(user!.id, journey, 'review') : null, `${journey}:${item.status}:review`);
   const assessment = useResource(
     () =>
       staff
@@ -239,19 +246,19 @@ function Details({
             refreshAssessment={assessment.reload}
             lock={setReviewLocked}
           />
-          <ApplicationDocuments
+          <div ref={documentsRef}><ApplicationDocuments
             application={item}
             required={product?.required_document_types || []}
             policy={policy}
             locked={locked}
             changed={refresh}
-          />
+          /></div>
         </div>
         <aside className="details-aside">
           {!!policyError && (
             <ErrorPanel error={policyError} retry={reloadPolicy} />
           )}
-          <SubmissionPanel
+          <div ref={reviewRef}><SubmissionPanel
             application={item}
             policy={policy}
             owner={user!.id}
@@ -266,7 +273,7 @@ function Details({
                 available_actions: [],
               }));
             }}
-          />
+          /></div>
           <History id={id} version={item.version} />
         </aside>
       </div>

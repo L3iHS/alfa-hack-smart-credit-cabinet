@@ -24,6 +24,7 @@ export function setIdentity(user: User | null) {
   if (next !== identity) {
     identity = next;
     invalidateCsrf();
+    window.dispatchEvent(new Event("credit-identity-changed"));
   }
 }
 export function setCsrf(token: string | null, userId: string | null = null) {
@@ -33,6 +34,7 @@ export function setCsrf(token: string | null, userId: string | null = null) {
 function expire() {
   identity = null;
   invalidateCsrf();
+  window.dispatchEvent(new Event("credit-identity-changed"));
   window.dispatchEvent(new Event("session-expired"));
 }
 function sessionChanged() {
@@ -211,3 +213,27 @@ export async function api<T>(
 export function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Не удалось выполнить запрос";
 }
+
+// Наблюдения не меняют состояние авторизации и не повторяют бизнес-команды.
+export async function observeEvent(owner: string, event: import('./types').AnalyticsEvent, signal: AbortSignal) {
+  const expected = generation;
+  const currentOwner = () => identity === owner && generation === expected && !signal.aborted;
+  if (!currentOwner()) throw sessionChanged();
+  let token = binding?.user_id === owner ? binding.csrf_token : null;
+  if (!token) {
+    const response = await raw('/auth/csrf', { signal });
+    const value = await decode(response);
+    if (!response.ok || !currentOwner() || value?.user_id !== owner || typeof value?.csrf_token !== 'string' || !value.csrf_token)
+      throw sessionChanged();
+    token = value.csrf_token;
+  }
+  if (!currentOwner() || !token) throw sessionChanged();
+  const response = await raw('/analytics/events', {
+    method: 'POST', signal,
+    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': token},
+    body: JSON.stringify(event),
+  });
+  if (!currentOwner()) throw sessionChanged();
+  if (!response.ok) throw new ApiError(response.status, 'observation_failed', 'Наблюдение не сохранено');
+}
+export function isObservationOwner(owner: string) { return identity === owner; }

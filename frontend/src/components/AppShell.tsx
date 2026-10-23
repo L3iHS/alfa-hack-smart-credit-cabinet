@@ -60,6 +60,7 @@ export default function AppShell() {
             </svg>
             {staff ? "Заявки на рассмотрение" : "Мои заявки"}
           </NavLink>
+        {staff && <NavLink to="/staff/analytics"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20V12h4v8M10 20V8h4v12M16 20V4h4v16" stroke="currentColor" strokeWidth="1.6" /></svg>Аналитика</NavLink>}
         </nav>
       </aside>
       <div className="workspace">

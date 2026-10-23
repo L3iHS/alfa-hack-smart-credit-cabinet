@@ -265,6 +265,8 @@ export interface InformationRequest {
   response_revision_id: string | null;
 }
 export interface Offer {
+  responded_at: string | null;
+  decline_reason: DeclineReason | null;
   id: string;
   version: number;
   revision_id: string;
@@ -405,3 +407,43 @@ export interface OfferActionBody {
   expected_version: number;
   offer_version: number;
 }
+export interface DeclineOfferBody extends OfferActionBody { decline_reason?: DeclineReason | null }
+
+export type DeclineReason = 'insufficient_amount' | 'high_payment' | 'unsuitable_term' | 'no_longer_needed' | 'other';
+export type OfferOutcome = 'accepted' | 'declined' | 'superseded' | 'no_response' | 'awaiting_response' | 'not_viewed';
+export type FormStep = 'terms' | 'finances' | 'documents' | 'review';
+export type AnalyticsEvent = {event_id: string} & (
+  | {kind: 'form_opened'; journey_id: string; product_code: ProductCode}
+  | {kind: 'form_step_viewed'; journey_id: string; step: FormStep}
+  | {kind: 'draft_linked'; journey_id: string; application_id: string}
+  | {kind: 'offer_viewed'; offer_id: string; offer_version: number}
+);
+export interface ObservationCount {count: number; base: number; share: number | null}
+export interface FunnelStage {
+  key: 'opened' | 'draft_saved' | 'submitted' | 'issued' | 'viewed' | 'responded' | 'accepted';
+  count: number; base_from_first: number; base_from_previous: number;
+  share_from_first: number | null; share_from_previous: number | null;
+}
+export interface ReportMetadata {
+  date_from: string; date_to: string; timezone: 'Europe/Moscow'; generated_at: string;
+  outcomes_as_of: string; product_code: ProductCode | null; no_response_hours: 72;
+}
+export interface AnalyticsSummary {
+  metadata: ReportMetadata; form_funnel: FunnelStage[]; offer_funnel: FunnelStage[];
+  last_steps: (ObservationCount & {step: FormStep | 'not_observed'})[];
+  offer_outcomes: (ObservationCount & {outcome: OfferOutcome})[];
+  declined_after_view: ObservationCount;
+  response_coverage: {responses_without_prior_view: number; response_without_registered_view: number; response_viewed_after_response: number; response_time_unknown: number};
+  decline_reasons: (ObservationCount & {reason: DeclineReason | null})[];
+  condition_changes: {change: 'amount_only' | 'term_only' | 'amount_and_term' | 'unchanged'; count: number; accepted: number; acceptance_share: number | null}[];
+}
+export interface CounterofferRow {
+  id: string; application_id: string; revision_id: string; company_name: string;
+  product_code: ProductCode; created_at: string; original_amount_kopecks: number;
+  original_term_months: number; original_monthly_payment_kopecks: number | null;
+  amount_kopecks: number; term_months: number; payment_terms: PaymentTerms;
+  amount_delta_kopecks: number; amount_delta_rubles: string; amount_delta_percent: number | null;
+  term_delta_months: number; first_viewed_at: string | null; responded_at: string | null;
+  outcome: OfferOutcome; decline_reason: DeclineReason | null;
+}
+export interface CounterofferPage {metadata: ReportMetadata; items: CounterofferRow[]; total: number; page: number; page_size: number}

@@ -12,6 +12,7 @@ import LoginPage from "./pages/LoginPage";
 import ApplicationsPage from "./pages/ApplicationsPage";
 import ApplicationFormPage from "./pages/ApplicationFormPage";
 import ApplicationDetailsPage from "./pages/ApplicationDetailsPage";
+import StaffAnalyticsPage from "./pages/StaffAnalyticsPage";
 import StaffApplicationsPage from "./pages/StaffApplicationsPage";
 import "./styles.css";
 
@@ -63,6 +64,7 @@ export default function App() {
                 />
               </Route>
               <Route element={<Protected role="staff" />}>
+                <Route path="/staff/analytics" element={<StaffAnalyticsPage />} />
                 <Route
                   path="/staff/applications/:id"
                   element={<ApplicationDetailsPage />}

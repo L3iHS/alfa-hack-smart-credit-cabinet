@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   Application,
@@ -6,6 +6,7 @@ import type {
   CreateOfferBody,
   DecisionBody,
   DocumentType,
+  DeclineReason,
   DraftFields,
   InformationRequestBody,
   InformationResponseBody,
@@ -17,6 +18,9 @@ import PaymentTermsView, { amountLabel } from "./PaymentTermsView";
 import { documentLabels } from "./ApplicationDocuments";
 import { dateTime, money, statusLabels } from "./shared";
 import { readStored, useReviewCommand, writeStored } from "./useReviewCommand";
+
+import { useVisibleObservation, viewOffer } from "../analytics/observations";
+import { reasonLabels } from "../analytics/labels";
 
 type RequestedField = Exclude<keyof DraftFields, "product_code">;
 export const fieldLabels: Record<RequestedField, string> = {
@@ -47,6 +51,7 @@ const nextStep = {
   rejected: "Рассмотрение завершено. Причина решения указана ниже",
 };
 type Draft = {
+  declineReason: DeclineReason | "";
   reason: string;
   message: string;
   fields: RequestedField[];
@@ -57,6 +62,7 @@ type Draft = {
   consent: boolean;
 };
 const emptyDraft: Draft = {
+  declineReason: "",
   reason: "",
   message: "",
   fields: [],
@@ -147,6 +153,8 @@ export default function ReviewActions({
   const offer =
     item.offers.find((offer) => offer.status === "active") ||
     item.offers.find((offer) => offer.status === "accepted");
+  const offerRef = useRef<HTMLDivElement>(null);
+  useVisibleObservation(offerRef, !staff && offer?.status === 'active' ? () => viewOffer(owner, offer.id, offer.version) : null, `${owner}:${staff}:${offer?.id}:${offer?.status}`);
   const productFields: RequestedField[] = item.product_code === "investment" ? ["project_description"] : item.product_code === "tender_guarantee" ? ["tender_number", "beneficiary_name"] : [];
   const paymentKind = item.product_code === "tender_guarantee"
     ? "guarantee"
@@ -279,6 +287,7 @@ export default function ReviewActions({
     } else if (action === "retry_processing") path += "processing-retries";
     else {
       if (!offer || offer.status !== "active") return;
+      if (action === "decline_offer" && draft.declineReason) body.decline_reason = draft.declineReason;
       path = `/offers/${offer.id}/${action === "accept_offer" ? "accept" : "decline"}`;
       Object.assign(body, { offer_version: offer.version } satisfies Omit<
         OfferActionBody,
@@ -374,7 +383,7 @@ export default function ReviewActions({
         </details>
       )}
       {offer && (
-        <div className="offer-comparison">
+        <div className="offer-comparison" ref={offerRef}>
           <h3>
             {offer.status === "accepted"
               ? "Принятые условия"
@@ -469,7 +478,9 @@ export default function ReviewActions({
         </div>
       )}
       {!staff && (can("accept_offer") || can("decline_offer")) && (
-        <div className="review-buttons">
+        <div className="offer-response">
+          {can("decline_offer") && <label className="field decline-reason"><span>Причина отказа <small>необязательно</small></span><select disabled={disabled} value={draft.declineReason || ''} onChange={event => update('declineReason', event.target.value as DeclineReason | '')}><option value="">Без причины</option>{Object.entries(reasonLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
+          <div className="review-buttons">
           {can("decline_offer") && (
             <button
               className="button secondary"
@@ -488,7 +499,7 @@ export default function ReviewActions({
               Принять условия
             </button>
           )}
-        </div>
+        </div></div>
       )}
       {staff && can("request_information") && (
         <details className="review-form">

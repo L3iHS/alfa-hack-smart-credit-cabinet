@@ -2074,3 +2074,101 @@ dd {
     justify-content: space-between;
   }
 }
+
+/* Подбор подстраивается под основную колонку, включая узкие desktop-сетки. */
+.form-main > .recommendation-panel { margin-bottom: 0; min-width: 0; container-type: inline-size; }
+.recommendation-input-row { display: flex; flex-wrap: wrap; align-items: end; }
+.recommendation-input-row > .purpose-picker { flex: 1 1 270px; min-width: 0; }
+.recommendation-input-row > .recommendation-actions { flex: 1 1 230px; min-width: 0; }
+.recommendation-actions .button { max-width: 100%; white-space: normal; }
+@container (max-width: 520px) { .recommendation-input-row > .recommendation-actions { flex-basis: 100%; } .recommendation-actions .button { width: 100%; } .recommendation-list { grid-template-columns: minmax(0, 1fr); } .recommendation-card:only-child .financial-details { grid-template-columns: minmax(0, 1fr); } }
+.decline-reason { max-width: 360px; margin-top: 22px; }
+.decline-reason small { color: var(--muted); font-weight: 400; }
+.analytics-page { min-width: 0; }
+.analytics-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+.analytics-heading h1 { font-size: 30px; margin: 0 0 6px; }
+.analytics-heading p, .analytics-unit, .analytics-context, .analytics-asof { color: var(--muted); font-size: 14px; line-height: 1.55; }
+.analytics-heading p { margin: 0; }
+.analytics-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding: 22px 24px; }
+.analytics-filters .field { flex: 1 1 150px; margin: 0; min-width: 0; }
+.analytics-filters .analytics-product { flex: 2 1 210px; }
+.analytics-filters .button { height: 48px; }
+.analytics-filters input, .analytics-filters select, .analytics-table-heading select { height: 48px; min-width: 0; width: 100%; }
+.analytics-context { margin: 16px 0; }
+.analytics-context > p { margin: 0 0 8px; }
+.analytics-context summary { color: var(--text); cursor: pointer; width: fit-content; font-weight: 600; padding: 4px 0; }
+.analytics-context details > div { max-width: 85ch; padding: 4px 0 0 16px; border-left: 2px solid var(--line); }
+.analytics-context details p { margin: 10px 0; }
+.analytics-asof { font-size: 12px; margin: 12px 0; }
+.analytics-funnels, .analytics-breakdowns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-bottom: 20px; }
+.analytics-funnel, .analytics-breakdown { padding: 26px; min-width: 0; }
+.analytics-page h2 { font-size: 21px; line-height: 1.25; margin: 0 0 8px; }
+.analytics-unit { margin: 0 0 24px; font-size: 13px; }
+.analytics-funnel ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 25px; }
+.funnel-label { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; font-size: 15px; }
+.funnel-label strong { font-size: 27px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.funnel-track { background: #f0f1f3; height: 12px; border-radius: 4px; overflow: hidden; margin: 10px 0 8px; }
+.funnel-track > span { display: block; height: 100%; background: #d92b20; border-radius: inherit; }
+.analytics-funnel li:nth-child(2) .funnel-track > span { background: #e3564d; }
+.analytics-funnel li:nth-child(3) .funnel-track > span { background: #ac2520; }
+.analytics-funnel li:nth-child(4) .funnel-track > span { background: #6a201c; }
+.funnel-caption { display: flex; justify-content: space-between; gap: 5px 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.analytics-breakdown dl { margin: 0; }
+.analytics-breakdown dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.analytics-breakdown dl > div:last-child { border: 0; }
+.analytics-breakdown dd { margin: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.analytics-fraction > span { color: var(--muted); }
+.analytics-footnote { padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.analytics-coverage { padding: 22px 26px; margin-bottom: 20px; }
+.analytics-coverage h2 { font-size: 18px; }
+.analytics-coverage > p { margin: 10px 0; font-size: 14px; }
+.analytics-coverage > div { display: flex; flex-wrap: wrap; gap: 10px 25px; color: var(--muted); font-size: 13px; }
+.analytics-coverage strong { color: var(--text); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.analytics-offers { padding: 26px; min-width: 0; }
+.analytics-table-heading { display: flex; justify-content: space-between; align-items: end; gap: 20px; }
+.analytics-table-heading .field { width: 250px; margin: 0; }
+.analytics-table-heading .analytics-unit { margin-bottom: 0; }
+.analytics-total { margin: 20px 0 12px; font-size: 14px; }
+.analytics-table-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.analytics-table { border-collapse: collapse; width: 100%; min-width: 1000px; font-size: 13px; text-align: left; }
+.analytics-table th { background: #f7f8f9; color: var(--muted); font-size: 12px; font-weight: 500; padding: 14px; border-bottom: 1px solid var(--line); }
+.analytics-table td { padding: 17px 14px; vertical-align: top; border-bottom: 1px solid var(--line); }
+.analytics-table tr:last-child td { border-bottom: 0; }
+.analytics-table td > span, .analytics-table td > small, .analytics-table td > strong { display: block; margin-top: 5px; }
+.analytics-table td > :first-child { margin-top: 0; }
+.analytics-table a { font-weight: 600; color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.analytics-table td small { color: var(--muted); line-height: 1.5; }
+.analytics-table td:nth-child(2) { min-width: 235px; font-variant-numeric: tabular-nums; }
+.analytics-table td:last-child { min-width: 190px; }
+.analytics-outcome { width: fit-content; padding: 5px 8px; border-radius: 6px; background: #f0f1f3; }
+.analytics-outcome.outcome-accepted { background: #e7f3eb; color: #276b41; }
+.analytics-outcome.outcome-declined { background: #fcece9; color: #a62d24; }
+.analytics-pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 20px; font-size: 13px; color: var(--muted); }
+.analytics-pagination > div { display: flex; gap: 10px; }
+.analytics-loading, .analytics-empty { padding: 20px 0; color: var(--muted); }
+@media (max-width: 1150px) { .analytics-funnels, .analytics-breakdowns { gap: 16px; } .analytics-funnel, .analytics-breakdown { padding: 20px; } .funnel-caption { display: grid; } }
+@media (max-width: 1000px) { .analytics-funnels, .analytics-breakdowns { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .analytics-heading h1 { font-size: 28px; } .analytics-heading { align-items: start; } .analytics-heading .button { padding: 10px 12px; } .analytics-filters { padding: 18px; gap: 14px; } .analytics-filters .field, .analytics-filters .analytics-product { flex-basis: 100%; } .analytics-filters .button { width: 100%; } .analytics-context { font-size: 13px; } .analytics-funnel, .analytics-breakdown, .analytics-coverage, .analytics-offers { padding: 18px; } .analytics-table-heading { flex-direction: column; align-items: stretch; } .analytics-table-heading .field { width: 100%; } .analytics-breakdown dl > div { font-size: 13px; flex-wrap: wrap; gap: 5px 10px; } .analytics-pagination { align-items: start; flex-direction: column; } .analytics-heading p { font-size: 13px; } }
+.analytics-heading { margin-bottom: 12px; }
+.analytics-filters { padding-top: 14px; padding-bottom: 14px; }
+.analytics-context { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 18px; margin: 8px 0 12px; }
+.analytics-context > p { margin: 0; font-size: 13px; }
+.analytics-context details { flex-shrink: 0; }
+.analytics-context details[open] { flex-basis: 100%; }
+.analytics-context:has(details[open]) { flex-wrap: wrap; }
+.analytics-context details > div { margin-top: 8px; }
+.analytics-funnel { padding: 20px; }
+.analytics-funnel .analytics-unit { margin-bottom: 14px; }
+.analytics-funnel ol { gap: 14px; }
+.funnel-label strong { font-size: 25px; }
+.funnel-track { height: 10px; margin-top: 6px; margin-bottom: 5px; }
+@media (max-width: 600px) { .analytics-context { flex-wrap: wrap; } .analytics-funnel { padding: 18px; } }
+.analytics-table { min-width: 840px; table-layout: fixed; }
+.analytics-table th:nth-child(1) { width: 19%; }
+.analytics-table th:nth-child(2) { width: 25%; }
+.analytics-table th:nth-child(3) { width: 19%; }
+.analytics-table th:nth-child(4) { width: 17%; }
+.analytics-table th:nth-child(5) { width: 20%; }
+.analytics-table td:nth-child(2), .analytics-table td:last-child { min-width: 0; }
+.analytics-table th, .analytics-table td { padding-left: 12px; padding-right: 12px; }
+.analytics-table a { overflow-wrap: anywhere; }
