@@ -88,6 +88,7 @@ class Offer(Base):
     term_months: Mapped[int]
     monthly_payment_kopecks: Mapped[int] = mapped_column(BigInteger)
     total_payment_kopecks: Mapped[int] = mapped_column(BigInteger)
+    payment_terms: Mapped[dict | None] = mapped_column(JSONB)
     annual_rate_bps: Mapped[int]
     reason: Mapped[str] = mapped_column(String(4000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

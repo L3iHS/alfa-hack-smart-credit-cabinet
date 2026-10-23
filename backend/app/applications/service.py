@@ -66,7 +66,10 @@ def application_output(application: Application, user: User) -> ApplicationOutpu
 
 
 def validate_draft(values: dict) -> None:
-    product = PRODUCTS[values['product_code']]
+    product = PRODUCTS.get(values['product_code'])
+    if product is None:
+        raise HTTPException(422, {'code': 'validation_error', 'message': 'Проверьте введённые данные',
+                                  'field_errors': {'product_code': 'Продукт отсутствует в текущем каталоге'}})
     errors = {}
     amount = values['amount_kopecks']
     term = values['term_months']

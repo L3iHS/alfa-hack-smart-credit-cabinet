@@ -245,6 +245,7 @@ def test_patch_product_code_openapi_matches_runtime(client):
     assert 'product_code' not in schema['required']
     product = schema['properties']['product_code']
     assert product.get('type') == 'string'
-    assert product['enum'] == ['working_capital', 'equipment']
+    assert product['enum'] == ['working_capital', 'equipment', 'overdraft', 'credit_line',
+                               'investment', 'tender_guarantee']
     assert 'anyOf' not in product
     assert 'default' not in product

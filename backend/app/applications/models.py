@@ -29,6 +29,9 @@ class Application(Base):
     product_code: Mapped[str] = mapped_column(String(40))
     purpose: Mapped[str | None] = mapped_column(String(2000))
     description: Mapped[str | None] = mapped_column(String(10000))
+    tender_number: Mapped[str | None] = mapped_column(String(40))
+    beneficiary_name: Mapped[str | None] = mapped_column(String(200))
+    project_description: Mapped[str | None] = mapped_column(String(2000))
     amount_kopecks: Mapped[int | None] = mapped_column(BigInteger)
     term_months: Mapped[int | None]
     period_start: Mapped[date | None]
