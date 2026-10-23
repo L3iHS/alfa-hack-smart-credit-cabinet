@@ -268,3 +268,43 @@ test('all four offer stages and all five columns fit normal laptop', async ({pag
   const overflow = await page.locator('.analytics-table-scroll').evaluate(element => element.scrollWidth - element.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1); await screenshot(page, 'analytics-laptop-1265');
 });
+
+for (const status of [503, 429]) {
+  test(`background CSRF ${status} retries original event and preserves business session`, async ({page}) => {
+    await login(page, false);
+    const owner = (await (await page.request.get('/api/v1/me')).json()).id;
+    const csrfEvents: {event_id: string; attempts: number}[] = [];
+    const observed: any[] = [];
+    const acknowledgements = new Map<string, number>();
+    page.on('response', response => {
+      if (response.url().endsWith('/analytics/events')) {
+        const event = response.request().postDataJSON();
+        acknowledgements.set(event.event_id, response.status());
+      }
+    });
+    await page.route('**/api/v1/auth/csrf', async route => {
+      const queued = await page.evaluate(ownerId => {
+        const entries = JSON.parse(sessionStorage.getItem(`credit-observations:v1:${ownerId}:queue`) || '[]');
+        return entries[0] ? {event_id: entries[0].event.event_id, attempts: entries[0].attempts} : null;
+      }, owner);
+      if (queued) csrfEvents.push(queued);
+      if (csrfEvents.length === 1) return route.fulfill({status, json: {code: 'temporarily_unavailable', message: 'Попробуйте позже'}});
+      await route.continue();
+    });
+    page.on('request', request => {if (request.url().endsWith('/analytics/events')) observed.push(request.postDataJSON());});
+    await page.goto('/applications/new');
+    await expect.poll(() => observed.filter(event => event.kind === 'form_opened').length, {timeout: 5000}).toBe(1);
+    expect(csrfEvents.slice(0, 2)).toEqual([
+      {event_id: csrfEvents[0].event_id, attempts: 1},
+      {event_id: csrfEvents[0].event_id, attempts: 2},
+    ]);
+    expect(observed.find(event => event.kind === 'form_opened').event_id).toBe(csrfEvents[0].event_id);
+    await expect.poll(() => acknowledgements.get(csrfEvents[0].event_id)).toBe(200);
+    expect((await (await page.request.get('/api/v1/me')).json()).id).toBe(owner);
+    await expect(page.getByRole('button', {name: 'Выйти', exact: true})).toBeVisible();
+    await page.locator('#purpose').fill(`Сохранение после CSRF ${status}`);
+    await page.getByRole('button', {name: 'Сохранить черновик', exact: true}).click();
+    await expect(page).toHaveURL(/\/applications\/[a-f0-9-]+$/);
+    await expect(page.getByText(`Сохранение после CSRF ${status}`, {exact: true})).toBeVisible();
+  });
+}

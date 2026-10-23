@@ -223,7 +223,10 @@ export async function observeEvent(owner: string, event: import('./types').Analy
   if (!token) {
     const response = await raw('/auth/csrf', { signal });
     const value = await decode(response);
-    if (!response.ok || !currentOwner() || value?.user_id !== owner || typeof value?.csrf_token !== 'string' || !value.csrf_token)
+    if (!currentOwner()) throw sessionChanged();
+    if (!response.ok)
+      throw new ApiError(response.status, 'observation_csrf_failed', 'Не удалось подготовить наблюдение');
+    if (value?.user_id !== owner || typeof value?.csrf_token !== 'string' || !value.csrf_token)
       throw sessionChanged();
     token = value.csrf_token;
   }
