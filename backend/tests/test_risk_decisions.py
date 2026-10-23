@@ -45,7 +45,7 @@ def test_exact_probability_changes_decision_and_staff_only_payload(client, db, m
     assert risk['probability'] == probability and risk['risk_band'] == band
     assert risk['prediction_scope'] == 'requested_terms'
     assert result['runs'][0]['scorer_version'] == 'logistic-risk-v1'
-    assert result['runs'][0]['policy_version'] == 'demo-policy-0.3'
+    assert result['runs'][0]['policy_version'] == 'demo-policy-0.4'
     assert result['runs'][0]['risk_assessments'] == [risk]
 
 
@@ -185,7 +185,7 @@ def test_aba_attempt_fences_late_source_success_and_error(client, db, monkeypatc
 def test_new_submission_pins_mandatory_model(client, db):
     fresh(client)
     row = db.execute(text('SELECT policy_version, scorer_version FROM processing_runs')).one()
-    assert row.policy_version == 'demo-policy-0.3'
+    assert row.policy_version == 'demo-policy-0.4'
     assert row.scorer_version == 'logistic-risk-v1'
 
 

@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal, localcontext
 
 from app.processing.policy import full_months, payment, period_months
-from app.products.catalog import PRODUCTS
+from app.risk.catalog import ML_PRODUCTS as PRODUCTS
 
 FEATURE_SCHEMA_VERSION = 'risk-features-v1'
 FEATURE_NAMES = (

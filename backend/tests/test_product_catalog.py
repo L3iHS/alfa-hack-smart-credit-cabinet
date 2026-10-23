@@ -5,9 +5,9 @@ def test_catalog_matches_demo_policy(client):
     response = client.get('/api/v1/products')
     assert response.status_code == 200
     catalog = response.json()
-    assert catalog['catalog_version'] == 'demo-v1'
+    assert catalog['catalog_version'] == 'demo-v2'
     products = {item['code']: item for item in catalog['items']}
-    assert set(products) == {'working_capital', 'equipment'}
+    assert set(products) == {'working_capital', 'equipment', 'overdraft', 'credit_line', 'investment', 'tender_guarantee'}
     for code, bounds, documents in [
         ('working_capital', (10_000_000, 500_000_000, 3, 24), ['financial_statement']),
         ('equipment', (30_000_000, 1_000_000_000, 6, 36), ['financial_statement', 'equipment_invoice']),

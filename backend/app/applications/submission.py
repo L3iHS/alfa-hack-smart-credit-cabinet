@@ -48,9 +48,11 @@ def validate_submission(db: Session, application: Application, body: SubmissionI
     values = DraftFields.model_validate(application).model_dump()
     validate_draft(values)
     errors = {}
+    product = PRODUCTS[application.product_code]
     for field in ('purpose', 'amount_kopecks', 'term_months', 'period_start', 'period_end',
-                  'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks'):
-        if values[field] is None or (field == 'purpose' and not values[field].strip()):
+                  'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks',
+                  *product.required_application_fields):
+        if values[field] is None or (isinstance(values[field], str) and not values[field].strip()):
             errors[field] = 'Заполните поле перед отправкой'
     if not body.data_confirmed:
         errors['data_confirmed'] = 'Подтвердите данные заявки'
@@ -63,8 +65,6 @@ def validate_submission(db: Session, application: Application, body: SubmissionI
         errors['documents'] = 'Прикрепите все обязательные документы выбранного продукта'
     if errors:
         raise HTTPException(422, {'code': 'validation_error', 'message': 'Заявка ещё не готова к отправке', 'field_errors': errors})
-    if application.catalog_version != CATALOG_VERSION:
-        raise HTTPException(409, {'code': 'catalog_changed', 'message': 'Условия продукта изменились, обновите заявку'})
     for document in documents:
         path = settings.document_storage_path / document.storage_key
         if not path.is_file() or path.stat().st_size != document.size_bytes:
@@ -75,6 +75,7 @@ def validate_submission(db: Session, application: Application, body: SubmissionI
 def create_submission(db: Session, user: User, application: Application, body: SubmissionInput,
                       event_type: str = 'application_submitted'):
     documents = validate_submission(db, application, body)
+    application.catalog_version = CATALOG_VERSION
     now = datetime.now(timezone.utc)
     application.version += 1
     application.status = 'submitted'
@@ -83,6 +84,7 @@ def create_submission(db: Session, user: User, application: Application, body: S
         id=uuid.uuid4(), application_id=application.id, application_version=application.version,
         submitted_by=user.id, created_at=now,
         snapshot={
+            'catalog_version': CATALOG_VERSION,
             'application': DraftFields.model_validate(application).model_dump(mode='json'),
             'company': CompanyOutput.model_validate(db.get(Company, application.company_id)).model_dump(mode='json'),
             'documents': [{**DocumentOutput.model_validate(document).model_dump(mode='json'), 'sha256': document.sha256} for document in documents],
@@ -97,7 +99,8 @@ def create_submission(db: Session, user: User, application: Application, body: S
     db.flush()
     run = ProcessingRun(
         id=uuid.uuid4(), application_id=application.id, revision_id=revision.id, status='pending',
-        catalog_version=application.catalog_version, policy_version=POLICY_VERSION, source_version=SOURCE_VERSION, scorer_version=MODEL_VERSION,
+        catalog_version=application.catalog_version, policy_version=POLICY_VERSION, source_version=SOURCE_VERSION,
+        scorer_version=MODEL_VERSION if application.product_code in ('working_capital', 'equipment') else None,
     )
     db.add(run)
     db.flush()

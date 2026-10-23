@@ -51,7 +51,7 @@ def test_information_response_creates_new_snapshot_only_on_explicit_send(client,
     assert db.execute(text('SELECT response_revision_id FROM information_requests')).scalar_one() == uuid.UUID(result.json()['revision_id'])
     process()
     # Новая отправка уточнений использует текущую политику с обязательным ML.
-    assert db.execute(text('SELECT policy_version FROM processing_runs WHERE id=:id'), {'id':result.json()['processing_run_id']}).scalar_one() == 'demo-policy-0.3'
+    assert db.execute(text('SELECT policy_version FROM processing_runs WHERE id=:id'), {'id':result.json()['processing_run_id']}).scalar_one() == 'demo-policy-0.4'
     assert current(client, identifier)['status'] == 'manual_review'
 
 

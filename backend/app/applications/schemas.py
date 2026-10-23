@@ -2,14 +2,14 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from app.products.schemas import ProductCode
 from app.processing.schemas import ApplicationStatus, ProcessingStatus, Action, InformationRequestOutput, OfferOutput
 
 Money = Annotated[StrictInt, Field(ge=0, le=9_007_199_254_740_991)]
-Months = Annotated[StrictInt, Field(ge=1, le=36)]
+Months = Annotated[StrictInt, Field(ge=1, le=120)]
 
 
 class DraftFields(BaseModel):
@@ -18,6 +18,9 @@ class DraftFields(BaseModel):
     product_code: ProductCode
     purpose: str | None = Field(default=None, max_length=2000)
     description: str | None = Field(default=None, max_length=10000)
+    tender_number: str | None = Field(default=None, max_length=40)
+    beneficiary_name: str | None = Field(default=None, max_length=200)
+    project_description: str | None = Field(default=None, max_length=2000)
     amount_kopecks: Money | None = None
     term_months: Months | None = None
     period_start: date | None = None
@@ -25,6 +28,11 @@ class DraftFields(BaseModel):
     revenue_kopecks: Money | None = None
     operating_expenses_kopecks: Money | None = None
     existing_debt_payments_kopecks: Money | None = None
+
+    @field_validator('tender_number', 'beneficiary_name', 'project_description', mode='before')
+    @classmethod
+    def normalize_product_fields(cls, value):
+        return value.strip() or None if isinstance(value, str) else value
 
 
 class DraftCreate(DraftFields):

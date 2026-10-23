@@ -55,7 +55,7 @@ def test_submission_snapshot_and_staff_access(client, db, product):
     assert revision['confirmations']['bki_consent'] is True
     assert revision['confirmations']['confirmed_at']
     run = db.execute(text('SELECT status, catalog_version, policy_version, scorer_version FROM processing_runs WHERE id=:id'), {'id': result['processing_run_id']}).one()
-    assert tuple(run) == ('pending', 'demo-v1', 'demo-policy-0.3', 'logistic-risk-v1')
+    assert tuple(run) == ('pending', 'demo-v2', 'demo-policy-0.4', 'logistic-risk-v1')
     history = client.get(f"{BASE}/{draft['id']}/history").json()['items']
     assert history[-1]['event_type'] == 'application_submitted'
     authenticate(client, 'client2@example.test')

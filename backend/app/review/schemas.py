@@ -10,7 +10,8 @@ from app.products.schemas import DocumentType
 Version = Annotated[StrictInt, Field(ge=1, le=2_147_483_647)]
 Message = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
 RequestedField = Literal['purpose', 'description', 'amount_kopecks', 'term_months', 'period_start', 'period_end',
-                         'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks']
+                         'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks',
+                         'tender_number', 'beneficiary_name', 'project_description']
 
 
 class CommandInput(BaseModel):
@@ -20,8 +21,8 @@ class CommandInput(BaseModel):
 
 class InformationRequestInput(CommandInput):
     message: Message
-    requested_fields: list[RequestedField] = Field(default_factory=list, max_length=9)
-    requested_document_types: list[DocumentType] = Field(default_factory=list, max_length=2)
+    requested_fields: list[RequestedField] = Field(default_factory=list, max_length=12)
+    requested_document_types: list[DocumentType] = Field(default_factory=list, max_length=5)
 
     @model_validator(mode='after')
     def require_requested_items(self):

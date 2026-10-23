@@ -12,8 +12,8 @@ def terms(code, amount, term):
 
 def test_versioned_catalog_is_isolated_and_retains_historical_products():
     from app.products.catalog import CATALOG_VERSION, PRODUCTS, get_catalog, get_product
-    assert CATALOG_VERSION == 'demo-v1'
-    assert set(PRODUCTS) == {'working_capital', 'equipment'}
+    assert CATALOG_VERSION == 'demo-v2'
+    assert set(PRODUCTS) == {'working_capital', 'equipment', 'overdraft', 'credit_line', 'investment', 'tender_guarantee'}
     v1, v2 = get_catalog('demo-v1'), get_catalog('demo-v2')
     assert set(v1) == {'working_capital', 'equipment'}
     assert set(v2) == set(v1) | {'overdraft', 'credit_line', 'investment', 'tender_guarantee'}
@@ -120,9 +120,9 @@ def test_legacy_offer_uses_persisted_totals_without_catalog_repricing():
     assert result.last_payment_kopecks == 3_428_220
 
 
-def test_unactivated_product_is_rejected_safely_in_draft_api(client):
+def test_unknown_product_is_rejected_safely_in_draft_api(client):
     from test_auth import login
     headers = {'X-CSRF-Token': login(client).json()['csrf_token']}
-    response = client.post('/api/v1/applications', json={'product_code': 'overdraft'}, headers=headers)
+    response = client.post('/api/v1/applications', json={'product_code': 'unknown'}, headers=headers)
     assert response.status_code == 422
     assert response.json()['field_errors']['product_code']

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, object_session
 from app.applications.models import Application, ApplicationEvent
 from app.applications.schemas import ApplicationOutput, DraftCreate, DraftFields, DraftPatch
 from app.auth.models import User
-from app.products.catalog import CATALOG_VERSION, PRODUCTS
+from app.products.catalog import CATALOG_VERSION, get_catalog
 
 
 def require_client(user: User) -> None:
@@ -65,12 +65,15 @@ def application_output(application: Application, user: User) -> ApplicationOutpu
     return result
 
 
-def validate_draft(values: dict) -> None:
-    product = PRODUCTS.get(values['product_code'])
+def validate_draft(values: dict, catalog_version: str = CATALOG_VERSION) -> None:
+    product = get_catalog(catalog_version).get(values['product_code'])
     if product is None:
         raise HTTPException(422, {'code': 'validation_error', 'message': 'Проверьте введённые данные',
                                   'field_errors': {'product_code': 'Продукт отсутствует в текущем каталоге'}})
     errors = {}
+    for field in ('tender_number', 'beneficiary_name', 'project_description'):
+        if values.get(field) is not None and field not in product.required_application_fields:
+            errors[field] = 'Поле не относится к выбранному продукту'
     amount = values['amount_kopecks']
     term = values['term_months']
     if amount is not None and not product.min_amount_kopecks <= amount <= product.max_amount_kopecks:
@@ -123,9 +126,10 @@ def update_draft(db: Session, user: User, application_id: uuid.UUID, body: Draft
         if values['product_code'] != application.product_code:
             raise HTTPException(422, {'code': 'validation_error', 'message': 'Продукт отправленной заявки менять нельзя', 'field_errors': {'product_code': 'Сохраните выбранный продукт'}})
     validate_draft(values)
-    if any(getattr(application, name) != value for name, value in changes.items()):
+    if application.catalog_version != CATALOG_VERSION or any(getattr(application, name) != value for name, value in changes.items()):
         for name, value in changes.items():
             setattr(application, name, value)
+        application.catalog_version = CATALOG_VERSION
         application.version += 1
         application.updated_at = datetime.now(timezone.utc)
         add_event(db, application, user, 'working_copy_updated' if application.status == 'needs_info' else 'draft_updated')

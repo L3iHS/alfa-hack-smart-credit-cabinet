@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from random import Random
 
-from app.products.catalog import PRODUCTS
+from app.risk.catalog import ML_PRODUCTS as PRODUCTS
 from app.risk.features import FeatureVector, build_features
 from app.risk.labels import HORIZON_MONTHS, LoanOutcome, add_months
 

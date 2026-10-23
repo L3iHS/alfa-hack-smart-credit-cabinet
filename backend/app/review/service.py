@@ -2,7 +2,6 @@ import hashlib
 import json
 import uuid
 from datetime import date, datetime, timezone
-from decimal import Decimal
 
 from fastapi import HTTPException
 from pydantic import ValidationError
@@ -20,12 +19,13 @@ from app.demo.profiles import SOURCE_VERSION
 from app.documents.models import Document
 from app.documents.service import active_documents
 from app.processing.models import CheckResult, Decision, InformationRequest, Offer
-from app.processing.policy import POLICY_VERSION, SUPPORTED_POLICY_VERSIONS, covered, evaluate, payment, period_months
+from app.processing.policy import evaluate, offer_terms, period_months, policy_profile, requires_model
 from app.risk.assessments import assess, exact_assessment, record_override, terms_for
 from app.risk.models import RiskOverride
 from app.processing.schemas import InformationRequestOutput, OfferOutput
 from app.processing.service import latest_revision, require_staff
-from app.products.catalog import CATALOG_VERSION, PRODUCTS
+from app.products.catalog import get_product
+from app.products.financial import financial_gate
 
 
 def conflict(message='Заявка изменилась, обновите страницу'):
@@ -140,8 +140,12 @@ def respond_information(db, user, application_id, body, key):
 def safe_terms(db, application, revision, amount=None, term=None):
     """Проверяет ограничения, которые сотрудник и клиент предложения не обходят."""
     run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id))
-    if (run is None or run.status != 'succeeded' or run.policy_version not in SUPPORTED_POLICY_VERSIONS
-            or run.catalog_version != CATALOG_VERSION or run.source_version != SOURCE_VERSION):
+    if run is None or run.status != 'succeeded' or run.source_version != SOURCE_VERSION:
+        conflict('Не завершены обязательные проверки актуальной версии')
+    try:
+        policy_profile(run.policy_version, run.catalog_version)
+        product = get_product(revision.snapshot['application']['product_code'], run.catalog_version)
+    except (ValueError, KeyError):
         conflict('Не завершены обязательные проверки актуальной версии')
     checks = {item.kind: item for item in db.scalars(select(CheckResult).where(CheckResult.run_id == run.id))}
     if set(checks) != {'registry', 'tax', 'bki'} or any(item.status != 'succeeded' or item.revision_id != revision.id or item.source_version != run.source_version for item in checks.values()):
@@ -151,14 +155,18 @@ def safe_terms(db, application, revision, amount=None, term=None):
         values = DraftFields.model_validate(snapshot['application']).model_dump()
     except (ValidationError, KeyError):
         conflict('Отправленные сведения неполны')
-    if any(values[name] is None for name in DraftFields.model_fields if name != 'description') or not values['purpose'].strip():
+    required = ('purpose', 'amount_kopecks', 'term_months', 'period_start', 'period_end',
+                'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks',
+                *product.required_application_fields)
+    if any(values[name] is None or isinstance(values[name], str) and not values[name].strip() for name in required):
         conflict('Отправленные сведения неполны')
-    validate_draft(values)
+    if snapshot.get('catalog_version', run.catalog_version) != run.catalog_version:
+        conflict('Версия отправленных условий не совпадает с рассмотрением')
+    validate_draft(values, run.catalog_version)
     confirmations = snapshot.get('confirmations', {})
     if confirmations.get('data_confirmed') is not True or confirmations.get('bki_consent') is not True:
         conflict('Нет подтверждения отправленных сведений')
     documents = snapshot.get('documents', [])
-    product = PRODUCTS[values['product_code']]
     if not set(product.required_document_types) <= {item['document_type'] for item in documents}:
         conflict('Не хватает обязательных документов')
     for item in documents:
@@ -173,38 +181,51 @@ def safe_terms(db, application, revision, amount=None, term=None):
     result = evaluate(original, registered_at=date.fromisoformat(checks['registry'].data['registered_at']),
                       submitted_at=revision.created_at.date(), liquidated=checks['registry'].data['liquidated'],
                       overdue_days=checks['bki'].data['overdue_days'],
-                      expected_monthly_revenue_kopecks=checks['tax'].data['expected_monthly_revenue_kopecks'], policy_version=run.policy_version)
+                      expected_monthly_revenue_kopecks=checks['tax'].data['expected_monthly_revenue_kopecks'],
+                      policy_version=run.policy_version, catalog_version=run.catalog_version)
     if result.outcome in ('needs_info', 'rejected'):
         conflict('Уточните сведения или устраните запретные стоп-факторы')
     amount = values['amount_kopecks'] if amount is None else amount
     term = values['term_months'] if term is None else term
-    validate_draft({**values, 'amount_kopecks': amount, 'term_months': term})
+    validate_draft({**values, 'amount_kopecks': amount, 'term_months': term}, run.catalog_version)
     months = period_months(values['period_start'], values['period_end'], revision.created_at.date())
-    monthly = payment(amount, term, product.annual_rate_bps)
-    flow = Decimal(values['revenue_kopecks']) - Decimal(values['operating_expenses_kopecks'])
-    if not covered(flow, Decimal(values['existing_debt_payments_kopecks']), monthly, months):
-        conflict('Для этих условий коэффициент покрытия меньше 1,30')
-    return dict(product_code=product.code, amount_kopecks=amount, term_months=term, monthly_payment_kopecks=monthly,
-                total_payment_kopecks=monthly*term, annual_rate_bps=product.annual_rate_bps), run
+    terms = offer_terms(product, amount, term)
+    gate = financial_gate(terms.payment_terms, values['revenue_kopecks'], values['operating_expenses_kopecks'],
+                          values['existing_debt_payments_kopecks'], period_months=months)
+    if not gate.allowed:
+        conflict('Комиссия гарантии недоступна при указанных финансах' if gate.reason_code == 'guarantee_fee_unaffordable' else
+                 'Сумма гарантии превышает половину расчётной годовой выручки' if gate.reason_code == 'guarantee_liability_exceeded' else
+                 'Для этих условий коэффициент покрытия меньше 1,30')
+    return terms.model_dump(mode='json'), run
 
 
 def guard_risk(db, run, revision, terms, *, offered, user=None, reason=None, acknowledged=False, offer=None):
-    if run.policy_version != POLICY_VERSION:
+    profile = policy_profile(run.policy_version, run.catalog_version)
+    if not profile.uses_risk_assessments:
         return None
     checks = {item.kind:item.data for item in db.scalars(select(CheckResult).where(CheckResult.run_id==run.id))}
     scope = 'offered_terms' if offered else 'requested_terms'
-    canonical = terms_for(revision, terms['amount_kopecks'], terms['term_months'])
+    canonical = terms_for(revision, terms['amount_kopecks'], terms['term_months'], run=run)
+    unsupported = not requires_model(run.policy_version, canonical['product_code'])
     if offer is not None:
         row = exact_assessment(db, offer.risk_assessment_id, run, revision, checks, canonical, scope)
         if (row is None or row.offer_version != offer.version
-                or offer.product_code != canonical['product_code'] or offer.annual_rate_bps != canonical['annual_rate_bps']
+                or offer.product_code != canonical['product_code'] or offer.annual_rate_bps != terms['annual_rate_bps']
                 or offer.monthly_payment_kopecks != terms['monthly_payment_kopecks']
                 or offer.total_payment_kopecks != terms['total_payment_kopecks']):
             conflict('Оценка предложенных условий отсутствует или устарела')
-        if row.probability >= .10 and not db.scalar(select(RiskOverride.id).where(RiskOverride.assessment_id==row.id)):
+        if unsupported:
+            actor = db.get(User, offer.actor_id) if offer.actor_id else None
+            if actor is None or actor.role != 'staff':
+                conflict('Для этого продукта требуется предложение сотрудника')
+        if not unsupported and row.probability >= .10 and not db.scalar(select(RiskOverride.id).where(RiskOverride.assessment_id==row.id)):
             conflict('Не сохранено подтверждение сотрудником повышенного риска')
         return row
     row = assess(db, run, revision, checks, canonical, scope)
+    if unsupported:
+        if exact_assessment(db, row.id, run, revision, checks, canonical, scope) is None:
+            conflict('Не подтверждена неприменимость модели к этим условиям')
+        return row
     if row.status != 'succeeded':
         # До этого места команда ничего не меняла: коммитим только проверенную оценку.
         db.commit()
@@ -276,6 +297,13 @@ def offer_action(db, user, offer_id, body, key, accept):
         risk = None
         if accept:
             terms, run = safe_terms(db, application, revision, current.amount_kopecks, current.term_months)
+            # Полные условия и старые колонки сверяются даже у исторической политики без ML.
+            flat_fields = ('product_code', 'amount_kopecks', 'term_months', 'annual_rate_bps',
+                           'monthly_payment_kopecks', 'total_payment_kopecks')
+            if (any(getattr(current, name) != terms[name] for name in flat_fields)
+                    or current.payment_terms is not None and current.payment_terms != terms['payment_terms']
+                    or current.payment_terms is None and run.catalog_version != 'demo-v1'):
+                conflict('Условия предложения изменились или устарели')
             risk = guard_risk(db,run,revision,terms,offered=True,offer=current)
         else:
             run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id))

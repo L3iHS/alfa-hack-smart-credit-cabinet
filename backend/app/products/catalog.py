@@ -2,7 +2,7 @@ from types import MappingProxyType
 
 from app.products.schemas import ProductOutput
 
-CATALOG_VERSION = 'demo-v1'
+CATALOG_VERSION = 'demo-v2'
 _DEMO_V1 = MappingProxyType({
     'working_capital': ProductOutput(
         code='working_capital', name='Оборотный кредит',

@@ -33,9 +33,9 @@ def test_draft_survives_new_db_session(client):
     headers = authenticate(client)
     draft = create(client, headers, purpose='Закупка сырья', amount_kopecks=10_000_001)
     assert draft['version'] == 1 and draft['status'] == 'draft'
-    assert draft['catalog_version'] == 'demo-v1'
+    assert draft['catalog_version'] == 'demo-v2'
     assert draft['public_reasons'] == [] and draft['available_actions'] == ['edit_draft', 'upload_document', 'submit']
-    assert set(draft) == {'id', 'version', 'status', 'updated_at', 'catalog_version', 'product_code', 'purpose', 'description', 'amount_kopecks', 'term_months', 'period_start', 'period_end', 'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks', 'public_reasons', 'available_actions', 'processing_status', 'information_requests', 'offers'}
+    assert set(draft) == {'id', 'version', 'status', 'updated_at', 'catalog_version', 'product_code', 'purpose', 'description', 'amount_kopecks', 'term_months', 'period_start', 'period_end', 'revenue_kopecks', 'operating_expenses_kopecks', 'existing_debt_payments_kopecks', 'public_reasons', 'available_actions', 'processing_status', 'information_requests', 'offers', 'tender_number', 'beneficiary_name', 'project_description'}
     uuid.UUID(draft['id'])
     with SessionLocal() as fresh:
         row = fresh.execute(text('SELECT version, amount_kopecks FROM applications WHERE id=:id'), {'id': draft['id']}).one()

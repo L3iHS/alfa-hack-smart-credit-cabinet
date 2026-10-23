@@ -18,7 +18,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from threadpoolctl import threadpool_limits
 
-from app.products.catalog import PRODUCTS
+from app.risk.catalog import ML_PRODUCTS as PRODUCTS
 from app.risk.features import FEATURE_NAMES
 from app.risk.training_data import MASK_FEATURES, MODEL_FEATURES, DataSplit
 

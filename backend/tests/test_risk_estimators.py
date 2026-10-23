@@ -10,7 +10,7 @@ pd = pytest.importorskip('pandas')
 pytest.importorskip('sklearn')
 pytest.importorskip('catboost')
 
-from app.products.catalog import PRODUCTS
+from app.risk.catalog import ML_PRODUCTS as PRODUCTS
 from app.risk.features import FEATURE_NAMES
 
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.products.catalog import CATALOG_VERSION, PRODUCTS
+from app.risk.catalog import ML_CATALOG_VERSION as CATALOG_VERSION, ML_PRODUCTS as PRODUCTS
 from app.risk.dataset import DATASET_VERSION, TARGET_VERSION, _HORIZON, _schema
 from app.risk.features import FEATURE_NAMES, FEATURE_SCHEMA_VERSION
 from app.risk.labels import TARGET_EVENT

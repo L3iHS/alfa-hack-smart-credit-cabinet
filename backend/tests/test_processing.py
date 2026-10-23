@@ -26,7 +26,8 @@ def prepared(client, profile='a', *, legacy=True):
     if legacy:
         # Эти сценарии фиксируют принятую историческую политику до появления ML.
         with SessionLocal() as historical:
-            historical.execute(text("UPDATE processing_runs SET policy_version='demo-policy-0.2', scorer_version=NULL WHERE id=:id"), {'id': response.json()['processing_run_id']})
+            historical.execute(text("UPDATE processing_runs SET policy_version='demo-policy-0.2', catalog_version='demo-v1', scorer_version=NULL WHERE id=:id"), {'id': response.json()['processing_run_id']})
+            historical.execute(text("UPDATE application_revisions SET snapshot=snapshot-'catalog_version' WHERE id=:id"), {'id': response.json()['revision_id']})
             historical.commit()
     return headers, draft['id'], response.json()
 

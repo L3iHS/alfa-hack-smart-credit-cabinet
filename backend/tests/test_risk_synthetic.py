@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from app.products.catalog import PRODUCTS
+from app.risk.catalog import ML_PRODUCTS as PRODUCTS
 from app.risk.features import FEATURE_NAMES, build_features
 from app.risk.labels import add_months, label_loan_90dpd_12m
 

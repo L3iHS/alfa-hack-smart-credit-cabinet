@@ -2,13 +2,18 @@ import uuid
 from typing import Literal
 
 from pydantic import BaseModel, Field
+from app.products.schemas import PaymentTerms
 
 
 class RiskTerms(BaseModel):
     product_code: str
     amount_kopecks: int
     term_months: int
-    annual_rate_bps: int
+    annual_rate_bps: int | None
+    payment_terms: PaymentTerms | None = None
+    tender_number: str | None = None
+    beneficiary_name: str | None = None
+    project_description: str | None = None
 
 
 class RiskContributionOutput(BaseModel):
@@ -26,8 +31,8 @@ class RiskAssessmentOutput(BaseModel):
     scorer_kind: str = 'model'
     scorer_version: str | None
     feature_schema_version: str | None = None
-    target_event: str = 'loan_90dpd_12m'
-    horizon_months: int = 12
+    target_event: str | None = 'loan_90dpd_12m'
+    horizon_months: int | None = 12
     data_kind: str = 'synthetic'
     prediction_scope: Literal['requested_terms','offered_terms']
     offer_version: int | None

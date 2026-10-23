@@ -1,10 +1,12 @@
 import uuid
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
-from app.products.schemas import ProductCode, DocumentType
+from app.products.schemas import ProductCode, DocumentType, PaymentTerms
+from app.products.financial import FinancialGate
 from app.risk.schemas import RiskAssessmentOutput
 
 ApplicationStatus = Literal['draft', 'submitted', 'processing', 'needs_info', 'manual_review', 'counteroffer', 'approved', 'rejected']
@@ -36,9 +38,11 @@ class OfferTerms(BaseModel):
     monthly_payment_kopecks: int
     total_payment_kopecks: int
     annual_rate_bps: int
+    payment_terms: PaymentTerms | None = None
 
 
 class OfferOutput(OfferTerms):
+    payment_terms: PaymentTerms
     version: int
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -47,6 +51,20 @@ class OfferOutput(OfferTerms):
     status: Literal['active', 'accepted', 'declined', 'superseded']
     reason: str
     created_at: datetime
+
+    @model_validator(mode='before')
+    @classmethod
+    def restore_historical_terms(cls, value):
+        if isinstance(value, dict):
+            if value.get('payment_terms') is None:
+                from app.products.calculations import payment_terms_from_legacy_offer
+                return {**value, 'payment_terms': payment_terms_from_legacy_offer(SimpleNamespace(**value))}
+            return value
+        if getattr(value, 'payment_terms', None) is None:
+            from app.products.calculations import payment_terms_from_legacy_offer
+            return {**{name: getattr(value, name) for name in cls.model_fields if name != 'payment_terms'},
+                    'payment_terms': payment_terms_from_legacy_offer(value)}
+        return value
 
 
 class CalculationOutput(BaseModel):
@@ -58,6 +76,8 @@ class CalculationOutput(BaseModel):
     monthly_payment_kopecks: int
     coverage_ratio: str | None
     policy_version: str
+    payment_terms: PaymentTerms | None = None
+    financial_gate: FinancialGate | None = None
 
 
 class RegistryData(BaseModel):

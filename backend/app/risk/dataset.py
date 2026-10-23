@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 from random import Random
 
-from app.products.catalog import CATALOG_VERSION, PRODUCTS
+from app.risk.catalog import ML_CATALOG_VERSION as CATALOG_VERSION, ML_PRODUCTS as PRODUCTS
 from app.risk.features import FEATURE_NAMES, FEATURE_SCHEMA_VERSION
 from app.risk.labels import HORIZON_MONTHS, TARGET_EVENT, label_loan_90dpd_12m
 from app.risk.synthetic import DEFAULT_SEED, GENERATOR_VERSION, SyntheticLoan, generate_loans

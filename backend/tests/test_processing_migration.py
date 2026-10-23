@@ -85,7 +85,16 @@ def test_upgrade_keeps_legacy_submission_and_retries_it(db, monkeypatch, policy_
             command.check(config)
             with factory() as legacy:
                 for table, rows in saved.items():
+                    if table == 'offers':
+                        # Downgrade до 0005 удаляет новую колонку; прежние суммы и связи сохраняются.
+                        rows = [{**row, 'payment_terms': None} for row in rows]
                     assert legacy.execute(text(f'SELECT to_jsonb(t) FROM {table} t ORDER BY id')).scalars().all()==rows
+                if profile == 'b':
+                    from app.processing.models import Offer
+                    from app.processing.schemas import OfferOutput
+                    output = OfferOutput.model_validate(legacy.scalar(select(Offer)))
+                    assert output.payment_terms.monthly_payment_kopecks == 12_382_411
+                    assert output.payment_terms.total_payment_kopecks == 297_177_864
                 assert legacy.execute(text('SELECT count(*) FROM risk_assessments')).scalar_one()==0
 
     finally:

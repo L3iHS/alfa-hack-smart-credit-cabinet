@@ -16,12 +16,11 @@ from app.core.db import SessionLocal
 from app.demo.profiles import SOURCE_VERSION
 from app.processing import providers
 from app.processing.models import Calculation, CheckResult, Decision, InformationRequest, Offer
-from app.processing.policy import POLICY_VERSION, SUPPORTED_POLICY_VERSIONS, evaluate
+from app.processing.policy import evaluate, policy_profile
 from app.risk.assessments import assess, assessment_output, terms_for
 from app.risk.models import RiskAssessment
 from app.risk.runtime import RiskModelError
 from app.processing.schemas import AssessmentOutput, CalculationOutput, CheckOutput, DecisionOutput, RetryInput, RunOutput
-from app.products.catalog import CATALOG_VERSION
 
 
 logger = logging.getLogger(__name__)
@@ -175,10 +174,14 @@ def process_next() -> bool:
             if state is None:
                 return True
             _, run, revision = state
-            if run.policy_version not in SUPPORTED_POLICY_VERSIONS or run.source_version != SOURCE_VERSION or run.catalog_version != CATALOG_VERSION:
+            try:
+                profile = policy_profile(run.policy_version, run.catalog_version)
+            except ValueError as exc:
+                raise providers.UnsupportedVersion('Версия расчёта не поддерживается') from exc
+            if run.source_version != SOURCE_VERSION:
                 raise providers.UnsupportedVersion('Версия расчёта не поддерживается')
             snapshot, submitted_at = revision.snapshot, revision.created_at.date()
-            source_version, policy_version = run.source_version, run.policy_version
+            source_version, policy_version, catalog_version = run.source_version, run.policy_version, run.catalog_version
             db.commit()
         checks = {}
         for kind in ('registry','tax','bki'):
@@ -203,10 +206,11 @@ def process_next() -> bool:
         stage = 'policy'
         kwargs = dict(registered_at=date.fromisoformat(checks['registry']['registered_at']), submitted_at=submitted_at,
                       liquidated=checks['registry']['liquidated'], overdue_days=checks['bki']['overdue_days'],
-                      expected_monthly_revenue_kopecks=checks['tax']['expected_monthly_revenue_kopecks'], policy_version=policy_version)
+                      expected_monthly_revenue_kopecks=checks['tax']['expected_monthly_revenue_kopecks'],
+                      policy_version=policy_version, catalog_version=catalog_version)
         result = evaluate(snapshot['application'], **kwargs)
         requested_risk = offered_risk = None
-        if policy_version == POLICY_VERSION:
+        if profile.uses_risk_assessments:
             stage = 'risk'
             with SessionLocal() as db:
                 state = current_locked(db, run_id, attempt)
@@ -215,7 +219,7 @@ def process_next() -> bool:
                 _, run, revision = state
                 db.commit()
                 # Внешний расчёт выполняется без блокировки; перед commit сверяем попытку заново.
-                requested_risk = assess(db, run, revision, checks, terms_for(revision), 'requested_terms',
+                requested_risk = assess(db, run, revision, checks, terms_for(revision, run=run), 'requested_terms',
                                       not_applicable=result.reason_code if result.outcome in ('needs_info','rejected') else None, persist=False)
                 state = current_locked(db, run_id, attempt)
                 if state is None:
@@ -235,7 +239,7 @@ def process_next() -> bool:
                         _, run, revision = state
                         db.commit()
                         offered_risk = assess(db, run, revision, checks,
-                            terms_for(revision,result.offer.amount_kopecks,result.offer.term_months), 'offered_terms', persist=False)
+                            terms_for(revision,result.offer.amount_kopecks,result.offer.term_months,run=run), 'offered_terms', persist=False)
                         if current_locked(db, run_id, attempt) is None:
                             db.rollback()
                             return True
@@ -255,7 +259,7 @@ def process_next() -> bool:
             application.status = result.outcome
             system_event(db, application, run, 'processing_completed')
             if result.calculation:
-                db.add(Calculation(run_id=run.id, revision_id=revision.id, data=result.calculation.model_dump()))
+                db.add(Calculation(run_id=run.id, revision_id=revision.id, data=result.calculation.model_dump(mode='json')))
             linked_risk = offered_risk if offered_risk is not None else requested_risk
             db.add(Decision(application_id=application.id, revision_id=revision.id, run_id=run.id, actor_id=None,
                             risk_assessment_id=linked_risk.id if linked_risk else None,
@@ -268,7 +272,7 @@ def process_next() -> bool:
             if result.offer:
                 db.add(Offer(application_id=application.id, revision_id=revision.id, run_id=run.id,
                              risk_assessment_id=offered_risk.id if offered_risk else None,
-                             application_version=application.version, reason=result.reason, **result.offer.model_dump()))
+                             application_version=application.version, reason=result.reason, **result.offer.model_dump(mode='json')))
             run.status, run.finished_at, run.error_code = 'succeeded', now(), None
             db.commit()
     except Exception as exc:

@@ -60,6 +60,7 @@ def test_reader_exposes_only_features_and_masks_and_separate_metadata(dataset_di
     assert set(train.y) == {0, 1}
     assert reader.fingerprint == hashlib.sha256((dataset_dir / 'manifest.json').read_bytes()).hexdigest()
     assert reader.manifest['dataset_version'] == 'risk-dataset-v1'
+    assert reader.manifest['catalog_version'] == 'demo-v1'
     assert reader.schema['target'] == TARGET_EVENT
     assert 'true_probability' not in train.X
     assert 'company_id' not in train.X

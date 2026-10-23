@@ -110,6 +110,7 @@ def test_export_has_whitelisted_columns_missing_masks_and_separate_audit(tmp_pat
     assert manifest == json.loads((output / 'manifest.json').read_text())
     assert manifest['count'] == 2000
     assert manifest['seed'] == 20261021
+    assert manifest['catalog_version'] == 'demo-v1'
     assert manifest['horizon']['months'] == 12
     assert set(manifest['sha256']) == set(files(output)) - {'manifest.json'}
     for name, digest in manifest['sha256'].items():
