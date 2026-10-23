@@ -51,7 +51,7 @@ def test_upgrade_preserves_old_offer_and_stores_full_new_terms(db, monkeypatch):
             command.check(config)
             with Session(engine) as session:
                 after = session.execute(text('SELECT to_jsonb(o) FROM offers o WHERE id=:id'), {'id': offer_id}).scalar_one()
-                assert after == before | {'payment_terms': None}
+                assert after == before | {'payment_terms': None, 'responded_at': None, 'decline_reason': None}
                 application = session.get(Application, application_id)
                 assert (application.tender_number, application.beneficiary_name, application.project_description) == (None, None, None)
                 application.tender_number = 'Т-100'

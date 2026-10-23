@@ -10,7 +10,7 @@ from app.auth.service import get_current_user
 from app.core.db import get_db
 from app.review import service
 from app.review.schemas import (CreateOfferInput, DecisionCommandOutput, DecisionInput, InformationRequestCommandOutput,
-                                InformationRequestInput, InformationResponseInput, OfferActionInput, OfferCommandOutput)
+                                InformationRequestInput, InformationResponseInput, OfferActionInput, DeclineOfferInput, OfferCommandOutput)
 
 router = APIRouter(tags=['Диалог и решения'])
 IdempotencyKey = Annotated[uuid.UUID, Header(alias='Idempotency-Key')]
@@ -47,6 +47,6 @@ def accept_offer(offer_id: uuid.UUID, body: OfferActionInput, idempotency_key: I
 
 
 @router.post('/offers/{offer_id}/decline', response_model=OfferCommandOutput)
-def decline_offer(offer_id: uuid.UUID, body: OfferActionInput, idempotency_key: IdempotencyKey,
+def decline_offer(offer_id: uuid.UUID, body: DeclineOfferInput, idempotency_key: IdempotencyKey,
                   user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return service.offer_action(db, user, offer_id, body, idempotency_key, False)

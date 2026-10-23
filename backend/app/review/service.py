@@ -61,7 +61,11 @@ def output(application, revision, **extra):
 def execute(db, user, application_id, body, key, operation, action, *, resource_id=None):
     # Принадлежность проверяется до повтора: ключ не раскрывает чужую заявку.
     get_application(db, user, application_id)
-    fingerprint = hashlib.sha256(json.dumps({'application_id': str(application_id), 'resource_id': str(resource_id) if resource_id else None, **body.model_dump(mode='json')},
+    values = body.model_dump(mode='json')
+    # Отсутствующая причина и явный null сохраняют отпечаток исторической команды.
+    if operation == 'decline_offer' and values.get('decline_reason') is None:
+        values.pop('decline_reason', None)
+    fingerprint = hashlib.sha256(json.dumps({'application_id': str(application_id), 'resource_id': str(resource_id) if resource_id else None, **values},
                                            sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     lock_key = int.from_bytes(hashlib.sha256(f'{user.id}:{operation}:{key}'.encode()).digest()[:8], signed=True)
     db.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': lock_key})
@@ -320,6 +324,8 @@ def offer_action(db, user, offer_id, body, key, accept):
         else:
             run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id))
         current.status = 'accepted' if accept else 'declined'
+        current.responded_at = now()
+        current.decline_reason = None if accept else body.decline_reason
         current.version += 1
         status = 'approved' if accept else 'manual_review'
         event(db, application, user, revision, 'offer_accepted' if accept else 'offer_declined', status)

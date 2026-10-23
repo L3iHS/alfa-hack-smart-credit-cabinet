@@ -73,7 +73,12 @@ class InformationRequest(Base):
 
 class Offer(Base):
     __tablename__ = 'offers'
-    __table_args__ = (CheckConstraint("status IN ('active','accepted','declined','superseded')", name='valid_offer_status'),)
+    __table_args__ = (
+        CheckConstraint("status IN ('active','accepted','declined','superseded')", name='valid_offer_status'),
+        CheckConstraint("decline_reason IS NULL OR (status = 'declined' AND decline_reason IN "
+                        "('insufficient_amount','high_payment','unsuitable_term','no_longer_needed','other'))",
+                        name='valid_offer_decline_reason'),
+    )
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     application_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('applications.id'), index=True)
     revision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('application_revisions.id'))
@@ -91,4 +96,6 @@ class Offer(Base):
     payment_terms: Mapped[dict | None] = mapped_column(JSONB)
     annual_rate_bps: Mapped[int]
     reason: Mapped[str] = mapped_column(String(4000))
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decline_reason: Mapped[str | None] = mapped_column(String(30))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

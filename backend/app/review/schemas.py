@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints, model_validator
 
 from app.applications.schemas import Money, Months, SubmissionInput
-from app.processing.schemas import ApplicationStatus, InformationRequestOutput, OfferOutput
+from app.processing.schemas import DeclineReason, ApplicationStatus, InformationRequestOutput, OfferOutput
 from app.products.schemas import DocumentType
 
 Version = Annotated[StrictInt, Field(ge=1, le=2_147_483_647)]
@@ -53,6 +53,10 @@ class DecisionInput(CommandInput):
 
 class OfferActionInput(CommandInput):
     offer_version: Version
+
+
+class DeclineOfferInput(OfferActionInput):
+    decline_reason: DeclineReason | None = None
 
 
 class CommandOutput(BaseModel):

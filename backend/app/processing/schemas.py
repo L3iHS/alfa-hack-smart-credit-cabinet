@@ -41,6 +41,9 @@ class OfferTerms(BaseModel):
     payment_terms: PaymentTerms | None = None
 
 
+DeclineReason = Literal['insufficient_amount', 'high_payment', 'unsuitable_term', 'no_longer_needed', 'other']
+
+
 class OfferOutput(OfferTerms):
     payment_terms: PaymentTerms
     version: int
@@ -50,6 +53,8 @@ class OfferOutput(OfferTerms):
     application_version: int
     status: Literal['active', 'accepted', 'declined', 'superseded']
     reason: str
+    responded_at: datetime | None = None
+    decline_reason: DeclineReason | None = None
     created_at: datetime
 
     @model_validator(mode='before')
