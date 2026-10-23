@@ -19,7 +19,7 @@ COMPLETE = {
 
 
 def submit(client, headers, draft, key=None, **changes):
-    body = {'expected_version': draft['version'], 'data_confirmed': True, 'bki_consent': True, 'consent_version': 'demo-consent-v1', **changes}
+    body = {'expected_version': draft['version'], 'data_confirmed': True, 'bki_consent': True, 'consent_version': 'submission-consent-v2', **changes}
     return client.post(f"{BASE}/{draft['id']}/submit", json=body, headers={**headers, 'Idempotency-Key': key or str(uuid.uuid4())})
 
 
@@ -51,7 +51,9 @@ def test_submission_snapshot_and_staff_access(client, db, product):
     assert revision['application']['purpose'] == COMPLETE['purpose']
     assert revision['company']['inn'] == '990000000001'
     assert revision['documents'][0]['id'] == document['id']
-    assert revision['confirmations']['consent_version'] == 'demo-consent-v1'
+    assert revision['confirmations']['consent_version'] == 'submission-consent-v2'
+    assert revision['confirmations']['data_confirmation_text'] == 'Подтверждаю, что проверил данные заявки.'
+    assert revision['confirmations']['bki_consent_text'] == 'Согласен на проверку кредитной истории.'
     assert revision['confirmations']['bki_consent'] is True
     assert revision['confirmations']['confirmed_at']
     run = db.execute(text('SELECT status, catalog_version, policy_version, scorer_version FROM processing_runs WHERE id=:id'), {'id': result['processing_run_id']}).one()
@@ -100,13 +102,16 @@ def test_required_files_follow_product(client):
 
 @pytest.mark.parametrize('changes', [
     {'data_confirmed': False}, {'bki_consent': False}, {'data_confirmed': 1},
-    {'bki_consent': 'true'}, {'consent_version': 'old-version'},
+    {'bki_consent': 'true'}, {'consent_version': 'old-version'}, {'consent_version': 'demo-consent-v1'},
     {'status': 'approved'}, {'expected_version': True},
 ])
 def test_submission_rejects_invalid_confirmation(client, changes):
     headers = authenticate(client)
     draft, _ = ready(client, headers)
-    assert submit(client, headers, draft, **changes).status_code == 422
+    response = submit(client, headers, draft, **changes)
+    assert response.status_code == 422
+    if changes.get('consent_version') == 'demo-consent-v1':
+        assert response.json()['field_errors']['consent_version'] == 'Текст согласия изменился, обновите страницу'
     assert client.get(f"{BASE}/{draft['id']}").json()['status'] == 'draft'
 
 
@@ -154,9 +159,10 @@ def test_submission_policy_and_permissions(client):
     assert client.get('/api/v1/submission-policy').status_code == 401
     headers = authenticate(client)
     policy = client.get('/api/v1/submission-policy').json()
-    assert policy['consent_version'] == 'demo-consent-v1'
+    assert policy['consent_version'] == 'submission-consent-v2'
     assert policy['max_file_size_bytes'] == 10 * 1024 * 1024
-    assert policy['bki_consent_text'] and policy['data_confirmation_text']
+    assert policy['data_confirmation_text'] == 'Подтверждаю, что проверил данные заявки.'
+    assert policy['bki_consent_text'] == 'Согласен на проверку кредитной истории.'
     draft, _ = ready(client, headers)
     assert submit(client, {}, draft).status_code == 403
     assert submit(client, headers, draft, key='invalid').status_code == 422

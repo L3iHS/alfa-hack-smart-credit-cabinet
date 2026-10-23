@@ -189,7 +189,7 @@ for (const [p, label, display] of [
     await expect(score).toContainText(label);
     await expect(score).toContainText(display);
     await expect(score).toContainText("Просрочка 90+ дней в первые 12 месяцев");
-    await expect(score).toContainText("Синтетические данные");
+    await expect(score).not.toContainText("Синтетические данные");
     await expect(score).toContainText("1 000 000");
     await expect(score).toContainText("12 мес.");
     await expect(score).toContainText("logistic-risk-v1");

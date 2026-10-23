@@ -54,7 +54,6 @@ export default function LoginPage() {
     <div className="login-page">
       <header>
         <Brand />
-        <span className="demo-label">Демонстрационный прототип</span>
       </header>
       <main className="login-layout">
         <section className="login-intro">
@@ -84,10 +83,6 @@ export default function LoginPage() {
               <span>Кредит на оборудование</span>
             </div>
           </div>
-          <p className="demo-explanation">
-            В кабинете используются тестовые компании и демонстрационные условия
-            кредитования
-          </p>
         </section>
         <section className="panel login-card">
           <h2>Вход в кабинет</h2>
@@ -153,12 +148,10 @@ export default function LoginPage() {
             </form>
           )}
           <div className="login-help">
-            Используйте демонстрационную учётную запись, которую предоставила
-            команда проекта
+            Используйте учётную запись, которую предоставила команда проекта
           </div>
         </section>
       </main>
-      <footer>Умный кредитный кабинет • Прототип для хакатона</footer>
     </div>
   );
 }

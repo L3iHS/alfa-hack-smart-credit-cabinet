@@ -1775,13 +1775,82 @@ dd {
   font-size: 14px;
   max-width: 640px;
 }
-.recommendation-controls {
+.recommendation-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 320px);
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  align-items: end;
   gap: 16px;
 }
-.recommendation-controls .field {
-  margin-bottom: 0;
+.purpose-picker {
+  position: relative;
+  min-width: 0;
+  margin: 0;
+}
+.purpose-trigger {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #f1f2f4;
+  color: #242426;
+  font-size: 16px;
+  text-align: left;
+}
+.purpose-trigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.purpose-trigger:hover {
+  background: #eceef0;
+}
+.purpose-trigger[aria-expanded="true"] {
+  background: #fff;
+  border-color: #b3b8c1;
+}
+.purpose-chevron {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+.purpose-options {
+  position: absolute;
+  z-index: 20;
+  inset: calc(100% + 6px) 0 auto;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px #2424261a;
+}
+.purpose-options [role="option"] {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.purpose-options [role="option"].active {
+  background: #f1f2f4;
+}
+.purpose-options [aria-selected="true"] {
+  font-weight: 650;
 }
 .recommendation-checks {
   display: flex;
@@ -1819,9 +1888,16 @@ dd {
 }
 .recommendation-actions {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+}
+.recommendation-actions .button {
+  height: 48px;
+  padding-top: 0;
+  padding-bottom: 0;
+  white-space: nowrap;
 }
 .recommendation-actions .muted {
   font-size: 12px;
@@ -1836,8 +1912,13 @@ dd {
 }
 .recommendation-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 16px;
+}
+.recommendation-card:only-child .financial-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
 }
 .recommendation-card {
   border: 1px solid var(--line);
@@ -1939,10 +2020,22 @@ dd {
   padding: 10px 14px;
   margin-top: auto;
 }
+.recommendation-card:only-child .recommendation-apply {
+  width: auto;
+  min-width: 220px;
+  align-self: flex-end;
+}
 .payment-terms { min-width: 0; overflow-wrap: anywhere; }
 .payment-terms .financial-details { margin: 0; }
 .payment-assumptions { color: var(--muted); font-size: 12px; line-height: 1.5; padding-left: 18px; margin: 0; }
 .payment-assumptions li { margin-top: 4px; }
+.payment-assumptions-details summary { width: fit-content; color: var(--muted); font-size: 12px; cursor: pointer; }
+.payment-assumptions-details .payment-assumptions { margin-top: 8px; }
+@media (max-width: 900px) {
+  .recommendation-input-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (max-width: 700px) {
   .product-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .product-option { min-height: 46px; padding: 7px 9px; font-size: 12px; overflow-wrap: anywhere; }
@@ -1951,27 +2044,24 @@ dd {
   .product-description { margin: 9px 0 10px; }
   .offer-comparison table { table-layout: fixed; }
 }
-@media (max-width: 1200px) {
-  .recommendation-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 950px) {
-  .recommendation-list {
-    grid-template-columns: 1fr;
-  }
-}
 @media (max-width: 700px) {
   .recommendation-panel {
     padding: 20px;
     border-radius: 18px;
   }
-  .recommendation-controls {
+  .recommendation-input-row {
     grid-template-columns: 1fr;
-    gap: 0;
+    gap: 14px;
   }
-  .recommendation-controls .field {
-    margin-bottom: 18px;
+  .recommendation-actions .button {
+    width: 100%;
+  }
+  .recommendation-card:only-child .financial-details {
+    grid-template-columns: 1fr;
+  }
+  .recommendation-card:only-child .recommendation-apply {
+    width: 100%;
+    min-width: 0;
   }
   .recommendation-terms {
     grid-template-columns: repeat(2, minmax(0, 1fr));

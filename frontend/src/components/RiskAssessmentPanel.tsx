@@ -160,10 +160,6 @@ export default function RiskAssessmentPanel({
       {risk.scorer_version !== null && <p className="muted risk-model">
         Модель: {risk.scorer_version}
       </p>}
-      {risk.scorer_version !== null && <p className="muted">
-        Синтетические данные. Качество на них не подтверждает точность для
-        реальных заёмщиков
-      </p>}
     </article>
   );
 }

@@ -481,7 +481,7 @@ function DraftEditor({
                   </dd>
                 </div>
                 <div>
-                  <dt>{product.payment_kind === "guarantee" ? "Комиссия за год" : "Демонстрационная ставка"}</dt>
+                  <dt>{product.payment_kind === "guarantee" ? "Комиссия за год" : "Ставка"}</dt>
                   <dd>
                     {((product.payment_kind === "guarantee" ? product.annual_commission_bps : product.annual_rate_bps || 0) / 100).toLocaleString("ru-RU")}%
                     годовых
@@ -492,10 +492,6 @@ function DraftEditor({
                   <dd>{(product.upfront_fee_bps / 100).toLocaleString("ru-RU")}% {product.payment_kind === "guarantee" ? "от суммы гарантии" : product.payment_kind === "revolving" ? "от лимита" : "от суммы"}</dd>
                 </div>}
               </dl>
-              <div className="terms-note">
-                Условия прототипа. Не являются действующим предложением
-                Альфа-Банка.
-              </div>
             </section>
             <section className="company-summary">
               <h3>{company.name}</h3>

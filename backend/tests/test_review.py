@@ -20,7 +20,7 @@ def command(client, headers, path, body, key=None):
 def response_body(detail, **changes):
     return {'expected_version': detail['version'], 'request_id': detail['information_requests'][-1]['id'],
             'message': 'Сведения проверены и дополнены', 'data_confirmed': True, 'bki_consent': True,
-            'consent_version': 'demo-consent-v1', **changes}
+            'consent_version': 'submission-consent-v2', **changes}
 
 
 def test_information_response_creates_new_snapshot_only_on_explicit_send(client, db):
@@ -47,7 +47,9 @@ def test_information_response_creates_new_snapshot_only_on_explicit_send(client,
     assert rows[0] == old and len(rows) == 2
     assert rows[1]['application']['revenue_kopecks'] == 240000000
     assert len(rows[1]['documents']) == len(old['documents']) + 1
-    assert rows[1]['confirmations']['bki_consent_text'] == old['confirmations']['bki_consent_text']
+    assert rows[1]['confirmations']['consent_version'] == 'submission-consent-v2'
+    assert rows[1]['confirmations']['data_confirmation_text'] == 'Подтверждаю, что проверил данные заявки.'
+    assert rows[1]['confirmations']['bki_consent_text'] == 'Согласен на проверку кредитной истории.'
     assert db.execute(text('SELECT response_revision_id FROM information_requests')).scalar_one() == uuid.UUID(result.json()['revision_id'])
     process()
     # Новая отправка уточнений использует текущую политику с обязательным ML.
@@ -237,7 +239,7 @@ def test_staff_can_approve_short_overdue_with_sufficient_coverage(client, db, ov
     assert result.status_code == 201, result.text
 
 
-@pytest.mark.parametrize('confirmation,value', [('data_confirmed', False), ('bki_consent', False), ('consent_version', 'old'), ('message', '   ')])
+@pytest.mark.parametrize('confirmation,value', [('data_confirmed', False), ('bki_consent', False), ('consent_version', 'old'), ('consent_version', 'demo-consent-v1'), ('message', '   ')])
 def test_response_validates_confirmation_and_message_again(client, db, confirmation, value):
     headers, identifier, _ = prepared(client, 'c')
     process()

@@ -46,7 +46,7 @@ for (const product of [
     await upload(page, "Финансовая отчётность");
     await upload(page, product.document);
     await page.getByRole("checkbox", { name: /Подтверждаю, что проверил данные/ }).check();
-    await page.getByRole("checkbox", { name: /Согласен на демонстрационную проверку/ }).check();
+    await page.getByRole("checkbox", { name: /Согласен на проверку кредитной истории/ }).check();
     await page.getByRole("button", { name: "Отправить заявку" }).click();
     await expect(page.locator(".page-heading .status")).toHaveText("На рассмотрении сотрудника", { timeout: 20000 });
     const context = await browser.newContext({ baseURL: process.env.BASE_URL || "http://127.0.0.1:8086" });
@@ -127,14 +127,40 @@ test("switching products clears incompatible fields and keeps financial input", 
   await expect(page.locator("#beneficiary_name")).toHaveValue("");
 });
 
-test("recommendation select has a visible keyboard focus ring", async ({ page }) => {
+test("recommendation purpose supports keyboard, escape, tab and outside click", async ({ page }) => {
   await login(page);
+  const options = await (await page.request.get("/api/v1/product-recommendations/options")).json();
   await page.goto("/applications/new");
-  const select = page.locator(".recommendation-panel select");
-  await select.focus();
-  const focus = await select.evaluate((element) => ({ width: getComputedStyle(element).outlineWidth, style: getComputedStyle(element).outlineStyle }));
-  expect(focus.style).not.toBe("none");
-  expect(parseFloat(focus.width)).toBeGreaterThanOrEqual(2);
+  const picker = page.getByRole("combobox", { name: "Что планируете финансировать" });
+  await expect(picker).toBeEnabled();
+  await picker.focus();
+  await expect(picker).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(picker).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("listbox", { name: "Что планируете финансировать" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(picker).toHaveAttribute("aria-expanded", "false");
+  await expect(picker).toBeFocused();
+
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(picker).toContainText(options.purposes[1].label);
+
+  await picker.click();
+  await page.getByRole("option", { name: "Покупка оборудования" }).click();
+  await expect(picker).toContainText("Покупка оборудования");
+  await picker.click();
+  await page.keyboard.press("Tab");
+  await expect(picker).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "Подобрать продукт" })).toBeFocused();
+
+  await picker.click();
+  await page.getByRole("heading", { name: "Подбор кредитного продукта" }).click();
+  await expect(picker).toHaveAttribute("aria-expanded", "false");
+
+  await picker.click();
+  await page.locator("#amount_kopecks").focus();
+  await expect(picker).toHaveAttribute("aria-expanded", "false");
 });
 
 test("editing an input invalidates recommendation cards", async ({ page }) => {
@@ -217,7 +243,7 @@ for (const product of [
     await upload(page, "Финансовая отчётность");
     await upload(page, product.document);
     await page.getByRole("checkbox", { name: /Подтверждаю, что проверил данные/ }).check();
-    await page.getByRole("checkbox", { name: /Согласен на демонстрационную проверку/ }).check();
+    await page.getByRole("checkbox", { name: /Согласен на проверку кредитной истории/ }).check();
     await page.getByRole("button", { name: "Отправить заявку" }).click();
     await expect(page.locator(".page-heading .status")).toHaveText("На рассмотрении сотрудника", { timeout: 20000 });
 
@@ -246,7 +272,7 @@ for (const product of [
       await expect(page).toHaveURL(new RegExp(`/applications/${id}$`));
       await page.getByLabel("Сообщение к ответу").fill("Сумма и срок уточнены");
       await page.getByRole("checkbox", { name: /Подтверждаю, что проверил данные/ }).check();
-      await page.getByRole("checkbox", { name: /Согласен на демонстрационную проверку/ }).check();
+      await page.getByRole("checkbox", { name: /Согласен на проверку кредитной истории/ }).check();
       const response = page.waitForResponse((item) => item.url().endsWith(`/api/v1/applications/${id}/information-responses`));
       await page.getByRole("button", { name: "Отправить ответ" }).click();
       expect((await response).status()).toBe(202);

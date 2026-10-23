@@ -61,11 +61,6 @@ export default function AppShell() {
             {staff ? "Заявки на рассмотрение" : "Мои заявки"}
           </NavLink>
         </nav>
-        <div className="sidebar-note">
-          <span className="demo-dot" />
-          Демонстрационный кабинет
-          <p>Синтетические данные и условия для хакатона</p>
-        </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
@@ -128,9 +123,6 @@ export default function AppShell() {
           )}
           <Outlet />
         </main>
-        <footer className="workspace-footer">
-          Прототип для хакатона • Условия не являются предложением банка
-        </footer>
       </div>
     </div>
   );

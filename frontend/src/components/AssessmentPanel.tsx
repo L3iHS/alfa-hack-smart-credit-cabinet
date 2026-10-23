@@ -29,9 +29,6 @@ export default function AssessmentPanel({
       aria-labelledby="assessment-title"
     >
       <h2 id="assessment-title">Проверки и расчёт</h2>
-      <p className="muted">
-        Синтетические источники и демонстрационные правила
-      </p>
       {error ? (
         <ErrorPanel error={error} retry={reload} />
       ) : !data ? (

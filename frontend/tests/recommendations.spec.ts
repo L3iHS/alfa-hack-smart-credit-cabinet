@@ -21,7 +21,8 @@ test("recommendation panel applies an equipment offer to the form", async ({ pag
   await page.locator("#period_start").fill("2026-01");
   await page.locator("#period_end").fill("2026-03");
 
-  await panel.locator("select").first().selectOption("equipment");
+  await panel.getByRole("combobox", { name: "Что планируете финансировать" }).click();
+  await panel.getByRole("option", { name: "Покупка оборудования" }).click();
 
   const responsePromise = page.waitForResponse(
     (response) =>

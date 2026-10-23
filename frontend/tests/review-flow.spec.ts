@@ -11,6 +11,11 @@ async function login(page: Page, staff = false, email?: string) {
     staff ? /\/staff\/applications$/ : /\/applications$/,
   );
 }
+async function consentVersion(page: Page): Promise<string> {
+  const response = await page.request.get("/api/v1/submission-policy");
+  expect(response.status()).toBe(200);
+  return (await response.json()).consent_version;
+}
 const id = "efbb7d37-1f76-4801-bdab-e417916293d1";
 function application(status = "manual_review") {
   return {
@@ -217,6 +222,7 @@ test("information_response_is_explicit_and_keeps_message_while_polling", async (
   page,
 }) => {
   await login(page);
+  const currentConsentVersion = await consentVersion(page);
   const item = {
     ...application("needs_info"),
     available_actions: ["edit_draft", "upload_document", "respond_information"],
@@ -277,7 +283,7 @@ test("information_response_is_explicit_and_keeps_message_while_polling", async (
       message: "Выручка уточнена по отчётности",
       data_confirmed: false,
       bki_consent: false,
-      consent_version: "demo-consent-v1",
+      consent_version: currentConsentVersion,
     },
   ]);
   await expect(message).toHaveValue("Выручка уточнена по отчётности");
@@ -404,11 +410,12 @@ for (const staff of [false, true]) {
     const displayedTime = new Date("2026-10-20T11:00:00Z").toLocaleString(
       "ru-RU",
       {
-        day: "numeric",
-        month: "short",
+        day: "2-digit",
+        month: "2-digit",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
       },
     );
     await expect(page.locator(".answered-requests")).toContainText(
@@ -425,6 +432,7 @@ test("real_information_working_copy_and_extra_document_wait_for_explicit_respons
   browser,
 }) => {
   await login(page, false, "demo-d@example.test");
+  const currentConsentVersion = await consentVersion(page);
   const token = (await (await page.request.get("/api/v1/auth/csrf")).json())
     .csrf_token;
   const now = new Date();
@@ -476,7 +484,7 @@ test("real_information_working_copy_and_extra_document_wait_for_explicit_respons
         expected_version: uploaded.application_version,
         data_confirmed: true,
         bki_consent: true,
-        consent_version: "demo-consent-v1",
+        consent_version: currentConsentVersion,
       },
     },
   );
@@ -599,6 +607,7 @@ test("real_information_working_copy_and_extra_document_wait_for_explicit_respons
 
 async function preparedReview(page: Page) {
   await login(page, false, "demo-d@example.test");
+  const currentConsentVersion = await consentVersion(page);
   const { csrf_token } = await (
     await page.request.get("/api/v1/auth/csrf")
   ).json();
@@ -646,7 +655,7 @@ async function preparedReview(page: Page) {
         expected_version: uploaded.application_version,
         data_confirmed: true,
         bki_consent: true,
-        consent_version: "demo-consent-v1",
+        consent_version: currentConsentVersion,
       },
     },
   );

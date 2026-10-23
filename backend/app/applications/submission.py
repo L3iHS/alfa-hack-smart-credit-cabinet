@@ -57,7 +57,7 @@ def validate_submission(db: Session, application: Application, body: SubmissionI
     if not body.data_confirmed:
         errors['data_confirmed'] = 'Подтвердите данные заявки'
     if not body.bki_consent:
-        errors['bki_consent'] = 'Подтвердите демонстрационную проверку БКИ'
+        errors['bki_consent'] = 'Подтвердите согласие на проверку кредитной истории'
     if body.consent_version != CONSENT_VERSION:
         errors['consent_version'] = 'Текст согласия изменился, обновите страницу'
     documents = active_documents(db, application.id)

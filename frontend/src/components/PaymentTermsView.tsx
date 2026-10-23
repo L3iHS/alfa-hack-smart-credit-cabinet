@@ -5,7 +5,7 @@ export function amountLabel(kind: PaymentTerms["payment_kind"]) {
   return kind === "guarantee" ? "Сумма гарантии" : kind === "revolving" ? "Лимит" : "Сумма кредита";
 }
 
-export default function PaymentTermsView({ terms }: { terms: PaymentTerms }) {
+export default function PaymentTermsView({ terms, collapseAssumptions = false }: { terms: PaymentTerms; collapseAssumptions?: boolean }) {
   const guarantee = terms.payment_kind === "guarantee";
   const revolving = terms.payment_kind === "revolving";
   return (
@@ -28,7 +28,9 @@ export default function PaymentTermsView({ terms }: { terms: PaymentTerms }) {
       </dl>
       {revolving && <p className="muted">Расчётная нагрузка включает резерв возврата лимита для оценки заявки. Это не ежемесячный платёж.</p>}
       {guarantee && <p className="muted">При выплате по гарантии может возникнуть обязанность возместить её сумму.</p>}
-      {terms.assumptions.length > 0 && <ul className="payment-assumptions">{terms.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul>}
+      {terms.assumptions.length > 0 && (collapseAssumptions
+        ? <details className="payment-assumptions-details"><summary>Как рассчитаны условия</summary><ul className="payment-assumptions">{terms.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul></details>
+        : <ul className="payment-assumptions">{terms.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul>)}
     </div>
   );
 }

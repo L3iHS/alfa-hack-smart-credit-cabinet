@@ -1,10 +1,10 @@
 from app.processing.policy import POLICY_VERSION
 
-CONSENT_VERSION = 'demo-consent-v1'
+CONSENT_VERSION = 'submission-consent-v2'
 MAX_FILE_SIZE = 10 * 1024 * 1024
 ACCEPTED_CONTENT_TYPES = ('application/pdf', 'image/png', 'image/jpeg')
-DATA_CONFIRMATION_TEXT = 'Подтверждаю, что проверил данные демонстрационной заявки.'
-BKI_CONSENT_TEXT = 'Согласен на демонстрационную проверку кредитной истории. Используется локальный симулятор БКИ; реальные сведения не запрашиваются.'
+DATA_CONFIRMATION_TEXT = 'Подтверждаю, что проверил данные заявки.'
+BKI_CONSENT_TEXT = 'Согласен на проверку кредитной истории.'
 
 
 def submission_policy():

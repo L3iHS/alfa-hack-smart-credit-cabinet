@@ -31,7 +31,7 @@ async function upload(page: Page, label: string, filename = "credit-demo.png") {
 }
 async function confirmations(page: Page) {
   await page.getByRole("checkbox", { name: /Подтверждаю, что проверил данные/ }).check();
-  await page.getByRole("checkbox", { name: /Согласен на демонстрационную проверку/ }).check();
+  await page.getByRole("checkbox", { name: /Согласен на проверку кредитной истории/ }).check();
 }
 async function createAndSubmit(page: Page, letter: Profile) {
   const p = profiles[letter];
