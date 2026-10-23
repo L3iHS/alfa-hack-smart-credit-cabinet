@@ -298,3 +298,20 @@ def test_report_reads_are_batched_and_do_not_change_credit_data(client, db, froz
         event.remove(engine, 'before_cursor_execute', capture)
     db.expire_all()
     assert [(row.id, row.status, row.version, row.responded_at) for row in db.scalars(select(Offer))] == before
+
+
+@pytest.mark.parametrize('path', ['summary', 'counteroffers'])
+@pytest.mark.parametrize('params,expected', [
+    ({'date_to': '0001-01-01'}, 422),
+    ({'date_from': '0001-01-01', 'date_to': '0001-01-01'}, 422),
+    ({'date_to': '0001-01-30'}, 422),
+    ({'date_from': '0001-01-02', 'date_to': '0001-01-02'}, 200),
+    ({'date_to': '0001-01-31'}, 200),
+    ({'date_to': '9999-12-31'}, 200),
+    ({'date_from': '9999-12-31', 'date_to': '9999-12-31'}, 200),
+    (PARAMS, 200),
+])
+def test_extreme_iso_dates_handle_arithmetic_and_timezone_overflow(client, frozen, path, params, expected):
+    authenticate(client, 'staff@example.test')
+    response = client.get(f'{BASE}/{path}', params=params)
+    assert response.status_code == expected, response.text

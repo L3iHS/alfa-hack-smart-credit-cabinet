@@ -26,12 +26,18 @@ MOSCOW = ZoneInfo('Europe/Moscow')
 
 
 def metadata(date_from: date | None, date_to: date | None, product_code, now: datetime) -> ReportMetadata:
-    end = date_to or now.astimezone(MOSCOW).date()
-    start = date_from or end - timedelta(days=29)
-    if start > end or (end - start).days >= 366:
-        raise HTTPException(422, {'code': 'invalid_period', 'message': 'Выберите период от 1 до 366 дней'})
-    return ReportMetadata(date_from=start, date_to=end, generated_at=now,
-                          outcomes_as_of=now, product_code=product_code)
+    try:
+        end = date_to or now.astimezone(MOSCOW).date()
+        start = date_from or end - timedelta(days=29)
+        if start > end or (end - start).days >= 366:
+            raise HTTPException(422, {'code': 'invalid_period', 'message': 'Выберите период от 1 до 366 дней'})
+        result = ReportMetadata(date_from=start, date_to=end, generated_at=now,
+                                outcomes_as_of=now, product_code=product_code)
+        # Крайняя ISO-дата может не помещаться в UTC после перевода из Москвы.
+        bounds(result)
+    except OverflowError:
+        raise HTTPException(422, {'code': 'invalid_period', 'message': 'Границы периода выходят за поддерживаемый диапазон дат'}) from None
+    return result
 
 
 def bounds(meta: ReportMetadata):
