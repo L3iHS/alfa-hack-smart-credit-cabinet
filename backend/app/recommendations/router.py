@@ -12,17 +12,10 @@ from app.core.db import get_db
 from app.recommendations.config import RecommendationConfigError, load_config
 from app.recommendations.engine import recommend
 from app.recommendations.schemas import (
-    OptionItem, OptionsOutput, PurposeOption, RecommendationRequest, RecommendationResponse,
+    OptionsOutput, PurposeOption, RecommendationRequest, RecommendationResponse,
 )
 
 router = APIRouter(tags=['Подбор продуктов'])
-COLLATERAL_OPTIONS = (
-    ('real_estate', 'Недвижимость'),
-    ('equipment', 'Оборудование'),
-    ('vehicle', 'Транспорт'),
-    ('none', 'Без залога'),
-)
-URGENCY_OPTIONS = (('high', 'Срочно'), ('normal', 'В плановом порядке'))
 
 
 def _company(user: User, db: Session, company_id: UUID | None) -> Company:
@@ -42,9 +35,7 @@ def _company(user: User, db: Session, company_id: UUID | None) -> Company:
 def recommendation_options():
     config = load_config()
     return OptionsOutput(
-        purposes=[PurposeOption(code=item.code, label=item.label) for item in config.purposes.values()],
-        collateral_types=[OptionItem(code=code, label=label) for code, label in COLLATERAL_OPTIONS],
-        urgency_levels=[OptionItem(code=code, label=label) for code, label in URGENCY_OPTIONS],
+        purposes=[PurposeOption(code=code, label=item.label) for code, item in config.purposes.items()],
         config_version=config.version,
     )
 

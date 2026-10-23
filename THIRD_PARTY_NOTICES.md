@@ -38,6 +38,7 @@
 | [pypdf](https://pypi.org/project/pypdf/6.21.1/) | 6.21.1 | BSD-3-Clause |
 | [pytest](https://pypi.org/project/pytest/8.3.5/) | 8.3.5 | MIT |
 | [python-dotenv](https://pypi.org/project/python-dotenv/1.2.4/) | 1.2.4 | BSD-3-Clause |
+| [PyYAML](https://pypi.org/project/PyYAML/6.0.3/) | 6.0.3 | MIT |
 | [SQLAlchemy](https://pypi.org/project/SQLAlchemy/2.0.40/) | 2.0.40 | MIT |
 | [starlette](https://pypi.org/project/starlette/0.52.1/) | 0.52.1 | BSD-3-Clause |
 | [typing-inspection](https://pypi.org/project/typing-inspection/0.4.4/) | 0.4.4 | MIT |
@@ -45,6 +46,8 @@
 | [uvicorn](https://pypi.org/project/uvicorn/0.34.2/) | 0.34.2 | BSD-3-Clause |
 
 Pillow использует [MIT-CMU](https://github.com/python-pillow/Pillow/blob/main/LICENSE), а не обычную MIT: PIL © 1997–2011 Secret Labs AB, © 1995–2011 Fredrik Lundh and contributors; Pillow © 2010 Jeffrey 'Alex' Clark and contributors. Psycopg и бинарный пакет используют [LGPLv3](https://github.com/psycopg/psycopg/blob/3.2.6/psycopg/LICENSE.txt). Бинарные колёса Pillow и psycopg-binary также включают нативные компоненты. Лицензионные файлы самих пакетов установлены в `pillow-13.0.0.dist-info/licenses/LICENSE` и `psycopg_binary-3.2.6.dist-info/LICENSE.txt`; состав нативных компонентов зависит от платформенного колеса. При отдельном распространении таких колёс нужно учитывать их вложенные компоненты и сохранять исходные уведомления поставки. Certifi содержит набор сертификатов Mozilla под MPL-2.0.
+
+PyYAML 6.0.3 используется для чтения конфигурации подбора. MIT сверена с установленным `pyyaml-6.0.3.dist-info/licenses/LICENSE`: © 2017–2021 Ingy döt Net, © 2006–2016 Kirill Simonov. Исходный текст лицензии сохраняется в пакете.
 
 ## Offline ML и построение отчётов
 

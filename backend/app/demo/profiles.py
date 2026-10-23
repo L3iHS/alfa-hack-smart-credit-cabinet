@@ -3,42 +3,6 @@ from datetime import date
 
 SOURCE_VERSION = 'demo-profiles-v1'
 PROFILE_INNS = {letter: f'99000000010{index}' for index, letter in enumerate('abcde', 1)}
-_RECOMMENDATION_PROFILES = {
-    '990000000001': dict(client_type='OOO', okved='10.71', tax_regime='USN', egrul_status='active',
-                         mass_address_flag=False, director_disqualified_flag=False,
-                         credit_history_score=620, overdue_days=0),
-    '990000000002': dict(client_type='OOO', okved='33.12', tax_regime='USN', egrul_status='active',
-                         mass_address_flag=False, director_disqualified_flag=False,
-                         credit_history_score=600, overdue_days=0),
-    PROFILE_INNS['a']: dict(client_type='OOO', okved='10.71', tax_regime='USN', egrul_status='active',
-                            mass_address_flag=False, director_disqualified_flag=False,
-                            credit_history_score=650, overdue_days=0),
-    PROFILE_INNS['b']: dict(client_type='OOO', okved='46.90', tax_regime='OSNO', egrul_status='active',
-                            mass_address_flag=False, director_disqualified_flag=False,
-                            credit_history_score=700, overdue_days=0),
-    PROFILE_INNS['c']: dict(client_type='OOO', okved='10.71', tax_regime='USN', egrul_status='active',
-                            mass_address_flag=False, director_disqualified_flag=False,
-                            credit_history_score=600, overdue_days=0),
-    PROFILE_INNS['d']: dict(client_type='IP', okved='47.11', tax_regime='USN', egrul_status='active',
-                            mass_address_flag=False, director_disqualified_flag=False,
-                            credit_history_score=520, overdue_days=0),
-    PROFILE_INNS['e']: dict(client_type='OOO', okved='46.90', tax_regime='OSNO', egrul_status='active',
-                            mass_address_flag=False, director_disqualified_flag=False,
-                            credit_history_score=450, overdue_days=100),
-}
-
-
-def recommendation_profile(inn: str) -> dict:
-    """Детерминированный мок ЕГРЮЛ/БКИ для подбора продукта."""
-    if inn in _RECOMMENDATION_PROFILES:
-        data = dict(_RECOMMENDATION_PROFILES[inn])
-    else:
-        data = dict(client_type='OOO' if len(inn) == 10 else 'IP', okved=None, tax_regime=None,
-                    egrul_status='active', mass_address_flag=False,
-                    director_disqualified_flag=False, credit_history_score=None,
-                    overdue_days=None)
-    data['max_overdue_days'] = data['overdue_days']
-    return data
 
 
 def months_before(today: date, months: int) -> date:

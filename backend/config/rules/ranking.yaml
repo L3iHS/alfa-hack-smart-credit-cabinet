@@ -1,24 +1,3 @@
-default_weights:
-  purpose_match: 0.35
-  amount_term_fit: 0.20
-  cost_score: 0.20
-  approval_likelihood: 0.20
-  speed_score: 0.05
-
-urgency_overrides:
-  high:
-    speed_score: 0.20
-    cost_score: 0.10
-    purpose_match: 0.30
-    amount_term_fit: 0.20
-    approval_likelihood: 0.20
-
 show_top_n: 3
-close_score_delta: 0.05
-availability_bonus: 0.05
-cost_cap: 40
-rounding_kopecks: 10000000
-speed:
-  high_urgency_threshold_hours: 8
-  fast_score: 1.0
-  normal_score: 0.5
+amount_weight: 0.5
+term_weight: 0.5

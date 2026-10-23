@@ -3,28 +3,9 @@ global_stop_factors:
     field: egrul_status
     op: eq
     value: active
-    on_fail: reject_product
-    reason_code: R_BUSINESS_NOT_ACTIVE
-  - id: STOP_MASS_ADDRESS
-    field: mass_address_flag
-    op: eq
-    value: false
-    on_fail: reject_product
-    reason_code: R_ADDRESS_CHECK
-  - id: STOP_DIRECTOR_DISQUALIFIED
-    field: director_disqualified_flag
-    op: eq
-    value: false
-    on_fail: reject_product
-    reason_code: R_DIRECTOR_CHECK
+    reason_code: company_status
   - id: STOP_ACTIVE_OVERDUE
     field: max_overdue_days
-    op: lte
-    value: 30
-    on_fail: reject_product
-    reason_code: R_OVERDUE
-
-excluded_okved_prefixes:
-  - "92."
-  - "64.92"
-  - "64.99"
+    op: lt
+    value: 90
+    reason_code: overdue
