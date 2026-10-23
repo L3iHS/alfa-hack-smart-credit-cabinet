@@ -25,7 +25,9 @@ GET {{base}}/products
 ### Подбор продуктов: цели и параметры
 GET {{base}}/product-recommendations/options
 
-### Подбор продуктов по параметрам заявки
+### Предварительный подбор: не создаёт Offer и не вызывает модель
+# Все суммы — копейки за указанный период; period_months или обе даты, без смешивания.
+# Ответ: recommendation_id, recommended_amount_kopecks, payment_terms и требования продукта.
 POST {{base}}/product-recommendations
 Content-Type: application/json
 X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
@@ -34,11 +36,6 @@ X-CSRF-Token: {{clientLogin.response.body.$.csrf_token}}
   "purpose":"working_capital",
   "amount_kopecks":200000000,
   "term_months":12,
-  "urgency":"normal",
-  "has_collateral":false,
-  "collateral_type":"none",
-  "supplier_invoice_attached":true,
-  "down_payment_pct":10,
   "revenue_total_kopecks":3000000000,
   "expenses_total_kopecks":2000000000,
   "existing_debt_payments_kopecks":10000000,
