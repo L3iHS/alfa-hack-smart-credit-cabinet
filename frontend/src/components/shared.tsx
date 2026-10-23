@@ -109,16 +109,21 @@ export function money(value: number | null) {
 }
 export function dateTime(value: string) {
   return new Date(value).toLocaleString("ru-RU", {
-    day: "numeric",
-    month: "short",
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 export function date(value: string | null) {
   return value
-    ? new Date(`${value}T12:00:00`).toLocaleDateString("ru-RU")
+    ? new Date(`${value}T12:00:00`).toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
     : "Не указан";
 }
 export function Pagination({
