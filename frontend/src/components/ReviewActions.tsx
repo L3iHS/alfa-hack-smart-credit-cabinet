@@ -13,6 +13,7 @@ import type {
   SubmissionPolicy,
 } from "../api/types";
 import RiskAssessmentPanel from "./RiskAssessmentPanel";
+import PaymentTermsView, { amountLabel } from "./PaymentTermsView";
 import { documentLabels } from "./ApplicationDocuments";
 import { dateTime, money, statusLabels } from "./shared";
 import { readStored, useReviewCommand, writeStored } from "./useReviewCommand";
@@ -28,6 +29,9 @@ export const fieldLabels: Record<RequestedField, string> = {
   revenue_kopecks: "Выручка",
   operating_expenses_kopecks: "Операционные расходы",
   existing_debt_payments_kopecks: "Платежи по кредитам",
+  tender_number: "Номер тендера",
+  beneficiary_name: "Заказчик по тендеру",
+  project_description: "Описание проекта",
 };
 const nextStep = {
   draft: "Заполните данные, приложите документы и отправьте заявку",
@@ -143,6 +147,7 @@ export default function ReviewActions({
   const offer =
     item.offers.find((offer) => offer.status === "active") ||
     item.offers.find((offer) => offer.status === "accepted");
+  const productFields: RequestedField[] = item.product_code === "investment" ? ["project_description"] : item.product_code === "tender_guarantee" ? ["tender_number", "beneficiary_name"] : [];
   useEffect(() => {
     writeStored(draftKey, draft);
   }, [draftKey, draft]);
@@ -226,11 +231,11 @@ export default function ReviewActions({
         !/^\d+$/.test(draft.term) ||
         !Number.isSafeInteger(term) ||
         term < 1 ||
-        term > 36 ||
+        term > 120 ||
         !draft.reason.trim()
       ) {
         setValidation(
-          "Укажите сумму в рублях, срок от 1 до 36 месяцев и основание",
+          "Укажите сумму в рублях, срок от 1 до 120 месяцев и основание",
         );
         return;
       }
@@ -379,7 +384,7 @@ export default function ReviewActions({
             </thead>
             <tbody>
               <tr>
-                <th scope="row">Сумма</th>
+                <th scope="row">{amountLabel(offer.payment_terms.payment_kind)}</th>
                 <td>{money(item.amount_kopecks)}</td>
                 <td>{money(offer.amount_kopecks)}</td>
               </tr>
@@ -390,22 +395,7 @@ export default function ReviewActions({
               </tr>
             </tbody>
           </table>
-          <dl className="financial-details">
-            <div>
-              <dt>Ежемесячный платёж</dt>
-              <dd>{money(offer.monthly_payment_kopecks)}</dd>
-            </div>
-            <div>
-              <dt>Общая сумма платежей</dt>
-              <dd>{money(offer.total_payment_kopecks)}</dd>
-            </div>
-            <div>
-              <dt>Ставка</dt>
-              <dd>
-                {(offer.annual_rate_bps / 100).toLocaleString("ru-RU")}% годовых
-              </dd>
-            </div>
-          </dl>
+          <PaymentTermsView terms={offer.payment_terms} />
         </div>
       )}
       {!staff && can("respond_information") && (
@@ -505,7 +495,7 @@ export default function ReviewActions({
           </label>
           <fieldset className="request-options" disabled={disabled}>
             <legend>Какие сведения нужны</legend>
-            {Object.entries(fieldLabels).map(([field, label]) => (
+            {Object.entries(fieldLabels).filter(([field]) => !(["tender_number", "beneficiary_name", "project_description"] as string[]).includes(field) || productFields.includes(field as RequestedField)).map(([field, label]) => (
               <label key={field}>
                 <input
                   type="checkbox"
@@ -582,7 +572,7 @@ export default function ReviewActions({
                   Предлагаемый срок, месяцев
                   <input
                     inputMode="numeric"
-                    maxLength={2}
+                    maxLength={3}
                     disabled={disabled}
                     value={draft.term}
                     onChange={(event) => update("term", event.target.value)}

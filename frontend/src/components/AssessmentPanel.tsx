@@ -1,6 +1,7 @@
 import RiskAssessmentPanel from "./RiskAssessmentPanel";
 import type { Assessment } from "../api/types";
 import { date, dateTime, ErrorPanel, Loading, money } from "./shared";
+import PaymentTermsView from "./PaymentTermsView";
 
 const runLabels = {
   pending: "Ожидает запуска",
@@ -60,7 +61,7 @@ export default function AssessmentPanel({
             {!run.risk_assessments?.length && (
               <p className="muted">
                 {!run.scorer_version
-                  ? "Историческая политика без ML"
+                  ? run.catalog_version === "demo-v1" ? "Историческая политика без ML" : "Оценка риска для этого запуска пока не сохранена"
                   : run.status === "pending" || run.status === "running"
                     ? "Ожидается расчёт риска"
                     : run.status === "failed" || run.status === "interrupted"
@@ -131,25 +132,29 @@ export default function AssessmentPanel({
                   <dt>Доступный денежный поток</dt>
                   <dd>{average(run.calculation.available_flow_kopecks)}</dd>
                 </div>
-                <div>
+                {!run.calculation.payment_terms && <div>
                   <dt>Новый месячный платёж</dt>
                   <dd>{money(run.calculation.monthly_payment_kopecks)}</dd>
-                </div>
-                <div>
+                </div>}
+                {run.calculation.payment_terms?.payment_kind !== "guarantee" && <div>
                   <dt>Коэффициент покрытия</dt>
                   <dd>
-                    {run.calculation.coverage_ratio === null
+                    {(run.calculation.financial_gate?.coverage_ratio ?? run.calculation.coverage_ratio) === null
                       ? "Не определён"
-                      : Number(run.calculation.coverage_ratio).toLocaleString(
+                      : Number(run.calculation.financial_gate?.coverage_ratio ?? run.calculation.coverage_ratio).toLocaleString(
                           "ru-RU",
                           { maximumFractionDigits: 4 },
                         )}
                   </dd>
-                </div>
+                </div>}
               </dl>
             ) : (
               <p className="muted">Финансовый расчёт для этого запуска отсутствует</p>
             )}
+            {run.calculation?.payment_terms && <>
+              <PaymentTermsView terms={run.calculation.payment_terms} />
+              {run.calculation.financial_gate?.guarantee_fee_affordable !== null && run.calculation.financial_gate?.guarantee_fee_affordable !== undefined && <p>Проверка комиссии: {run.calculation.financial_gate.guarantee_fee_affordable ? "пройдена" : "не пройдена"}. Проверка масштаба условного обязательства: {run.calculation.financial_gate.guarantee_liability_within_limit ? "пройдена" : "не пройдена"}.</p>}
+            </>}
             {run.decision && (
               <div className="assessment-decision">
                 <strong>Основание результата</strong>

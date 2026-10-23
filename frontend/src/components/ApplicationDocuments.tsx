@@ -11,6 +11,9 @@ import { dateTime, ErrorPanel, Loading, useResource } from "./shared";
 export const documentLabels: Record<DocumentType, string> = {
   financial_statement: "Финансовая отчётность",
   equipment_invoice: "Счёт на оборудование",
+  bank_statement: "Выписка по счёту",
+  business_plan: "Бизнес-план",
+  tender_document: "Документы по тендеру",
 };
 function DocumentUpload({
   documentType,

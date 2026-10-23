@@ -120,6 +120,22 @@ async function open(
   );
   await page.goto(`${staff ? "/staff" : ""}/applications/${id}`);
 }
+test("historical calculation without payment terms retains saved monthly amount and coverage", async ({ page }) => {
+  const historical = assessment() as ReturnType<typeof assessment> & { runs: Array<Record<string, unknown>> };
+  historical.runs[0].catalog_version = "demo-v1";
+  historical.runs[0].policy_version = "demo-policy-0.2";
+  historical.runs[0].calculation = {
+    months: 3, monthly_revenue_kopecks: "100000000", monthly_operating_expenses_kopecks: "30000000",
+    monthly_debt_kopecks: "0", available_flow_kopecks: "70000000", monthly_payment_kopecks: 9466000,
+    coverage_ratio: "7.394", policy_version: "demo-policy-0.2", payment_terms: null, financial_gate: null,
+  };
+  await open(page, () => historical);
+  await expect(page.getByText("Новый месячный платёж", { exact: true })).toBeVisible();
+  await expect(page.getByText("94 660 ₽", { exact: true })).toBeVisible();
+  await expect(page.getByText("Коэффициент покрытия", { exact: true })).toBeVisible();
+  await expect(page.getByText("7,394", { exact: true })).toBeVisible();
+  await expect(page.locator(".assessment-run .payment-terms")).toHaveCount(0);
+});
 for (const [p, label, display] of [
   [0.070751957, "Низкий риск", "7,08%"],
   [0.1, "Повышенный риск", "10,00%"],

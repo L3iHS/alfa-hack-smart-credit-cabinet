@@ -1,4 +1,32 @@
-export type ProductCode = "working_capital" | "equipment";
+export type ProductCode = "working_capital" | "equipment" | "overdraft" | "credit_line" | "investment" | "tender_guarantee";
+export type PaymentKind = "annuity" | "revolving" | "guarantee";
+export type DocumentType = "financial_statement" | "equipment_invoice" | "bank_statement" | "business_plan" | "tender_document";
+export type ProductField = "tender_number" | "beneficiary_name" | "project_description";
+export interface PaymentTerms {
+  payment_kind: PaymentKind;
+  amount_kopecks: number;
+  term_months: number;
+  annual_rate_bps: number | null;
+  annual_commission_bps: number;
+  monthly_payment_kopecks: number | null;
+  upfront_fee_kopecks: number;
+  principal_due_at_end_kopecks: number;
+  last_payment_kopecks: number;
+  total_payment_kopecks: number;
+  total_cost_kopecks: number;
+  assessment_monthly_burden_kopecks: number | null;
+  contingent_liability_kopecks: number;
+  assumptions: string[];
+}
+export interface FinancialGate {
+  allowed: boolean;
+  reason_code: string;
+  coverage_ratio: string | null;
+  guarantee_fee_affordable: boolean | null;
+  guarantee_liability_within_limit: boolean | null;
+  available_after_debt_kopecks: string;
+  guarantee_liability_limit_kopecks: string | null;
+}
 export interface User {
   id: string;
   role: "client" | "staff";
@@ -20,8 +48,12 @@ export interface Product {
   max_amount_kopecks: number;
   min_term_months: number;
   max_term_months: number;
-  annual_rate_bps: number;
-  required_document_types: ("financial_statement" | "equipment_invoice")[];
+  annual_rate_bps: number | null;
+  payment_kind: PaymentKind;
+  upfront_fee_bps: number;
+  annual_commission_bps: number;
+  required_document_types: DocumentType[];
+  required_application_fields: ProductField[];
 }
 export interface Catalog {
   catalog_version: string;
@@ -43,13 +75,6 @@ export interface RecommendationRequest {
   purpose: RecommendationPurpose;
   amount_kopecks: number;
   term_months: number;
-  urgency: "high" | "normal";
-  has_collateral?: boolean | null;
-  collateral_type?: RecommendationCollateral | null;
-  supplier_invoice_attached?: boolean | null;
-  down_payment_pct?: number | null;
-  business_plan_attached?: boolean | null;
-  tender_number?: string | null;
   revenue_total_kopecks?: number | null;
   expenses_total_kopecks?: number | null;
   existing_debt_payments_kopecks?: number | null;
@@ -63,61 +88,44 @@ export interface RecommendationOption {
 }
 export interface RecommendationOptions {
   purposes: { code: RecommendationPurpose; label: string }[];
-  collateral_types: RecommendationOption[];
-  urgency_levels: RecommendationOption[];
   config_version: string;
 }
 export interface RecommendationAction {
-  kind:
-    | "change_purpose"
-    | "change_amount"
-    | "change_term"
-    | "change_collateral"
-    | "attach_document"
-    | "offer_choice"
-    | "open_cabinet";
-  code: string;
+  kind: "request_field" | "apply_recommendation" | "change_amount";
   label: string;
-  product_id: string | null;
+  field: "revenue_total_kopecks" | "expenses_total_kopecks" | "existing_debt_payments_kopecks" | "period_months" | "amount_kopecks" | null;
+  product_code: ProductCode | null;
+  recommendation_id: string | null;
 }
 export interface RecommendationItem {
-  offer_id: string;
-  product_id: string;
+  recommendation_id: string;
+  product_code: ProductCode;
   product_name: string;
-  product_type: string;
-  cabinet_product_code: ProductCode | null;
-  is_available_in_cabinet: boolean;
   rank: number;
-  score: number;
   purpose_match: boolean;
-  approved_amount_kopecks: number;
+  recommended_amount_kopecks: number;
   term_months: number;
-  term_days: number | null;
-  base_rate_pct: number | null;
-  commission_year_pct: number | null;
-  effective_annual_cost_pct: number;
-  monthly_payment_kopecks: number | null;
-  total_cost_kopecks: number | null;
-  approval_likelihood: number;
-  approval_time_hours: number;
+  payment_terms: PaymentTerms;
+  financial_gate: FinancialGate;
   client_reasons: string[];
-  missing_data: string[];
-  next_action: string | null;
+  reason_codes: string[];
+  required_application_fields: ProductField[];
+  required_document_types: DocumentType[];
 }
 export type RecommendationStatus =
   | "ok"
-  | "counter_offer"
+  | "adjusted"
   | "request_data"
-  | "alternative_product"
   | "no_match";
 export interface RecommendationResponse {
   status: RecommendationStatus;
   message: string;
   items: RecommendationItem[];
-  alternatives: RecommendationItem[];
+  missing_fields: RecommendationAction["field"][];
   actions: RecommendationAction[];
   config_version: string;
   trace_id: string;
+  catalog_version: string;
   staff_trace: Record<string, unknown>[] | null;
 }
 export interface DraftFields {
@@ -131,6 +139,9 @@ export interface DraftFields {
   revenue_kopecks: number | null;
   operating_expenses_kopecks: number | null;
   existing_debt_payments_kopecks: number | null;
+  tender_number: string | null;
+  beneficiary_name: string | null;
+  project_description: string | null;
 }
 export interface Application extends DraftFields {
   id: string;
@@ -171,6 +182,9 @@ export interface FormValues {
   revenue_kopecks: string;
   operating_expenses_kopecks: string;
   existing_debt_payments_kopecks: string;
+  tender_number: string;
+  beneficiary_name: string;
+  project_description: string;
 }
 export interface Recovery {
   owner: string;
@@ -184,7 +198,6 @@ export interface CsrfBinding {
   user_id: string | null;
 }
 
-export type DocumentType = "financial_statement" | "equipment_invoice";
 export interface ApplicationDocument {
   id: string;
   document_type: DocumentType;
@@ -263,6 +276,7 @@ export interface Offer {
   monthly_payment_kopecks: number;
   total_payment_kopecks: number;
   annual_rate_bps: number;
+  payment_terms: PaymentTerms;
   reason: string;
   created_at: string;
 }
@@ -286,8 +300,8 @@ export interface RiskAssessment {
   scorer_kind: string;
   scorer_version: string | null;
   feature_schema_version: string | null;
-  target_event: string;
-  horizon_months: number;
+  target_event: string | null;
+  horizon_months: number | null;
   data_kind: string;
   prediction_scope: "requested_terms" | "offered_terms";
   offer_version: number | null;
@@ -296,7 +310,7 @@ export interface RiskAssessment {
     product_code: string;
     amount_kopecks: number;
     term_months: number;
-    annual_rate_bps: number;
+    annual_rate_bps: number | null;
   };
   probability: number | null;
   risk_band: "low" | "elevated" | "high" | null;
@@ -345,6 +359,8 @@ export interface Assessment {
       monthly_payment_kopecks: number;
       coverage_ratio: string | null;
       policy_version: string;
+      payment_terms: PaymentTerms | null;
+      financial_gate: FinancialGate | null;
     } | null;
     decision: {
       id: string;

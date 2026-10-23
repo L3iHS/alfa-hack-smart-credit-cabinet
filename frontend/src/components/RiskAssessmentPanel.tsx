@@ -40,6 +40,7 @@ export default function RiskAssessmentPanel({
   assessment: RiskAssessment;
 }) {
   const successful = risk.status === "succeeded" && risk.probability !== null;
+  const unsupported = risk.status === "not_applicable" && risk.reason_code === "unsupported_product";
   const band = risk.risk_band;
   const labels = {
     low: "Низкий риск",
@@ -62,7 +63,7 @@ export default function RiskAssessmentPanel({
       </h3>
       <p className="risk-terms">
         {money(risk.terms.amount_kopecks)} · {risk.terms.term_months} мес. ·{" "}
-        {(risk.terms.annual_rate_bps / 100).toLocaleString("ru-RU")}% годовых
+        {risk.terms.annual_rate_bps === null ? "Без кредитной ставки" : `${(risk.terms.annual_rate_bps / 100).toLocaleString("ru-RU")}% годовых`}
       </p>
       <p className="muted">
         {risk.prediction_scope === "requested_terms"
@@ -71,7 +72,7 @@ export default function RiskAssessmentPanel({
             ? "Расчёт до создания предложения"
             : `Версия предложения ${risk.offer_version}`}
       </p>
-      <p className="risk-target">Просрочка 90+ дней в первые 12 месяцев</p>
+      {!unsupported && <p className="risk-target">Просрочка 90+ дней в первые 12 месяцев</p>}
       {successful ? (
         <>
           <div className="risk-result">
@@ -151,17 +152,17 @@ export default function RiskAssessmentPanel({
           <p>
             {risk.status === "failed"
               ? "Вероятность не рассчитана. Кредитное решение по этой оценке не принято; повторите действие после устранения сбоя"
-              : "Для этих условий оценка не рассчитывается. Изучите проверки и основания результата"}
+              : unsupported ? "Модель риска для этого продукта пока не применяется. Заявку рассматривает сотрудник" : "Для этих условий оценка не рассчитывается. Изучите проверки и основания результата"}
           </p>
         </div>
       )}
-      <p className="muted risk-model">
+      {!unsupported && <p className="muted risk-model">
         Модель: {risk.scorer_version || "Не определена"}
-      </p>
-      <p className="muted">
+      </p>}
+      {!unsupported && <p className="muted">
         Синтетические данные. Качество на них не подтверждает точность для
         реальных заёмщиков
-      </p>
+      </p>}
     </article>
   );
 }

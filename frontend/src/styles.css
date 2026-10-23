@@ -44,6 +44,7 @@ a {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible {
   outline: 3px solid #2273ce;
   outline-offset: 3px;
@@ -1776,7 +1777,7 @@ dd {
 }
 .recommendation-controls {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 0.8fr 1fr;
+  grid-template-columns: minmax(0, 320px);
   gap: 16px;
 }
 .recommendation-controls .field {
@@ -1849,6 +1850,7 @@ dd {
 }
 .recommendation-card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -1936,6 +1938,18 @@ dd {
   min-height: 42px;
   padding: 10px 14px;
   margin-top: auto;
+}
+.payment-terms { min-width: 0; overflow-wrap: anywhere; }
+.payment-terms .financial-details { margin: 0; }
+.payment-assumptions { color: var(--muted); font-size: 12px; line-height: 1.5; padding-left: 18px; margin: 0; }
+.payment-assumptions li { margin-top: 4px; }
+@media (max-width: 700px) {
+  .product-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .product-option { min-height: 46px; padding: 7px 9px; font-size: 12px; overflow-wrap: anywhere; }
+  .product-option .choice-mark { display: none; }
+  .form-panel h2 { margin-bottom: 12px; }
+  .product-description { margin: 9px 0 10px; }
+  .offer-comparison table { table-layout: fixed; }
 }
 @media (max-width: 1200px) {
   .recommendation-controls {

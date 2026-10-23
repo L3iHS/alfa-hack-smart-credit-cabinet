@@ -112,6 +112,7 @@ export async function api<T>(
     rawBody?: Blob;
     headers?: Record<string, string>;
     responseType?: "json" | "blob";
+    signal?: AbortSignal;
   } = {},
 ): Promise<T> {
   const method = options.method || "GET";
@@ -152,6 +153,7 @@ export async function api<T>(
   const response = await raw(path, {
     method,
     headers,
+    signal: options.signal,
     body:
       options.rawBody ??
       (options.body === undefined ? undefined : JSON.stringify(options.body)),

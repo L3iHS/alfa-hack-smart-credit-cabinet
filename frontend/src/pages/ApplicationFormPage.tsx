@@ -50,6 +50,9 @@ function valuesFrom(
     existing_debt_payments_kopecks: amountInput(
       application?.existing_debt_payments_kopecks ?? null,
     ),
+    tender_number: application?.tender_number || "",
+    beneficiary_name: application?.beneficiary_name || "",
+    project_description: application?.project_description || "",
   };
 }
 function parseMoney(value: string): number | null {
@@ -144,25 +147,31 @@ function DraftEditor({
     };
   }, [values, record, pathname, user, recovery]);
   function change(name: keyof FormValues, value: string) {
-    setValues((current) => ({ ...current, [name]: value }));
+    setValues((current) => name === "product_code" ? {
+      ...current,
+      product_code: value as ProductCode,
+      tender_number: value === "tender_guarantee" ? current.tender_number : "",
+      beneficiary_name: value === "tender_guarantee" ? current.beneficiary_name : "",
+      project_description: value === "investment" ? current.project_description : "",
+    } : ({ ...current, [name]: value }));
     setFields((current) => ({ ...current, [name]: "" }));
   }
   function applyRecommendation(code: ProductCode, amount: number, term: number) {
     const target = catalog.items.find((item) => item.code === code);
     if (!target) return;
-    const safeAmount = Math.min(
-      Math.max(amount, target.min_amount_kopecks),
-      target.max_amount_kopecks,
-    );
-    const safeTerm = Math.min(
-      Math.max(term, target.min_term_months),
-      target.max_term_months,
-    );
+    if (amount < target.min_amount_kopecks || amount > target.max_amount_kopecks ||
+        term < target.min_term_months || term > target.max_term_months) {
+      setError("Условия изменились. Повторите подбор");
+      return;
+    }
     setValues((current) => ({
       ...current,
       product_code: code,
-      amount_kopecks: amountInput(safeAmount),
-      term_months: String(safeTerm),
+      amount_kopecks: amountInput(amount),
+      term_months: String(term),
+      tender_number: code === "tender_guarantee" ? current.tender_number : "",
+      beneficiary_name: code === "tender_guarantee" ? current.beneficiary_name : "",
+      project_description: code === "investment" ? current.project_description : "",
     }));
     setFields((current) => ({
       ...current,
@@ -246,6 +255,9 @@ function DraftEditor({
       term_months: term,
       period_start: values.period_start || null,
       period_end: values.period_end || null,
+      tender_number: values.product_code === "tender_guarantee" ? values.tender_number.trim() || null : null,
+      beneficiary_name: values.product_code === "tender_guarantee" ? values.beneficiary_name.trim() || null : null,
+      project_description: values.product_code === "investment" ? values.project_description.trim() || null : null,
     };
     setBusy(true);
     try {
@@ -314,9 +326,6 @@ function DraftEditor({
         }
       />
       <form onSubmit={save} noValidate>
-        {(!record || record.status === "draft") && (
-          <RecommendationPanel form={values} onApply={applyRecommendation} />
-        )}
         <div className="form-layout">
           <div className="form-main">
             <section className="panel form-panel">
@@ -352,11 +361,11 @@ function DraftEditor({
                 </p>
               )}
               <div className="field-grid">
-                {field("amount_kopecks", "Сумма кредита, ₽", {
+                {field("amount_kopecks", product.payment_kind === "guarantee" ? "Сумма гарантии, ₽" : product.payment_kind === "revolving" ? "Лимит, ₽" : "Сумма кредита, ₽", {
                   hint: `От ${money(product.min_amount_kopecks)} до ${money(product.max_amount_kopecks)}`,
                   maxLength: 24,
                 })}
-                {field("term_months", "Срок кредита, месяцев", {
+                {field("term_months", product.payment_kind === "annuity" ? "Срок кредита, месяцев" : "Срок, месяцев", {
                   hint: `От ${product.min_term_months} до ${product.max_term_months} месяцев`,
                   maxLength: 3,
                 })}
@@ -365,6 +374,19 @@ function DraftEditor({
                 hint: "Например, закупка сырья или покупка оборудования",
                 maxLength: 2000,
               })}
+              {values.product_code === "investment" && (
+                <label className="field" htmlFor="project_description">
+                  <span>Описание проекта</span>
+                  <textarea id="project_description" rows={3} maxLength={2000} value={values.project_description} onChange={(event) => change("project_description", event.target.value)} aria-invalid={!!fields.project_description} aria-describedby="project_description-error" />
+                  <small id="project_description-error" className="field-error">{fields.project_description}</small>
+                </label>
+              )}
+              {values.product_code === "tender_guarantee" && (
+                <div className="field-grid">
+                  {field("tender_number", "Номер тендера", { maxLength: 40 })}
+                  {field("beneficiary_name", "Заказчик по тендеру", { maxLength: 200 })}
+                </div>
+              )}
               <label className="field" htmlFor="description">
                 <span>Дополнительное описание</span>
                 <textarea
@@ -439,14 +461,14 @@ function DraftEditor({
             <section className="panel terms-panel">
               <div className="terms-heading">
                 <span className="product-glyph small" aria-hidden="true">
-                  {product.code === "working_capital" ? "↻" : "▧"}
+                  {product.payment_kind === "guarantee" ? "◇" : product.payment_kind === "revolving" ? "↻" : "▧"}
                 </span>
                 <span>Условия продукта</span>
               </div>
               <h2>{product.name}</h2>
               <dl className="terms">
                 <div>
-                  <dt>Сумма кредита</dt>
+                  <dt>{product.payment_kind === "guarantee" ? "Сумма гарантии" : product.payment_kind === "revolving" ? "Лимит" : "Сумма кредита"}</dt>
                   <dd>
                     {money(product.min_amount_kopecks)} —<br />
                     {money(product.max_amount_kopecks)}
@@ -459,9 +481,9 @@ function DraftEditor({
                   </dd>
                 </div>
                 <div>
-                  <dt>Демонстрационная ставка</dt>
+                  <dt>{product.payment_kind === "guarantee" ? "Комиссия за год" : "Демонстрационная ставка"}</dt>
                   <dd>
-                    {(product.annual_rate_bps / 100).toLocaleString("ru-RU")}%
+                    {((product.payment_kind === "guarantee" ? product.annual_commission_bps : product.annual_rate_bps || 0) / 100).toLocaleString("ru-RU")}%
                     годовых
                   </dd>
                 </div>
@@ -479,6 +501,9 @@ function DraftEditor({
             </section>
           </aside>
         </div>
+        {(!record || record.status === "draft") && (
+          <RecommendationPanel form={values} onApply={applyRecommendation} />
+        )}
         <div className="save-area">
           {conflict ? (
             <div className="notice conflict" role="alert">

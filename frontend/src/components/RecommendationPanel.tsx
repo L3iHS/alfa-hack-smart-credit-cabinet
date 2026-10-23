@@ -1,15 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "../api/client";
-import type {
-  ProductCode,
-  RecommendationCollateral,
-  RecommendationItem,
-  RecommendationOptions,
-  RecommendationPurpose,
-  RecommendationRequest,
-  RecommendationResponse,
-} from "../api/types";
-import { money, useResource } from "./shared";
+import type { ProductCode, RecommendationItem, RecommendationOptions, RecommendationPurpose, RecommendationRequest, RecommendationResponse } from "../api/types";
+import PaymentTermsView from "./PaymentTermsView";
+import { documentLabels } from "./ApplicationDocuments";
+import { useResource } from "./shared";
 
 export interface RecommendationFormSnapshot {
   amount_kopecks: string;
@@ -20,7 +14,15 @@ export interface RecommendationFormSnapshot {
   operating_expenses_kopecks: string;
   existing_debt_payments_kopecks: string;
 }
-
+const missingLabels: Record<string, string> = {
+  revenue_total_kopecks: "выручку", expenses_total_kopecks: "операционные расходы",
+  existing_debt_payments_kopecks: "платежи по кредитам (укажите 0, если их нет)",
+  period_months: "финансовый период", amount_kopecks: "сумму",
+};
+const targetFields: Record<string, string> = {
+  revenue_total_kopecks: "revenue_kopecks", expenses_total_kopecks: "operating_expenses_kopecks",
+  existing_debt_payments_kopecks: "existing_debt_payments_kopecks", period_months: "period_start", amount_kopecks: "amount_kopecks",
+};
 function parseMoney(value: string): number | null {
   if (!value.trim()) return null;
   const normalized = value.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".");
@@ -29,270 +31,84 @@ function parseMoney(value: string): number | null {
   const result = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0"));
   return result > BigInt(Number.MAX_SAFE_INTEGER) ? null : Number(result);
 }
-
-function percentage(value: number | null) {
-  return value === null ? "—" : `${value.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}%`;
+function Item({ item, apply }: { item: RecommendationItem; apply: () => void }) {
+  const fieldLabels = { tender_number: "номер тендера", beneficiary_name: "название заказчика", project_description: "описание проекта" };
+  return <article className="recommendation-card">
+    <div className="recommendation-card-head"><h3>{item.product_name}</h3><span className="recommendation-tag">{item.purpose_match ? "Подходит под цель" : "Возможная альтернатива"}</span></div>
+    <PaymentTermsView terms={item.payment_terms} />
+    {item.client_reasons.length > 0 && <ul className="recommendation-reasons">{item.client_reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
+    {item.required_application_fields.length > 0 && <p className="recommendation-hint">Для заявки понадобятся: {item.required_application_fields.map((field) => fieldLabels[field]).join(", ")}.</p>}
+    {item.required_document_types.length > 0 && <p className="recommendation-hint">Документы для отправки: {item.required_document_types.map((type) => documentLabels[type]).join(", ")}.</p>}
+    <button type="button" className="button secondary recommendation-apply" aria-label={`Подставить ${item.product_name} в заявку`} onClick={apply}>Подставить в заявку</button>
+  </article>;
 }
-
-function Item({
-  item,
-  onApply,
-}: {
-  item: RecommendationItem;
-  onApply?: (code: ProductCode, amount: number, term: number) => void;
-}) {
-  return (
-    <article className="recommendation-card">
-      <div className="recommendation-card-head">
-        <div>
-          <h3>{item.product_name}</h3>
-          {item.purpose_match ? (
-            <span className="recommendation-tag">Подходит под цель</span>
-          ) : (
-            <span className="recommendation-tag neutral">Смежная цель</span>
-          )}
-        </div>
-        <span className="recommendation-score">{item.score}/100</span>
-      </div>
-      <dl className="recommendation-terms">
-        <div>
-          <dt>Сумма</dt>
-          <dd>{money(item.approved_amount_kopecks)}</dd>
-        </div>
-        <div>
-          <dt>Срок</dt>
-          <dd>{item.term_months} мес.</dd>
-        </div>
-        <div>
-          <dt>Ставка / стоимость</dt>
-          <dd>
-            {item.commission_year_pct !== null
-              ? `комиссия ${percentage(item.commission_year_pct)} в год`
-              : percentage(item.base_rate_pct)}
-          </dd>
-        </div>
-        <div>
-          <dt>Платёж</dt>
-          <dd>{money(item.monthly_payment_kopecks)}</dd>
-        </div>
-        <div>
-          <dt>Одобрение</dt>
-          <dd>{item.approval_likelihood}%</dd>
-        </div>
-        <div>
-          <dt>Решение</dt>
-          <dd>{item.approval_time_hours === 0 ? "сразу" : `${item.approval_time_hours} ч`}</dd>
-        </div>
-      </dl>
-      {item.client_reasons.length > 0 && (
-        <ul className="recommendation-reasons">
-          {item.client_reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
-          ))}
-        </ul>
-      )}
-      {item.missing_data.length > 0 && (
-        <p className="recommendation-missing">
-          Не хватает: {item.missing_data.join(", ")}.
-        </p>
-      )}
-      {item.next_action && <p className="recommendation-hint">{item.next_action}</p>}
-      {item.is_available_in_cabinet && item.cabinet_product_code && onApply && (
-        <button
-          type="button"
-          className="button secondary recommendation-apply"
-          onClick={() =>
-            onApply(item.cabinet_product_code!, item.approved_amount_kopecks, item.term_months)
-          }
-        >
-          Подставить в заявку
-        </button>
-      )}
-    </article>
-  );
-}
-
-export function RecommendationPanel({
-  form,
-  onApply,
-}: {
-  form: RecommendationFormSnapshot;
-  onApply?: (code: ProductCode, amount: number, term: number) => void;
-}) {
-  const options = useResource(
-    () => api<RecommendationOptions>("/product-recommendations/options"),
-    "recommendation-options",
-  );
+export function RecommendationPanel({ form, onApply }: { form: RecommendationFormSnapshot; onApply?: (code: ProductCode, amount: number, term: number) => void }) {
+  const options = useResource(() => api<RecommendationOptions>("/product-recommendations/options"), "recommendation-options");
   const [purpose, setPurpose] = useState<RecommendationPurpose>("working_capital");
-  const [urgency, setUrgency] = useState<"high" | "normal">("normal");
-  const [hasCollateral, setHasCollateral] = useState(false);
-  const [collateralType, setCollateralType] =
-    useState<RecommendationCollateral>("equipment");
-  const [invoice, setInvoice] = useState(false);
-  const [businessPlan, setBusinessPlan] = useState(false);
-  const [downPayment, setDownPayment] = useState("");
-  const [tenderNumber, setTenderNumber] = useState("");
-  const [result, setResult] = useState<RecommendationResponse | null>(null);
+  const [result, setResult] = useState<{ value: RecommendationResponse; key: string; generation: number } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
-  async function submit() {
-    setError("");
+  const [notice, setNotice] = useState("");
+  const generation = useRef(0);
+  const controller = useRef<AbortController | null>(null);
+  const wasApplied = useRef(false);
+  const key = JSON.stringify({ form, purpose });
+  const latestKey = useRef(key);
+  const effectKey = useRef(key);
+  if (latestKey.current !== key) {
+    latestKey.current = key;
+    generation.current++;
+    controller.current?.abort();
+  }
+  useEffect(() => {
+    if (effectKey.current === key) return;
+    effectKey.current = key;
     setResult(null);
+    setBusy(false);
+    setNotice(wasApplied.current ? "Условия подставлены. Проверьте данные и сохраните черновик" : "Данные изменились. Подберите продукт заново");
+    wasApplied.current = false;
+  }, [key]);
+  useEffect(() => () => { generation.current++; controller.current?.abort(); }, []);
+  async function submit() {
+    const requestGeneration = ++generation.current;
+    controller.current?.abort();
+    const currentController = new AbortController();
+    controller.current = currentController;
+    setResult(null); setError(""); setNotice("");
     const amount = parseMoney(form.amount_kopecks);
     const term = Number(form.term_months);
-    if (amount === null || !Number.isSafeInteger(term) || term < 1) {
-      setError("Сначала укажите сумму и срок кредита.");
-      return;
+    if (amount === null || amount <= 0 || !/^\d+$/.test(form.term_months) || !Number.isSafeInteger(term) || term < 1 || term > 120) {
+      setError("Сначала укажите сумму и срок финансирования."); return;
     }
     const body: RecommendationRequest = {
-      purpose,
-      amount_kopecks: amount,
-      term_months: term,
-      urgency,
-      has_collateral: hasCollateral,
-      collateral_type: hasCollateral ? collateralType : "none",
-      supplier_invoice_attached: invoice,
-      down_payment_pct: downPayment.trim() ? Number(downPayment) : null,
-      business_plan_attached: businessPlan,
-      tender_number: tenderNumber.trim() || null,
-      revenue_total_kopecks: parseMoney(form.revenue_kopecks),
-      expenses_total_kopecks: parseMoney(form.operating_expenses_kopecks),
+      purpose, amount_kopecks: amount, term_months: term,
+      revenue_total_kopecks: parseMoney(form.revenue_kopecks), expenses_total_kopecks: parseMoney(form.operating_expenses_kopecks),
       existing_debt_payments_kopecks: parseMoney(form.existing_debt_payments_kopecks),
-      period_start: form.period_start || null,
-      period_end: form.period_end || null,
+      period_start: form.period_start || null, period_end: form.period_end || null,
     };
-    if ((body.period_start && !body.period_end) || (!body.period_start && body.period_end)) {
-      setError("Для расчёта нужны обе даты финансового периода.");
-      return;
-    }
+    if (Boolean(body.period_start) !== Boolean(body.period_end)) { setError("Для расчёта нужны обе даты финансового периода."); return; }
     setBusy(true);
     try {
-      setResult(await api<RecommendationResponse>("/product-recommendations", {
-        method: "POST",
-        body,
-      }));
+      const value = await api<RecommendationResponse>("/product-recommendations", { method: "POST", body, signal: currentController.signal });
+      if (requestGeneration === generation.current && key === latestKey.current) setResult({ value, key, generation: requestGeneration });
     } catch (value) {
-      setError(errorMessage(value));
-    } finally {
-      setBusy(false);
-    }
+      if (requestGeneration === generation.current && key === latestKey.current) setError(errorMessage(value));
+    } finally { if (requestGeneration === generation.current) setBusy(false); }
   }
-
-  return (
-    <section className="panel recommendation-panel" aria-labelledby="recommendation-title">
-      <div className="recommendation-heading">
-        <div>
-          <h2 id="recommendation-title">Подбор кредитного продукта</h2>
-          <p>
-            Укажите цель и параметры — банк покажет подходящие продукты, сумму и срок.
-            Итоговые условия и вероятность одобрения уточняются после рассмотрения заявки.
-          </p>
-        </div>
-      </div>
-      <div className="recommendation-controls">
-        <label className="field">
-          <span>Цель финансирования</span>
-          <select value={purpose} onChange={(event) => setPurpose(event.target.value as RecommendationPurpose)}>
-            {(options.data?.purposes || []).map((item) => (
-              <option key={item.code} value={item.code}>{item.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Срочность</span>
-          <select value={urgency} onChange={(event) => setUrgency(event.target.value as "high" | "normal")}>
-            {(options.data?.urgency_levels || []).map((item) => (
-              <option key={item.code} value={item.code}>{item.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Первоначальный взнос, %</span>
-          <input
-            inputMode="numeric"
-            value={downPayment}
-            maxLength={3}
-            onChange={(event) => setDownPayment(event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Номер тендера</span>
-          <input
-            value={tenderNumber}
-            maxLength={40}
-            onChange={(event) => setTenderNumber(event.target.value)}
-          />
-        </label>
-      </div>
-      <div className="recommendation-checks">
-        <label>
-          <input
-            type="checkbox"
-            checked={hasCollateral}
-            onChange={(event) => setHasCollateral(event.target.checked)}
-          />
-          <span>Есть залог</span>
-        </label>
-        {hasCollateral && (
-          <label className="field inline-field">
-            <span>Тип залога</span>
-            <select
-              value={collateralType}
-              onChange={(event) => setCollateralType(event.target.value as RecommendationCollateral)}
-            >
-              {(options.data?.collateral_types || []).map((item) => (
-                <option key={item.code} value={item.code}>{item.label}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label>
-          <input type="checkbox" checked={invoice} onChange={(event) => setInvoice(event.target.checked)} />
-          <span>Есть счёт поставщика</span>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={businessPlan}
-            onChange={(event) => setBusinessPlan(event.target.checked)}
-          />
-          <span>Есть бизнес-план</span>
-        </label>
-      </div>
-      {options.error ? (
-        <div className="notice error" role="alert">
-          Не удалось загрузить варианты подбора. {errorMessage(options.error)}
-          <button type="button" className="text-link" onClick={options.reload}>Повторить</button>
-        </div>
-      ) : (
-        <div className="recommendation-actions">
-          <button type="button" className="button primary" disabled={busy || !options.data} onClick={submit}>
-            {busy ? "Подбираем..." : "Подобрать продукт"}
-          </button>
-          {options.data && <span className="muted">Правила {options.data.config_version}</span>}
-        </div>
-      )}
-      {error && <div className="notice error" role="alert">{error}</div>}
-      {result && (
-        <div className="recommendation-results" aria-live="polite">
-          <div className={`notice ${result.status === "no_match" ? "error" : result.status === "request_data" ? "" : "success"}`}>
-            {result.message}
-          </div>
-          {result.items.length > 0 && (
-            <div className="recommendation-list">
-              {result.items.map((item) => (
-                <Item key={item.offer_id} item={item} onApply={onApply} />
-              ))}
-            </div>
-          )}
-          {result.items.length === 0 && result.actions.length > 0 && (
-            <p className="recommendation-hint">
-              Что можно сделать: {result.actions.map((action) => action.label).join("; ")}.
-            </p>
-          )}
-        </div>
-      )}
-    </section>
-  );
+  function apply(item: RecommendationItem, resultGeneration: number) {
+    if (!result || result.generation !== resultGeneration || resultGeneration !== generation.current || result.key !== latestKey.current) {
+      setError("Условия изменились. Повторите подбор"); return;
+    }
+    onApply?.(item.product_code, item.recommended_amount_kopecks, item.term_months);
+    wasApplied.current = true;
+    setNotice("Условия подставлены. Проверьте данные и сохраните черновик");
+  }
+  const visible = result?.key === key && result.generation === generation.current ? result : null;
+  return <section className="panel recommendation-panel" aria-labelledby="recommendation-title">
+    <div className="recommendation-heading"><div><h2 id="recommendation-title">Подбор кредитного продукта</h2><p>Укажите цель и параметры. Подбор использует финансовые данные этой формы и не является кредитным решением.</p></div></div>
+    <div className="recommendation-controls"><label className="field"><span>Что планируете финансировать</span><select value={purpose} onChange={(event) => setPurpose(event.target.value as RecommendationPurpose)}>{(options.data?.purposes || []).map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label></div>
+    {options.error ? <div className="notice error" role="alert">Не удалось загрузить варианты подбора. {errorMessage(options.error)} <button type="button" className="text-link" onClick={options.reload}>Повторить</button></div> : <div className="recommendation-actions"><button type="button" className="button primary" disabled={busy || !options.data} onClick={submit}>{busy ? "Подбираем…" : "Подобрать продукт"}</button></div>}
+    {error && <div className="notice error" role="alert">{error}</div>}
+    <div aria-live="polite">{notice && <p className="recommendation-hint">{notice}</p>}{visible && <div className="recommendation-results"><div className={`notice ${visible.value.status === "no_match" ? "error" : visible.value.status === "request_data" ? "" : "success"}`}>{visible.value.message}</div>{visible.value.missing_fields.length > 0 && <div className="recommendation-missing">Не хватает: {visible.value.missing_fields.map((field) => missingLabels[field || ""] || field).join(", ")}. <button type="button" className="text-link" onClick={() => document.getElementById(targetFields[visible.value.missing_fields[0] || ""])?.focus()}>Перейти к полю</button></div>}{visible.value.items.length > 0 && <div className="recommendation-list">{visible.value.items.map((item) => <Item key={item.recommendation_id} item={item} apply={() => apply(item, visible.generation)} />)}</div>}</div>}</div>
+  </section>;
 }

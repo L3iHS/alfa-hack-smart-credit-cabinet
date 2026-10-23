@@ -25,6 +25,7 @@ import {
   Status,
   useResource,
 } from "../components/shared";
+import { amountLabel } from "../components/PaymentTermsView";
 
 export default function ApplicationDetailsPage() {
   const { id } = useParams();
@@ -173,11 +174,11 @@ function Details({
             </div>
             <dl className="details-grid">
               <div>
-                <dt>Сумма кредита</dt>
+                <dt>{amountLabel(product?.payment_kind || "annuity")}</dt>
                 <dd className="summary-amount">{money(item.amount_kopecks)}</dd>
               </div>
               <div>
-                <dt>Срок кредита</dt>
+                <dt>Срок</dt>
                 <dd className="summary-amount">
                   {item.term_months ? `${item.term_months} мес.` : "Не указан"}
                 </dd>
@@ -192,6 +193,9 @@ function Details({
                   <dd className="multiline">{item.description}</dd>
                 </div>
               )}
+              {item.project_description && <div className="full-width"><dt>Описание проекта</dt><dd className="multiline">{item.project_description}</dd></div>}
+              {item.tender_number && <div><dt>Номер тендера</dt><dd>{item.tender_number}</dd></div>}
+              {item.beneficiary_name && <div><dt>Заказчик по тендеру</dt><dd>{item.beneficiary_name}</dd></div>}
             </dl>
             <div className="details-divider" />
             <h2>Финансы компании</h2>
