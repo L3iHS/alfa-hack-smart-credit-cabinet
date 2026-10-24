@@ -2241,21 +2241,51 @@ dd {
 
 /* Отдельная строка сообщения сохраняет отступ и ширину панели при ошибке. */
 .assistant-panel .notice { max-width: none; margin: 16px 0 0; }
+/* Окно раскрывается из той же точки, в которой находится кнопка помощника. */
 .assistant-chat { position: fixed; right: 24px; bottom: 24px; z-index: 50; margin: 0; padding: 0; width: auto; }
-.assistant-chat > .assistant-launcher { border: 0; cursor: pointer; font-weight: 600; line-height: 1.5; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 12px 18px; border-radius: 16px; background: var(--red); color: #fff; box-shadow: 0 4px 18px #18181b24; list-style: none; font-size: 15px; }
-
-.assistant-chat-window { position: absolute; right: 0; bottom: calc(100% + 12px); width: min(420px, calc(100vw - 48px)); max-height: min(600px, calc(100dvh - 112px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: #fff; box-shadow: 0 12px 48px #18181b26; }
-.assistant-chat-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
-.assistant-chat-heading h2 { margin: 0; font-size: 18px; line-height: 1.4; }
-.assistant-close { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 10px; background: #f0f1f3; color: var(--muted); }
-.assistant-chat .assistant-body { padding: 20px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-.assistant-chat textarea { min-height: 80px; max-height: 160px; font-size: 16px; }
+.assistant-chat > .assistant-launcher { border: 0; cursor: pointer; font-weight: 600; line-height: 1.5; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 12px 18px; border-radius: 16px; background: var(--red); color: #fff; box-shadow: 0 4px 18px #18181b24; font-size: 15px; }
+.assistant-chat > .assistant-launcher[hidden] { display: none; }
+.assistant-launcher:hover { background: #bd241b; }
+.assistant-chat-window { position: absolute; right: 0; bottom: 0; width: min(410px, calc(100vw - 48px)); height: min(540px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: #fff; box-shadow: 0 16px 56px #18181b24, 0 2px 8px #18181b0a; transform-origin: bottom right; animation: assistant-open 220ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes assistant-open { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.assistant-chat-heading { display: flex; flex-shrink: 0; align-items: center; gap: 12px; padding: 18px; border-bottom: 1px solid var(--line); }
+.assistant-chat-mark { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; color: var(--red); background: #fff0ee; border-radius: 12px; }
+.assistant-chat-heading > div { min-width: 0; flex: 1; }
+.assistant-chat-heading h2 { margin: 0; font-size: 16px; line-height: 1.4; letter-spacing: -.25px; }
+.assistant-chat-heading h2:focus { outline: none; }
+.assistant-chat-heading p { margin-top: 3px; font-size: 11px; color: var(--muted); }
+.assistant-close { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); }
+.assistant-close:hover { background: #f0f1f3; color: #242426; }
+.assistant-close svg { width: 20px; height: 20px; }
+.assistant-chat .assistant-body { flex: 1; padding: 20px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; scrollbar-width: thin; }
+.assistant-welcome > p { font-size: 15px; margin-bottom: 20px; }
+.assistant-chat .assistant-examples { display: grid; gap: 8px; }
+.assistant-chat .assistant-examples button { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; color: #45474e; background: #fafafa; font-size: 13px; line-height: 1.45; }
+.assistant-chat .assistant-examples button:hover { border-color: #c8cbd0; background: #f3f4f5; }
+.assistant-chat .assistant-examples button span { color: var(--red); font-size: 17px; }
+.assistant-composer { flex-shrink: 0; padding: 16px 20px 18px; border-top: 1px solid var(--line); background: #fff; }
 .assistant-chat .field { margin-bottom: 12px; }
-.assistant-chat .assistant-examples { font-size: 13px; gap: 4px 12px; }
-.assistant-chat .assistant-body > .muted { font-size: 12px; margin-bottom: 0; }
-.assistant-chat .assistant-result { font-size: 14px; }
+.assistant-chat .field > span { font-size: 13px; font-weight: 600; }
+.assistant-chat textarea { height: 72px; min-height: 72px; max-height: 72px; resize: none; overflow-y: auto; font-size: 16px; line-height: 1.45; padding: 11px 12px; border-radius: 12px; }
+.assistant-composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.assistant-composer-footer .muted { font-size: 11px; line-height: 1.45; }
+.assistant-composer-footer .button { min-height: 40px; padding: 9px 12px; gap: 6px; border-radius: 10px; font-size: 13px; }
+.assistant-composer-footer .button svg { width: 18px; height: 18px; }
+.assistant-chat .assistant-result { border: 0; margin: 0; padding: 0; font-size: 14px; line-height: 1.6; }
+.assistant-chat .assistant-sources { margin-top: 18px; border-top: 1px solid var(--line); }
+.assistant-chat .assistant-sources summary { font-size: 13px; color: var(--muted); }
+.assistant-chat .assistant-sources h3 { margin-top: 12px; }
+.assistant-chat .assistant-sources article { font-size: 13px; }
+.assistant-chat .notice { margin: 0; font-size: 14px; }
+.assistant-progress { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.assistant-progress > span { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
 @media (max-width: 600px) {
   .assistant-chat { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); padding: 0; }
-  .assistant-chat-window { width: calc(100vw - 32px); max-height: min(600px, calc(100dvh - 100px - env(safe-area-inset-bottom))); }
+  .assistant-chat-window { width: calc(100vw - 32px); height: min(540px, calc(100dvh - 32px - env(safe-area-inset-bottom))); }
+  .assistant-chat-heading { padding: 14px 12px; gap: 8px; }
   .assistant-chat .assistant-body { padding: 16px; }
+  .assistant-composer { padding: 14px 16px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .assistant-chat-window { animation: none; }
 }
