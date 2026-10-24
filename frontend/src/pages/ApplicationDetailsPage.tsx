@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, errorMessage } from "../api/client";
 import { useSession } from "../auth/session";
+import AssistantPanel from "../components/assistant/AssistantPanel";
+import StaffSummaryPanel from "../components/assistant/StaffSummaryPanel";
 import ApplicationDocuments from "../components/ApplicationDocuments";
 import ReviewActions from "../components/ReviewActions";
 import AssessmentPanel from "../components/AssessmentPanel";
@@ -229,6 +231,7 @@ function Details({
               </div>
             </dl>
           </section>
+          {staff ? <StaffSummaryPanel owner={user!.id} application={item} catalog={catalog} /> : <AssistantPanel owner={user!.id} application={item} catalog={catalog} />}
           {staff && (
             <AssessmentPanel
               data={assessment.data}

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import AssistantPanel from "../components/assistant/AssistantPanel";
+import { useSession } from "../auth/session";
 import { api } from "../api/client";
 import type { Application, Catalog, PageResult } from "../api/types";
 import {
@@ -14,6 +16,7 @@ import {
 } from "../components/shared";
 
 export default function ApplicationsPage() {
+  const { user } = useSession();
   const [offset, setOffset] = useState(0);
   const { data, error, reload } = useResource(
     async () => {
@@ -36,6 +39,7 @@ export default function ApplicationsPage() {
           <span aria-hidden="true">＋</span> Новая заявка
         </Link>
       </PageHeading>
+      {data && <AssistantPanel owner={user!.id} catalog={data.catalog} />}
       {error ? (
         <ErrorPanel error={error} retry={reload} />
       ) : !data ? (

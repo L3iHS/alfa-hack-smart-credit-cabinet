@@ -11,6 +11,8 @@ import type {
   ProductCode,
 } from "../api/types";
 import { useSession } from "../auth/session";
+import IntakePanel from "../components/assistant/IntakePanel";
+import type { SuggestedFields } from "../api/assistant";
 import { RecommendationPanel } from "../components/RecommendationPanel";
 import {
   ErrorPanel,
@@ -154,15 +156,28 @@ function DraftEditor({
       application: record,
     };
   }, [values, record, pathname, user, recovery]);
-  function change(name: keyof FormValues, value: string) {
-    setValues((current) => name === "product_code" ? {
+  function withProduct(current: FormValues, value: ProductCode): FormValues {
+    return {
       ...current,
       product_code: value as ProductCode,
       tender_number: value === "tender_guarantee" ? current.tender_number : "",
       beneficiary_name: value === "tender_guarantee" ? current.beneficiary_name : "",
       project_description: value === "investment" ? current.project_description : "",
-    } : ({ ...current, [name]: value }));
+    };
+  }
+  function change(name: keyof FormValues, value: string) {
+    setValues((current) => name === "product_code" ? withProduct(current, value as ProductCode) : ({ ...current, [name]: value }));
     setFields((current) => ({ ...current, [name]: "" }));
+  }
+  function applyIntake(suggested: SuggestedFields) {
+    if (record?.status === "needs_info" && suggested.product_code && suggested.product_code !== values.product_code) return;
+    setValues(current => ({
+      ...(suggested.product_code ? withProduct(current, suggested.product_code) : current),
+      ...(suggested.amount_kopecks !== null ? { amount_kopecks: amountInput(suggested.amount_kopecks) } : {}),
+      ...(suggested.term_months !== null ? { term_months: String(suggested.term_months) } : {}),
+      ...(suggested.purpose !== null ? { purpose: suggested.purpose } : {}),
+    }));
+    setFields(current => ({ ...current, ...Object.fromEntries(Object.entries(suggested).filter(([, value]) => value !== null).map(([key]) => [key, ""])) }));
   }
   function applyRecommendation(code: ProductCode, amount: number, term: number) {
     const target = catalog.items.find((item) => item.code === code);
@@ -413,6 +428,7 @@ function DraftEditor({
                 </small>
               </label>
             </section>
+            <IntakePanel catalog={catalog} values={values} owner={user!.id} applicationKey={`${record?.id || 'new'}:${record?.version || 0}`} productLocked={record?.status === "needs_info"} onApply={applyIntake} />
             <section className="panel form-panel" ref={financesRef}>
               <h2>Финансы компании</h2>
               <p className="section-description">

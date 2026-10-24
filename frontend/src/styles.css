@@ -2201,3 +2201,37 @@ dd {
   .analytics-help-body { padding: 18px; font-size: 14px; }
   .analytics-help-dialog footer { padding: 0 18px 18px; }
 }
+
+/* Помощник дополняет текущую задачу и сохраняет компоновку кабинета. */
+.assistant-panel { padding: 24px; min-width: 0; margin-bottom: 24px; }
+.assistant-panel > summary { cursor: pointer; font-size: 18px; font-weight: 600; line-height: 1.5; }
+.assistant-panel summary:focus-visible { outline: 3px solid #242426; outline-offset: 5px; border-radius: 3px; }
+.assistant-panel h2 { margin: 0 0 12px; }
+.assistant-panel h3 { font-size: 15px; margin: 20px 0 10px; }
+.assistant-body { padding-top: 16px; }
+.assistant-body > p:first-child { margin-top: 0; }
+.assistant-panel p, .assistant-panel li { line-height: 1.55; max-width: 78ch; }
+.assistant-panel textarea { width: 100%; resize: vertical; }
+.assistant-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+.assistant-result { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 4px; overflow-wrap: anywhere; }
+.assistant-examples { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.assistant-examples button { background: none; border: 0; border-bottom: 1px dotted var(--muted); color: var(--muted); padding: 4px 0; text-align: left; line-height: 1.5; }
+.assistant-sources > summary { cursor: pointer; font-weight: 600; padding: 12px 0; }
+.assistant-sources article + article { border-top: 1px solid var(--line); margin-top: 16px; }
+.assistant-sources dl { margin: 0; }
+.assistant-sources dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 8px 0; }
+.assistant-sources dt { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.assistant-sources dd { margin: 0; line-height: 1.5; }
+.intake-comparison-head, .intake-comparison-row { display: grid; grid-template-columns: minmax(90px, .8fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.intake-comparison-head { color: var(--muted); font-size: 13px; }
+.intake-comparison-row { font-size: 14px; line-height: 1.5; }
+.intake-comparison-row small { display: block; color: var(--muted); margin-top: 6px; }
+.intake-mobile-label { display: none; }
+@media (max-width: 600px) {
+  .assistant-panel { padding: 20px; }
+  .assistant-actions .button { width: 100%; }
+  .intake-comparison-head { display: none; }
+  .intake-comparison-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .intake-mobile-label { display: inline; color: var(--muted); }
+  .assistant-sources dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
