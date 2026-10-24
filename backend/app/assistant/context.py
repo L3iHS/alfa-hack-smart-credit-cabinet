@@ -1,4 +1,5 @@
 import json
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -19,6 +20,21 @@ class ApplicationContext:
     version: int
     catalog_version: str
     sources: list[Source]
+
+
+# Узкий словарь предметов кабинета: id сам по себе не делает снимок релевантным.
+_APPLICATION_SUBJECT = re.compile(
+    r'\b(?:заявк|сумм|запросил|попросил|срок|цел[ьи]|назначен|'
+    r'статус|этап|рассмотр|решени|результат|одобр|отказ|причин|дальше|действи|'
+    r'документ|вложен|файл|уточн|предлож|услови|финанс|выруч|доход|расход|'
+    r'долг|плат[её]ж|ставк|комисси|период|риск|оценк|продукт|кредит|'
+    r'оборудован|овердрафт|оборотн|сырь|закуп|гарант|тендер|инвестици)', re.IGNORECASE,
+)
+
+
+def application_sources_for_question(context: ApplicationContext, question: str) -> list[Source]:
+    # Это выбор известного предмета, а не обещание общего понимания произвольного текста.
+    return context.sources if _APPLICATION_SUBJECT.search(question) else []
 
 
 def version_conflict():

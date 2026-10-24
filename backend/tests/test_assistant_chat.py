@@ -226,3 +226,72 @@ def test_only_open_current_clarifications_are_context(client, db, fake):
     sources = json.loads(fake.calls[-1][1])['sources']
     assert not any(':clarification:' in s['id'] for s in sources)
     assert 'ПРОШЛЫЙ_ОТВЕТ' not in str(sources)
+
+
+@pytest.mark.parametrize('question,want_status,want_call', [
+    ('космонавтика марсианский вулкан', 'insufficient_context', False),
+    ('Сколько спутников у Марса?', 'insufficient_context', False),
+    ('Какую сумму я запросил?', 'answered', True),
+])
+def test_application_id_only_supplies_context_for_application_subject(client, fake, monkeypatch, question, want_status, want_call):
+    headers = authenticate(client)
+    draft = create(client, headers, amount_kopecks=50000000)
+    # Пара проверяет точный контекст независимо от совпадений в справочнике.
+    if want_call:
+        monkeypatch.setattr('app.assistant.chat.retrieve', lambda *args: [])
+    response = chat(client, headers, draft, question=question)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result['status'] == want_status
+    assert bool(fake.calls) is want_call
+    assert result['application_version'] == draft['version']
+    if want_call:
+        sources = json.loads(fake.calls[-1][1])['sources']
+        assert all(s['id'].startswith(f"application:{draft['id']}:") for s in sources)
+        assert '50000000' in str(sources)
+    else:
+        assert result['sources'] == [] and result['model'] is None
+
+
+@pytest.mark.parametrize('question', [
+    'На каком этапе моя заявка?', 'Каков статус рассмотрения?',
+    'Какие условия действующего предложения?', 'Какие документы ещё нужны?',
+    'Какую выручку и расходы я указал?', 'Что нужно уточнить по заявке?',
+])
+def test_application_subjects_keep_context_without_knowledge_matches(client, fake, monkeypatch, question):
+    headers = authenticate(client)
+    draft = create(client, headers, amount_kopecks=50000000)
+    monkeypatch.setattr('app.assistant.chat.retrieve', lambda *args: [])
+    response = chat(client, headers, draft, question=question)
+    assert response.status_code == 200 and response.json()['status'] == 'answered'
+    assert fake.calls and json.loads(fake.calls[-1][1])['sources']
+
+
+@pytest.mark.parametrize('access,want', [('foreign', 404), ('stale', 409), ('staff_draft', 404)])
+def test_unrelated_question_still_checks_application_access_and_version(client, fake, access, want):
+    headers = authenticate(client)
+    draft = create(client, headers)
+    if access == 'foreign':
+        headers = authenticate(client, 'client2@example.test')
+    elif access == 'staff_draft':
+        headers = authenticate(client, 'staff@example.test')
+    else:
+        draft['version'] = 99
+    response = chat(client, headers, draft, question='космонавтика марсианский вулкан')
+    assert response.status_code == want
+    assert not fake.calls
+
+
+def test_unrelated_question_rechecks_version_after_context_materialization(client, fake, monkeypatch):
+    headers = authenticate(client)
+    draft = create(client, headers)
+    def no_knowledge(db, question, version):
+        # Изменение другой транзакцией после чтения точного контекста, до локального ответа.
+        with SessionLocal() as other:
+            other.execute(update(Application).where(Application.id == uuid.UUID(draft['id'])).values(version=2))
+            other.commit()
+        return []
+    monkeypatch.setattr('app.assistant.chat.retrieve', no_knowledge)
+    response = chat(client, headers, draft, question='космонавтика марсианский вулкан')
+    assert response.status_code == 409, response.text
+    assert not fake.calls

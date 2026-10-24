@@ -4,7 +4,7 @@ from fastapi import Request
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.assistant.context import build_application_context, revalidate_access
+from app.assistant.context import application_sources_for_question, build_application_context, revalidate_access
 from app.assistant.provider import AssistantUnavailable, Provider
 from app.assistant.retrieval import retrieve
 from app.assistant.schemas import AnswerOutput, ChatInput, GeneratedAnswer
@@ -25,13 +25,14 @@ def answer_chat(body: ChatInput, request: Request, db: Session, user: User, prov
     catalog_version = context.catalog_version if context else CATALOG_VERSION
     sources = retrieve(db, body.question, catalog_version)
     if context:
-        sources += context.sources
+        sources += application_sources_for_question(context, body.question)
     # Материализация закончена; освобождаем CSRF row-lock до сетевого обращения.
     db.rollback()
     if not sources:
-        revalidate_access(db, request, user_id, role)
+        revalidate_access(db, request, user_id, role, context)
         return AnswerOutput(status='insufficient_context', answer='В справочнике недостаточно сведений для ответа. Уточните вопрос.',
-                            sources=[], model=None, knowledge_version=catalog_version, application_version=None)
+                            sources=[], model=None, knowledge_version=catalog_version,
+                            application_version=context.version if context else None)
     raw = provider.generate_json(system=SYSTEM, user=json.dumps({'question': body.question,
         'sources': [source.model_dump() for source in sources]}, ensure_ascii=False),
         schema=GeneratedAnswer.model_json_schema())
