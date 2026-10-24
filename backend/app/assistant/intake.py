@@ -16,7 +16,8 @@ _AMOUNT = re.compile(
 )
 _TERM = re.compile(r'(?<![\w.,+\-])(\d+)\s*(месяц(?:а|ев)?|мес\.?|год(?:а|ов)?|лет)(?!\w)', re.I)
 _OTHER_DURATION = re.compile(
-    r'окуп\w*|работ\w*|существ\w*|возраст\w*|основан\w*|зарегистр\w*|эксплуатац\w*|служб\w*|стаж\w*', re.I,
+    r'окуп\w*|\bработа(?:ет|ем|ют|ла|ли)\b|\bработы\b|существ\w*|возраст\w*|'
+    r'основан\w*|зарегистр\w*|эксплуатац\w*|служб\w*|стаж\w*', re.I,
 )
 _LOAN_TERM_PREFIX = re.compile(
     r'(?:\bна|\bсрок\s+(?:кредит\w*|з[аё]м\w*|финансирован\w*)|'
@@ -60,6 +61,13 @@ def _term_supported(text: str, quote: str, value: int) -> bool:
         # Число связывается с ближайшей фразой с обеих сторон, а не с ранним словом «кредит».
         prefix = re.split(r'[,;.!?\n]', text[max(0, match.start() - 160):match.start()])[-1]
         suffix = re.split(r'[,;.!?\n]', text[match.end():match.end() + 160])[0]
+        # Новое упоминание кредита начинает отдельную связь, а «работающий» описывает бизнес.
+        references = list(re.finditer(r'\b(?:срок(?:ом)?\s+)?(?:кредит\w*|з[аё]м\w*|финансирован\w*)', prefix, re.I))
+        if references:
+            prefix = prefix[references[-1].start():]
+        # Союз отделяет следующий факт; «и это срок окупаемости» ещё поясняет то же число.
+        suffix = re.split(r'\s+(?:и|а|но)\s+(?!(?:это|есть|является|срок)\b)',
+                          suffix, maxsplit=1, flags=re.I)[0]
         if _OTHER_DURATION.search(prefix) or _OTHER_DURATION.search(suffix):
             continue
         if _LOAN_TERM_PREFIX.search(prefix) or _LOAN_TERM_SUFFIX.search(suffix):

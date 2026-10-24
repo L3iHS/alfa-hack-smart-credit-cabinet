@@ -271,3 +271,29 @@ def test_nullable_wire_evidence_does_not_change_public_output(client, fake):
     assert response.status_code == 200
     assert response.json()['suggested_fields']['purpose'] is None
     assert 'purpose' not in response.json()['evidence']
+
+
+@pytest.mark.parametrize('text', [
+    'Нужен кредит на оборудование на 24 месяца и окупить за 3 года',
+    'Для работающего бизнеса нужен кредит на 24 месяца',
+    'Кредит для работающего бизнеса нужен на 24 месяца',
+    'Окупаемость 3 года и нужен кредит на 24 месяца',
+])
+def test_explicit_loan_term_survives_a_separate_business_duration(client, fake, text):
+    fake.result = {'suggested_fields': {'product_code': None, 'amount_kopecks': None,
+                                       'term_months': 24, 'purpose': None},
+                   'evidence': {'term_months': '24 месяца'}, 'questions': [], 'unsupported_need': False}
+    response = post(client, text)
+    assert response.status_code == 200
+    assert response.json()['suggested_fields']['term_months'] == 24
+    assert response.json()['evidence']['term_months'] == '24 месяца'
+
+
+def test_conjunction_does_not_hide_payback_qualifying_the_same_duration(client, fake):
+    fake.result = {'suggested_fields': {'product_code': None, 'amount_kopecks': None,
+                                       'term_months': 24, 'purpose': None},
+                   'evidence': {'term_months': '24 месяца'}, 'questions': [], 'unsupported_need': False}
+    response = post(client, 'Кредит на оборудование на 24 месяца и это срок окупаемости')
+    assert response.status_code == 200
+    assert response.json()['suggested_fields']['term_months'] is None
+    assert 'term_months' not in response.json()['evidence']
