@@ -15,7 +15,63 @@ test('staff analytics has honest funnels and immutable conditions', async ({ pag
   await expect(page.getByText('Просмотр не зафиксирован', { exact: true }).first()).toBeVisible();
   await page.getByText('Как считаем', { exact: true }).click();
   await expect(page.getByText(/72 часов/).first()).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.locator('.analytics-table tbody tr').first()).toBeVisible();
+});
+
+for (const width of [320, 1366]) {
+test(`analytics help is modal, preserves layout and returns keyboard focus at ${width}px`, async ({page}) => {
+  await page.setViewportSize({width, height: 900});
+  await login(page);
+  await page.goto('/staff/analytics');
+  await expect(page.locator('.analytics-funnel')).toHaveCount(2);
+  const trigger = page.getByText('Как считаем', {exact: true});
+  const before = await trigger.boundingBox();
+  const funnels = await page.locator('.analytics-funnels').boundingBox();
+  const overflow = await page.locator('body').evaluate(element => element.style.overflow);
+  await trigger.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible({timeout: 1500});
+  await expect(dialog.getByRole('heading', {name: 'Как считаем показатели'})).toBeVisible();
+  const box = await dialog.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(900);
+  expect((await trigger.boundingBox())!.x).toBeCloseTo(before!.x, 0);
+  expect((await trigger.boundingBox())!.y).toBeCloseTo(before!.y, 0);
+  expect((await page.locator('.analytics-funnels').boundingBox())!.y).toBeCloseTo(funnels!.y, 0);
+  await expect(dialog.getByRole('button', {name: 'Закрыть пояснение'})).toBeFocused();
+  await page.keyboard.press('Tab');
+  expect(await page.evaluate(() => !!document.activeElement?.closest('dialog'))).toBe(true);
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.evaluate(() => !!document.activeElement?.closest('dialog'))).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  expect(await page.locator('body').evaluate(element => element.style.overflow)).toBe(overflow);
+  await trigger.click();
+  await page.mouse.click(4, 4);
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await screenshot(page, `help-closed-${width}`);
+});
+}
+
+test('empty analytics explains missing data and offers contextual help', async ({page}) => {
+  await login(page);
+  await page.goto('/staff/analytics');
+  await page.getByLabel('Период с', {exact: true}).fill('01.01.2000');
+  await page.getByLabel('Период по', {exact: true}).fill('02.01.2000');
+  await page.getByRole('button', {name: 'Применить', exact: true}).click();
+  await expect(page.getByText('Нет незавершённых оформлений за выбранный период.', {exact: true})).toBeVisible({timeout: 1500});
+  await expect(page.locator('.analytics-page')).not.toContainText(/0\s+из\s+0/);
+  const info = page.getByRole('button', {name: 'О разделе «Где остановились»'});
+  await info.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('ещё не отправлены');
+  await expect(dialog).toContainText('3 из 10');
+  await dialog.getByRole('button', {name: 'Закрыть пояснение'}).click();
+  await expect(info).toBeFocused();
 });
 
 async function screenshot(page: Page, name: string) {
@@ -91,6 +147,14 @@ for (const width of [320, 390, 768, 901, 1366]) {
   test(`analytics and recommendation geometry at ${width}px`, async ({page}) => {
     await page.setViewportSize({width, height: 900}); await login(page);
     await page.goto('/staff/analytics'); await expect(page.locator('.analytics-funnel')).toHaveCount(2);
+    const dateField = page.getByLabel('Период с', {exact: true});
+    const productField = page.getByLabel('Продукт', {exact: true});
+    const outcomeField = page.getByLabel('Исход', {exact: true});
+    const radius = await dateField.evaluate(element => getComputedStyle(element).borderRadius);
+    for (const control of [productField, outcomeField]) {
+      expect(await control.evaluate(element => getComputedStyle(element).borderRadius)).toBe(radius);
+      expect((await control.boundingBox())!.height).toBe((await dateField.boundingBox())!.height);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await screenshot(page, `analytics-${width}`);
     await page.getByRole('button', {name: 'Выйти', exact: true}).click(); await expect(page).toHaveURL(/\/login$/);
@@ -217,8 +281,10 @@ test('empty period has null shares and filter races never paint stale data', asy
   await page.getByLabel('Продукт', {exact: true}).selectOption('equipment'); await page.getByRole('button', {name: 'Применить', exact: true}).click();
   await page.getByLabel('Продукт', {exact: true}).selectOption('investment'); await page.getByRole('button', {name: 'Применить', exact: true}).click();
   await expect(page.getByText('За этот период наблюдений и предложений нет. Выберите другой период или продукт.')).toBeVisible();
-  await page.waitForTimeout(1000); await expect(page.locator('.funnel-label strong').first()).toHaveText('0');
-  await expect(page.locator('.funnel-caption').first()).toContainText('—'); expect(saved).toBeTruthy();
+  await page.waitForTimeout(1000);
+  await expect(page.locator('.funnel-label strong')).toHaveCount(0);
+  await expect(page.locator('.analytics-funnel').first()).toContainText('За выбранный период новые оформления не начинались.');
+  expect(saved.form_funnel[0].share_from_first).toBeNull();
 });
 
 test('observation retries stop after three attempts and keep one event id', async ({page}) => {

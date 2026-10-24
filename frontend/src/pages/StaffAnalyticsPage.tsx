@@ -5,6 +5,7 @@ import type { AnalyticsSummary, Catalog, CounterofferPage, FunnelStage, Observat
 import { money, useResource } from '../components/shared';
 
 import { reasonLabels } from "../analytics/labels";
+import { AnalyticsHelpDialog, AnalyticsSectionHeading, type AnalyticsHelpTopic } from "../components/AnalyticsHelp";
 const reportTimestamp = new Intl.DateTimeFormat('ru-RU', {timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false});
 function reportDateTime(value: string) { return reportTimestamp.format(new Date(value)); }
 const outcomes: Record<OfferOutcome, string> = {
@@ -15,14 +16,14 @@ const stages: Record<FunnelStage['key'], string> = {opened: 'Открыли фо
 const steps = {terms: 'Условия', finances: 'Финансы', documents: 'Документы', review: 'Проверка', not_observed: 'Раздел не зафиксирован'};
 const changes = {amount_only: 'Только сумма', term_only: 'Только срок', amount_and_term: 'Сумма и срок', unchanged: 'Без изменений'};
 const percent = (value: number | null) => value === null ? '—' : `${(value * 100).toLocaleString('ru-RU', {maximumFractionDigits: 1})}%`;
-function Fraction({value}: {value: ObservationCount}) { return <span className="analytics-fraction">{value.count} из {value.base} <span>· {percent(value.share)}</span></span>; }
-function Funnel({title, data, note}: {title: string; data: FunnelStage[]; note: string}) {
-  return <section className="panel analytics-funnel"><h2>{title}</h2><p className="analytics-unit">{note}</p>
-    <ol>{data.map((stage, index) => <li key={stage.key}>
+function Fraction({value}: {value: ObservationCount}) { if (!value.base) return <span className="analytics-empty-fraction">Нет данных</span>; return <span className="analytics-fraction">{value.count} из {value.base} <span>· {percent(value.share)}</span></span>; }
+function Funnel({title, data, note, topic, onHelp}: {title: string; data: FunnelStage[]; note: string; topic: AnalyticsHelpTopic; onHelp: (topic: AnalyticsHelpTopic) => void}) {
+  return <section className="panel analytics-funnel"><AnalyticsSectionHeading title={title} topic={topic} onHelp={onHelp} /><p className="analytics-unit">{note}</p>
+    {!data[0]?.count ? <p className="analytics-empty">{topic === "form" ? "За выбранный период новые оформления не начинались." : "За выбранный период предложения не выставлялись."}</p> : <ol>{data.map((stage, index) => <li key={stage.key}>
       <div className="funnel-label"><span>{stages[stage.key]}</span><strong>{stage.count.toLocaleString('ru-RU')}</strong></div>
       <div className="funnel-track" aria-hidden="true"><span style={{width: `${Math.max(0, Math.min(100, (stage.share_from_first ?? 0) * 100))}%`}} /></div>
-      <div className="funnel-caption"><span>{stage.count} из {stage.base_from_first} · {percent(stage.share_from_first)}</span>{index > 0 && <span>От предыдущего: {stage.count} из {stage.base_from_previous} · {percent(stage.share_from_previous)}</span>}</div>
-    </li>)}</ol>
+      <div className="funnel-caption"><span>{stage.count} из {stage.base_from_first} · {percent(stage.share_from_first)}</span>{index > 0 && <span>{stage.base_from_previous ? `От предыдущего: ${stage.count} из ${stage.base_from_previous} · ${percent(stage.share_from_previous)}` : "Для перехода пока нет данных"}</span>}</div>
+    </li>)}</ol>}
   </section>;
 }
 function initialDates() {
@@ -40,6 +41,7 @@ function filterDate(value: string): string | null {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso ? iso : null;
 }
 export default function StaffAnalyticsPage() {
+  const [help, setHelp] = useState<AnalyticsHelpTopic | null>(null);
   const [draft, setDraft] = useState(() => { const dates = initialDates(); return {...dates, date_from: displayDate(dates.date_from), date_to: displayDate(dates.date_to)}; });
   const [filterError, setFilterError] = useState('');
   const [filters, setFilters] = useState(initialDates);
@@ -96,29 +98,23 @@ export default function StaffAnalyticsPage() {
       <button className="button primary">Применить</button>
     </form>
     {filterError && <p className="notice error" id="analytics-filter-error" role="alert">{filterError}</p>}
-    <div className="analytics-context"><p>Начало: {displayDate(summary?.metadata.date_from || filters.date_from)} — {displayDate(summary?.metadata.date_to || filters.date_to)} · исходы {summary ? reportDateTime(summary.metadata.outcomes_as_of) : "на момент отчёта"} · Москва</p><details><summary>Как считаем</summary><div>
-      <p>Период — по дате начала попытки или создания предложения. Календарные дни Москвы, включительно; исходы — на момент построения отчёта.</p>
-      <p>Оформление: уникальные попытки, начатые в периоде. Сохранение и отправку подтверждает сервер. Последний раздел — наблюдение, а не причина ухода.</p>
-      <p>Предложения: уникальные условия, созданные в периоде. «Ответили» и «Приняты» в воронке учитывают только зарегистрированный просмотр до ответа с известным временем. Общие исходы и группы условий включают все предложения.</p>
-      <p>«Без ответа 3 дня» — активное предложение без ответа, просмотренное не менее 72 часов назад. Нет просмотра — «Просмотр не зафиксирован». Закрытие вкладки не означает отказ.</p>
-      <p>Доли показаны с числителем и базой. При пустой базе — «—». Небольшая выборка и неполные наблюдения не доказывают причины поведения. Исходные условия взяты из сохранённой отправки; исторический исходный платёж неизвестен.</p>
-    </div></details></div>
+    <div className="analytics-context"><p>Начало: {displayDate(summary?.metadata.date_from || filters.date_from)} — {displayDate(summary?.metadata.date_to || filters.date_to)} · результаты на {summary ? reportDateTime(summary.metadata.outcomes_as_of) : "момент отчёта"} · Москва</p><button type="button" className="analytics-help-trigger" aria-haspopup="dialog" onClick={() => setHelp('overview')}>Как считаем</button></div>
     {loading && <p className="analytics-loading" role="status">Обновляем воронки…</p>}
     {error && <div className="notice error" role="alert"><p>{error}</p><button className="button secondary" onClick={() => setRevision(value => value + 1)}>Повторить</button></div>}
     {summary && <>
       {summary.form_funnel[0]?.count === 0 && summary.offer_funnel[0]?.count === 0 && <div className="notice" role="status">За этот период наблюдений и предложений нет. Выберите другой период или продукт.</div>}
-      <div className="analytics-funnels"><Funnel title="Оформление заявки" note="Уникальные попытки оформления" data={summary.form_funnel} /><Funnel title="Предложения клиентам" note="Уникальные предложения · просмотр до ответа" data={summary.offer_funnel} /></div>
+      <div className="analytics-funnels"><Funnel title="Оформление заявки" note="Уникальные попытки оформления" data={summary.form_funnel} topic="form" onHelp={setHelp} /><Funnel title="Предложения клиентам" note="Уникальные предложения · просмотр до ответа" data={summary.offer_funnel} topic="offers" onHelp={setHelp} /></div>
       <div className="analytics-breakdowns">
-        <section className="panel analytics-breakdown"><h2>Последний раздел</h2><p className="analytics-unit">Только неотправленные попытки</p><dl>{summary.last_steps.map(value => <div key={value.step}><dt>{steps[value.step]}</dt><dd><Fraction value={value} /></dd></div>)}</dl></section>
-        <section className="panel analytics-breakdown"><h2>Все исходы предложений</h2><p className="analytics-unit">Включая ответы без наблюдаемого просмотра</p><dl>{summary.offer_outcomes.map(value => <div key={value.outcome}><dt>{outcomes[value.outcome]}</dt><dd><Fraction value={value} /></dd></div>)}</dl><p className="analytics-footnote">Отказы после просмотра: <Fraction value={summary.declined_after_view} /></p></section>
+        <section className="panel analytics-breakdown"><AnalyticsSectionHeading title="Где остановились" topic="last_steps" onHelp={setHelp} /><p className="analytics-unit">Последний видимый раздел в неотправленных формах</p>{summary.last_steps[0]?.base ? <dl>{summary.last_steps.map(value => <div key={value.step}><dt>{steps[value.step]}</dt><dd><Fraction value={value} /></dd></div>)}</dl> : <p className="analytics-empty">Нет незавершённых оформлений за выбранный период.</p>}</section>
+        <section className="panel analytics-breakdown"><AnalyticsSectionHeading title="Результаты предложений" topic="outcomes" onHelp={setHelp} /><p className="analytics-unit">Все предложения, включая ответы без записи просмотра</p>{summary.offer_funnel[0]?.count ? <><dl>{summary.offer_outcomes.map(value => <div key={value.outcome}><dt>{outcomes[value.outcome]}</dt><dd><Fraction value={value} /></dd></div>)}</dl><p className="analytics-footnote">Отказы после просмотра: <Fraction value={summary.declined_after_view} /></p></> : <p className="analytics-empty">Предложений для расчёта пока нет.</p>}</section>
       </div>
-      <section className="panel analytics-coverage"><h2>Полнота наблюдений</h2><p>Ответы вне вложенной воронки: <strong>{summary.response_coverage.responses_without_prior_view}</strong></p><div><span>Без зарегистрированного просмотра <strong>{summary.response_coverage.response_without_registered_view}</strong></span><span>Просмотр после ответа <strong>{summary.response_coverage.response_viewed_after_response}</strong></span><span>Время ответа неизвестно <strong>{summary.response_coverage.response_time_unknown}</strong></span></div></section>
+      <section className="panel analytics-coverage"><AnalyticsSectionHeading title="Полнота наблюдений" topic="coverage" onHelp={setHelp} /><p>Ответы вне воронки: <strong>{summary.response_coverage.responses_without_prior_view}</strong></p><div className="analytics-coverage-items"><span>Без зарегистрированного просмотра <strong>{summary.response_coverage.response_without_registered_view}</strong></span><span>Просмотр после ответа <strong>{summary.response_coverage.response_viewed_after_response}</strong></span><span>Время ответа неизвестно <strong>{summary.response_coverage.response_time_unknown}</strong></span></div></section>
       <div className="analytics-breakdowns">
-        <section className="panel analytics-breakdown"><h2>Изменения условий</h2><p className="analytics-unit">Принятые из всех предложений группы</p><dl>{summary.condition_changes.map(value => <div key={value.change}><dt>{changes[value.change]}</dt><dd><Fraction value={{count: value.accepted, base: value.count, share: value.acceptance_share}} /></dd></div>)}</dl></section>
-        <section className="panel analytics-breakdown"><h2>Причины отказа</h2><p className="analytics-unit">Ответ клиента необязателен · база — все отказы</p><dl>{summary.decline_reasons.map(value => <div key={value.reason || 'none'}><dt>{value.reason ? reasonLabels[value.reason] : 'Без причины'}</dt><dd><Fraction value={value} /></dd></div>)}</dl></section>
+        <section className="panel analytics-breakdown"><AnalyticsSectionHeading title="Изменения условий" topic="changes" onHelp={setHelp} /><p className="analytics-unit">Сколько принято в каждой группе предложений</p>{summary.offer_funnel[0]?.count ? <dl>{summary.condition_changes.map(value => <div key={value.change}><dt>{changes[value.change]}</dt><dd><Fraction value={{count: value.accepted, base: value.count, share: value.acceptance_share}} /></dd></div>)}</dl> : <p className="analytics-empty">Предложений для сравнения пока нет.</p>}</section>
+        <section className="panel analytics-breakdown"><AnalyticsSectionHeading title="Причины отказа" topic="reasons" onHelp={setHelp} /><p className="analytics-unit">Причину выбирает клиент · доля среди всех отказов</p>{summary.decline_reasons[0]?.base ? <dl>{summary.decline_reasons.map(value => <div key={value.reason || 'none'}><dt>{value.reason ? reasonLabels[value.reason] : 'Без причины'}</dt><dd><Fraction value={value} /></dd></div>)}</dl> : <p className="analytics-empty">За выбранный период отказов нет.</p>}</section>
       </div>
     </>}
-    <section className="panel analytics-offers"><div className="analytics-table-heading"><div><h2>Контрпредложения</h2><p className="analytics-unit">Запрошенные и предложенные условия</p></div><label className="field"><span>Исход</span><select aria-label="Исход" value={outcome} onChange={event => {setOutcome(event.target.value); setPage(1);}}><option value="">Все исходы</option>{Object.entries(outcomes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div>
+    <section className="panel analytics-offers"><div className="analytics-table-heading"><div><AnalyticsSectionHeading title="Контрпредложения" topic="counteroffers" onHelp={setHelp} /><p className="analytics-unit">Запрошенные и предложенные условия</p></div><label className="field analytics-outcome-filter"><select aria-label="Исход" value={outcome} onChange={event => {setOutcome(event.target.value); setPage(1);}}><option value="">Все исходы</option>{Object.entries(outcomes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div>
       {tableLoading && <p role="status">Обновляем предложения…</p>}{tableError && <div className="notice error" role="alert">{tableError} <button className="button secondary" onClick={() => setRevision(value => value + 1)}>Повторить</button></div>}
       {rows && <><p className="analytics-total">Найдено: <strong>{rows.total}</strong></p>{!rows.items.length ? <p className="analytics-empty">Предложений с такими фильтрами нет</p> : <div className="analytics-table-scroll" role="region" aria-label="Условия контрпредложений" tabIndex={0}><table className="analytics-table"><thead><tr><th scope="col">Компания и продукт</th><th scope="col">Запрос → предложение</th><th scope="col">Платёж / комиссия</th><th scope="col">Результат</th><th scope="col">Даты</th></tr></thead><tbody>{rows.items.map(row => <tr key={row.id}>
         <td><Link to={`/staff/applications/${row.application_id}`}>{row.company_name}</Link><span>{productName(row.product_code)}</span><small>Заявка {row.application_id.slice(0, 8)}</small></td>
@@ -129,5 +125,6 @@ export default function StaffAnalyticsPage() {
       </tr>)}</tbody></table></div>}
       <div className="analytics-pagination"><span>Страница {rows.page} из {Math.max(1, Math.ceil(rows.total / rows.page_size))}</span><div><button className="button secondary" disabled={page <= 1 || tableLoading} onClick={() => setPage(value => value - 1)}>Назад</button><button className="button secondary" disabled={page * rows.page_size >= rows.total || tableLoading} onClick={() => setPage(value => value + 1)}>Далее</button></div></div></>}
     </section>
+    <AnalyticsHelpDialog topic={help} onClose={() => setHelp(null)} />
   </div>;
 }
