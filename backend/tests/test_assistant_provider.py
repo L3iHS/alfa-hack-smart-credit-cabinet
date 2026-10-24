@@ -34,6 +34,63 @@ def completion(content='{"ok": true}'):
     return httpx.Response(200, json={'choices': [{'message': {'content': content}}]})
 
 
+def polza_config(**kwargs):
+    config = configured(**kwargs)
+    config.llm_base_url = 'https://polza.ai/api/v1'
+    config.llm_model = 'deepseek/deepseek-v4.1-flash-1017'
+    return config
+
+
+@pytest.mark.parametrize('host', ['polza.ai', 'polza.ai.'])
+def test_polza_sends_ruble_price_caps_and_bounded_generation(monkeypatch, host):
+    config = polza_config(llm_polza_max_prompt_rub=15, llm_polza_max_completion_rub=25,
+                          llm_reasoning_enabled=False, llm_max_tokens=2048)
+    config.llm_base_url = f'https://{host}/api/v1'
+
+    def handler(request):
+        assert str(request.url) == f'https://{host}/api/v1/chat/completions'
+        body = json.loads(request.content)
+        assert body['provider'] == {'allow_fallbacks': False, 'sort': 'price',
+                                   'max_price': {'prompt': 15, 'completion': 25, 'request': 0}}
+        assert body['reasoning'] == {'enabled': False}
+        assert body['max_tokens'] == 2048
+        assert body['response_format'] == {'type': 'json_object'}
+        return completion()
+
+    assert provider(monkeypatch, handler, config).generate_json(system='s', user='u', schema={}) == {'ok': True}
+
+
+@pytest.mark.parametrize('change', [
+    {}, {'llm_polza_max_prompt_rub': 15}, {'llm_polza_max_completion_rub': 25},
+    {'llm_base_url': 'http://polza.ai/api/v1'},
+    {'llm_base_url': 'https://polza.ai/other'},
+    {'llm_base_url': 'https://polza.ai:444/api/v1'},
+    {'llm_provider': 'ollama'}, {'llm_api_key': None},
+    {'llm_model': 'deepseek/deepseek-v4.1-flash-1017@allow_fallbacks=true'},
+])
+def test_polza_missing_caps_or_invalid_endpoint_never_sends_http(monkeypatch, change):
+    from app.assistant.provider import AssistantUnavailable
+
+    caps = {} if not change or any(key.startswith('llm_polza_') for key in change) else {
+        'llm_polza_max_prompt_rub': 15, 'llm_polza_max_completion_rub': 25}
+    config = polza_config(**caps)
+    for key, value in change.items():
+        setattr(config, key, value)
+
+    def forbidden(request):
+        pytest.fail('Запрос без корректных ограничений не должен отправляться')
+
+    with pytest.raises(AssistantUnavailable):
+        provider(monkeypatch, forbidden, config).generate_json(system='s', user='u', schema={})
+
+
+@pytest.mark.parametrize('field', ['llm_polza_max_prompt_rub', 'llm_polza_max_completion_rub'])
+@pytest.mark.parametrize('value', [-1, float('nan'), float('inf')])
+def test_invalid_polza_price_caps_are_rejected(field, value):
+    with pytest.raises(ValidationError):
+        configured(**{field: value})
+
+
 @pytest.mark.parametrize('policy', ['deny', 'allow'])
 def test_openrouter_data_collection_setting_preserves_free_only(monkeypatch, policy):
     def handler(request):
@@ -92,6 +149,7 @@ def test_openrouter_uses_explicit_free_model_and_zero_price(monkeypatch):
 
 @pytest.mark.parametrize('model,url', [
     ('vendor/paid', 'https://openrouter.ai/api/v1'), ('openrouter/free', 'https://openrouter.ai/api/v1'),
+    ('vendor/paid', 'https://openrouter.ai./api/v1'),
     ('vendor/model:free', 'http://openrouter.ai/api/v1'),
     ('vendor/model:free', 'https://openrouter.ai/other'),
     ('vendor/model:free', 'https://user:pass@host.test/v1'),

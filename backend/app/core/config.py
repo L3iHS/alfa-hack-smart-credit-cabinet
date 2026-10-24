@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     llm_json_mode: Literal['json_object', 'json_schema'] = 'json_object'
     llm_reasoning_enabled: bool | None = None
     llm_data_collection: Literal['deny', 'allow'] = 'deny'
+    # Потолки тарифа Польза AI в рублях за миллион токенов; нули отключают вызовы.
+    llm_polza_max_prompt_rub: float = Field(default=0, ge=0, allow_inf_nan=False)
+    llm_polza_max_completion_rub: float = Field(default=0, ge=0, allow_inf_nan=False)
 
     @field_validator('llm_reasoning_enabled', mode='before')
     @classmethod

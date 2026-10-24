@@ -70,10 +70,19 @@ class LLMProvider:
                 or url.password is not None or url.query or url.fragment):
             raise AssistantUnavailable()
         # Обращения к OpenRouter всегда ограничены выбранной бесплатной моделью.
-        openrouter = url.hostname.lower() == 'openrouter.ai'
+        hostname = url.hostname.lower().rstrip('.')
+        openrouter = hostname == 'openrouter.ai'
+        polza = hostname == 'polza.ai'
         if openrouter and (config.llm_provider != 'openai' or url.scheme != 'https'
                            or url.port not in (None, 443) or url.path.rstrip('/') != '/api/v1'
                            or not self.model.endswith(':free')):
+            raise AssistantUnavailable()
+        # Платный провайдер включается только с явными потолками тарифа.
+        # Алиасы в model не допускаются: настройки маршрутизации задаются телом запроса.
+        if polza and (config.llm_provider != 'openai' or url.scheme != 'https'
+                      or url.port not in (None, 443) or url.path.rstrip('/') != '/api/v1'
+                      or '@' in self.model or config.llm_polza_max_prompt_rub <= 0
+                      or config.llm_polza_max_completion_rub <= 0):
             raise AssistantUnavailable()
         if config.llm_provider == 'openai' and config.llm_json_mode == 'json_object':
             system += '\nСхема обязательного JSON-ответа: ' + json.dumps(schema, ensure_ascii=False)
@@ -91,13 +100,18 @@ class LLMProvider:
             }} if config.llm_json_mode == 'json_schema' else {'type': 'json_object'})
             if config.llm_api_key and config.llm_api_key.get_secret_value():
                 headers['Authorization'] = 'Bearer ' + config.llm_api_key.get_secret_value()
-            if openrouter:
+            if openrouter or polza:
                 if not headers:
                     raise AssistantUnavailable()
                 if config.llm_reasoning_enabled is not None:
                     payload['reasoning'] = {'enabled': config.llm_reasoning_enabled}
-                payload['provider'] = {'allow_fallbacks': False, 'data_collection': config.llm_data_collection,
-                                       'max_price': {'prompt': 0, 'completion': 0, 'request': 0}}
+                if openrouter:
+                    payload['provider'] = {'allow_fallbacks': False, 'data_collection': config.llm_data_collection,
+                                           'max_price': {'prompt': 0, 'completion': 0, 'request': 0}}
+                else:
+                    payload['provider'] = {'allow_fallbacks': False, 'sort': 'price', 'max_price': {
+                        'prompt': config.llm_polza_max_prompt_rub,
+                        'completion': config.llm_polza_max_completion_rub, 'request': 0}}
         return endpoint, payload, headers
 
     def generate_json(self, *, system: str, user: str, schema: dict) -> dict:

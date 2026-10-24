@@ -30,6 +30,8 @@ services:
       LLM_JSON_MODE: ${LLM_JSON_MODE:-json_object}
       LLM_REASONING_ENABLED: ${LLM_REASONING_ENABLED:-}
       LLM_DATA_COLLECTION: ${LLM_DATA_COLLECTION:-deny}
+      LLM_POLZA_MAX_PROMPT_RUB: ${LLM_POLZA_MAX_PROMPT_RUB:-0}
+      LLM_POLZA_MAX_COMPLETION_RUB: ${LLM_POLZA_MAX_COMPLETION_RUB:-0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
