@@ -71,7 +71,7 @@ test('assistant keeps composer available with long answer and sources on a short
   await input.fill('Длинный вопрос\n'.repeat(100));
   expect(await input.evaluate(element => element.clientHeight)).toBeLessThanOrEqual(80);
   expect(await input.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
-  await input.fill('Новый вопрос'); await expect(dialog).not.toContainText('Для покупки оборудования');
+  await input.fill('Новый вопрос'); await expect(dialog).toContainText('Для покупки оборудования');
 });
 
 test('assistant reduced motion preserves open close and error retry', async ({ page }) => {
@@ -82,7 +82,7 @@ test('assistant reduced motion preserves open close and error retry', async ({ p
   await dialog.getByRole('button', { name: 'Спросить', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Помощник временно недоступен');
   await page.route('**/api/v1/assistant/chat', route => route.fulfill({ json: { status: 'insufficient_context', answer: 'В доступных сведениях нет ответа', sources: [], application_version: null } }));
-  await dialog.getByRole('button', { name: 'Спросить', exact: true }).click(); await expect(dialog).toContainText('В доступных сведениях нет ответа');
+  await dialog.getByRole('button', { name: 'Повторить вопрос', exact: true }).click(); await expect(dialog).toContainText('В доступных сведениях нет ответа');
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Помощник', exact: true })).toBeFocused();
 });
