@@ -14,7 +14,7 @@
 
 ## Настройка окружения
 
-Для отдельного стенда используйте отдельный каталог и Compose-проект. Не запускайте его поверх рабочего локального окружения. Пример задаёт постоянное имя проекта через `COMPOSE_PROJECT_NAME` в `.env.deploy`; при обновлении сохраняйте это имя и каталог.
+Для отдельного стенда используйте отдельный каталог и Compose-проект. Не запускайте его поверх рабочего локального окружения. Пример задаёт постоянное имя проекта через `COMPOSE_PROJECT_NAME` в `.env.deploy`; при обновлении сохраняйте это имя и каталог. Команды ниже дополнительно закрепляют его через `-p credit-cabinet-vps`, чтобы проверка и обновление обращались к одному стенду. Если используете собственное имя проекта, замените его и в файле, и в командах.
 
 Создайте закрытый файл из примера, затем сгенерируйте два разных пароля без передачи секретов в аргументах процессов:
 
@@ -30,7 +30,7 @@ path = Path('.env.deploy')
 text = path.read_text()
 for key in ('POSTGRES_PASSWORD', 'DEMO_PASSWORD'):
     text = text.replace(f'{key}=\n', f'{key}={secrets.token_hex(24)}\n')
-path.write_text(text + 'COMPOSE_PROJECT_NAME=credit-cabinet-vps\n')
+path.write_text(text)
 PY
 ```
 
@@ -43,10 +43,10 @@ PY
 Во всех командах используется сочетание основного файла и серверного дополнения:
 
 ```sh
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml config --quiet
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml up --build -d --wait
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec backend uv run python -m app.seed
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml config --quiet
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml up --build -d --wait
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec backend uv run python -m app.seed
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps
 ```
 
 Обычный backend-образ уже содержит выбранную модель и работает без ML extra; переносить папки обучения на сервер не требуется. Backend применяет миграции при запуске. Seed создаёт аккаунты из [README](../README.md#демонстрационные-учётные-записи); пароль — значение `DEMO_PASSWORD`. Повторный seed сохраняет существующие данные и пароли. Успешный `up --wait` подтверждает состояние контейнеров, но сам по себе не подтверждает получение публичного сертификата.
@@ -71,7 +71,7 @@ curl --fail --head https://biom.cloud-path.ru/applications/example
 В браузере откройте HTTPS-адрес, войдите клиентом, создайте и повторно откройте черновик; отдельно проверьте вход сотрудником. В инструментах разработчика у cookie сессии должны быть `Secure` и `HttpOnly`. API перед изменяющим запросом выдаёт CSRF-токен через `/api/v1/auth/csrf`; cookie и заголовок `X-CSRF-Token` обязательны, вход обновляет токен. Перезапустите backend и убедитесь, что черновик и сессия сохранились:
 
 ```sh
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml restart backend
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml restart backend
 ```
 
 После согласованной перезагрузки VPS отдельно проверьте доступность HTTPS и сохранность данных. Локальный тест не заменяет эту проверку.
@@ -87,9 +87,9 @@ docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml res
 ```sh
 cd /srv/credit-cabinet &&
 git pull --ff-only origin main &&
-sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml config --quiet &&
-sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml up --build -d --wait &&
-sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps &&
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml config --quiet &&
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml up --build -d --wait &&
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps &&
 curl --fail --silent --show-error https://biom.cloud-path.ru/api/v1/health
 ```
 
@@ -100,12 +100,12 @@ curl --fail --silent --show-error https://biom.cloud-path.ru/api/v1/health
 Перед обновлением согласуйте окно недоступности, запишите текущую ревизию (`git rev-parse HEAD`) и подготовьте конкретную следующую проверенную ревизию. При изменениях схемы учитывайте совместимость и прекратите запись, остановив frontend, Caddy и backend перед резервным копированием; БД продолжает работать:
 
 ```sh
-sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml stop caddy frontend backend
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml stop caddy frontend backend
 umask 077
 mkdir -p "$HOME/credit-cabinet-backups"
 chmod 700 "$HOME/credit-cabinet-backups"
 backup_file="$HOME/credit-cabinet-backups/database-$(date -u +%Y%m%dT%H%M%SZ).dump"
-sudo docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_file" || {
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_file" || {
   echo "Ошибка pg_dump: обновление остановлено" >&2
   exit 1
 }
@@ -123,9 +123,9 @@ test -s "$backup_file" || exit 1
 ## Диагностика
 
 ```sh
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml logs --tail 100 caddy backend db
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps
-docker compose --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml logs --tail 100 caddy backend db
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
 При ошибке сертификата проверьте A/AAAA, доступность TCP 80/443 извне и логи Caddy; не повторяйте получение сертификата в цикле. При недоступности API проверьте health backend и миграции, затем доступность БД. Логи и backup могут содержать данные: перед передачей удаляйте секреты. Для временной остановки используйте `stop`, для запуска — `up -d --wait` с теми же двумя Compose-файлами и `.env.deploy`.

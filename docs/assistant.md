@@ -80,8 +80,10 @@ docker compose --env-file .env --env-file .env.llm up -d --no-deps --force-recre
 
 ```sh
 cd /srv/credit-cabinet
-sudo docker compose --env-file .env.deploy --env-file .env.llm -f compose.yaml -f compose.deploy.yaml up -d --no-deps --force-recreate --wait backend
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy --env-file .env.llm -f compose.yaml -f compose.deploy.yaml up -d --no-deps --force-recreate --wait backend
 ```
+
+Параметр `-p credit-cabinet-vps` выбирает действующий серверный стенд. Его имя должно совпадать с проектом контейнеров Caddy, backend и БД. Без него при отсутствии `COMPOSE_PROJECT_NAME` может быть создан другой стенд, а сайт продолжит работать со старым backend.
 
 Второй файл содержит только `LLM_*` и имеет приоритет над первым. Если все настройки модели записаны непосредственно в `.env.deploy`, уберите `--env-file .env.llm`. Изменение файла на ноутбуке не меняет серверный файл. Не публикуйте файлы с ключами. Команды предполагают уже собранный backend с поддержкой соответствующих параметров; после обновления кода сначала выполните обычное обновление со сборкой.
 
