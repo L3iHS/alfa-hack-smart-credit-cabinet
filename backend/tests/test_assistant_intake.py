@@ -297,3 +297,36 @@ def test_conjunction_does_not_hide_payback_qualifying_the_same_duration(client, 
     assert response.status_code == 200
     assert response.json()['suggested_fields']['term_months'] is None
     assert 'term_months' not in response.json()['evidence']
+
+
+@pytest.mark.parametrize('text', [
+    'Срок окупаемости кредитного оборудования рассчитан на 24 месяца',
+    'Срок окупаемости финансирования рассчитан на 24 месяца',
+    'Срок окупаемости кредита рассчитан на 24 месяца',
+    'Срок окупаемости займа рассчитан на 24 месяца',
+])
+def test_loan_word_inside_payback_description_does_not_reset_context(client, fake, text):
+    fake.result = {'suggested_fields': {'product_code': None, 'amount_kopecks': None,
+                                       'term_months': 24, 'purpose': None},
+                   'evidence': {'term_months': '24 месяца'}, 'questions': [], 'unsupported_need': False}
+    response = post(client, text)
+    assert response.status_code == 200
+    assert response.json()['suggested_fields']['term_months'] is None
+    assert 'term_months' not in response.json()['evidence']
+    assert any('срок' in question.lower() for question in response.json()['questions'])
+
+
+@pytest.mark.parametrize('text', [
+    'Нужен заём на 24 месяца',
+    'Срок займа 24 месяца',
+    '24 месяца — срок займа',
+    'Нужно финансирование на 24 месяца',
+])
+def test_real_financing_noun_forms_keep_the_explicit_loan_term(client, fake, text):
+    fake.result = {'suggested_fields': {'product_code': None, 'amount_kopecks': None,
+                                       'term_months': 24, 'purpose': None},
+                   'evidence': {'term_months': '24 месяца'}, 'questions': [], 'unsupported_need': False}
+    response = post(client, text)
+    assert response.status_code == 200
+    assert response.json()['suggested_fields']['term_months'] == 24
+    assert response.json()['evidence']['term_months'] == '24 месяца'

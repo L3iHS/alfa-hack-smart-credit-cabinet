@@ -19,13 +19,18 @@ _OTHER_DURATION = re.compile(
     r'окуп\w*|\bработа(?:ет|ем|ют|ла|ли)\b|\bработы\b|существ\w*|возраст\w*|'
     r'основан\w*|зарегистр\w*|эксплуатац\w*|служб\w*|стаж\w*', re.I,
 )
+# Точные формы существительных не принимают прилагательные «кредитного», «заёмного».
+_FINANCING_NOUN = (
+    r'(?:кредит(?:а|у|ом|е|ы|ов|ам|ами|ах)?|за[её]м|'
+    r'займ(?:а|у|ом|е|ы|ов|ам|ами|ах)?|финансировани(?:е|я|ю|ем|и))'
+)
 _LOAN_TERM_PREFIX = re.compile(
-    r'(?:\bна|\bсрок\s+(?:кредит\w*|з[аё]м\w*|финансирован\w*)|'
-    r'\b(?:кредит\w*|з[аё]м\w*)\s+сроком|\b(?:погаш\w*|верну\w*|выплат\w*)\s+(?:за|через))'
+    rf'(?:\bна|\bсрок\s+{_FINANCING_NOUN}\b|'
+    rf'\b{_FINANCING_NOUN}\b\s+сроком|\b(?:погаш\w*|верну\w*|выплат\w*)\s+(?:за|через))'
     r'\s*[:—–-]?\s*$', re.I,
 )
 _LOAN_TERM_SUFFIX = re.compile(
-    r'^\s*[-—–:=]?\s*(?:это\s+)?срок\s+(?:кредит\w*|з[аё]м\w*|финансирован\w*)\b', re.I,
+    rf'^\s*[-—–:=]?\s*(?:это\s+)?срок\s+{_FINANCING_NOUN}\b', re.I,
 )
 _QUESTIONS = {
     'product_code': 'Какой вид финансирования вам нужен?',
@@ -62,9 +67,16 @@ def _term_supported(text: str, quote: str, value: int) -> bool:
         prefix = re.split(r'[,;.!?\n]', text[max(0, match.start() - 160):match.start()])[-1]
         suffix = re.split(r'[,;.!?\n]', text[match.end():match.end() + 160])[0]
         # Новое упоминание кредита начинает отдельную связь, а «работающий» описывает бизнес.
-        references = list(re.finditer(r'\b(?:срок(?:ом)?\s+)?(?:кредит\w*|з[аё]м\w*|финансирован\w*)', prefix, re.I))
+        references = list(re.finditer(rf'\b(?:срок(?:ом)?\s+)?{_FINANCING_NOUN}\b', prefix, re.I))
         if references:
-            prefix = prefix[references[-1].start():]
+            leading = prefix[:references[-1].start()]
+            new_request = re.search(
+                r'\b(?:нужен|нужна|нужно|нужны|требуется|хочу|запрашиваю|оформить|получить|взять)\s*$',
+                leading, re.I,
+            )
+            # «Окупаемость финансирования» — одна группа; только отдельный запрос начинает новую.
+            if not _OTHER_DURATION.search(leading) or new_request:
+                prefix = prefix[references[-1].start():]
         # Союз отделяет следующий факт; «и это срок окупаемости» ещё поясняет то же число.
         suffix = re.split(r'\s+(?:и|а|но)\s+(?!(?:это|есть|является|срок)\b)',
                           suffix, maxsplit=1, flags=re.I)[0]
