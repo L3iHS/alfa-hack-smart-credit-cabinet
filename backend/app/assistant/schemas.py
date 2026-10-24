@@ -1,6 +1,7 @@
+import uuid
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
 
 from app.applications.schemas import Money
 from app.products.catalog import CATALOG_VERSION, get_catalog
@@ -86,3 +87,34 @@ class AnswerOutput(AssistantSchema):
     model: str | None
     knowledge_version: str
     application_version: int | None
+
+
+class ChatInput(AssistantSchema):
+    question: str = Field(min_length=1, max_length=2000)
+    application_id: uuid.UUID | None = Field(default=None, strict=False)
+    expected_version: Annotated[StrictInt, Field(ge=1, le=2_147_483_647)] | None = None
+
+    @field_validator('question')
+    @classmethod
+    def question_is_not_blank(cls, value):
+        if not value.strip():
+            raise ValueError('Введите вопрос')
+        return value
+
+    @model_validator(mode='after')
+    def application_requires_version(self):
+        if (self.application_id is None) != (self.expected_version is None):
+            raise ValueError('Укажите заявку вместе с её версией')
+        return self
+
+
+class GeneratedAnswer(AssistantSchema):
+    answer: str = Field(min_length=1, max_length=6000)
+    source_ids: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(min_length=1, max_length=50)
+
+    @field_validator('answer')
+    @classmethod
+    def answer_is_not_blank(cls, value):
+        if not value.strip():
+            raise ValueError('Ответ пуст')
+        return value
