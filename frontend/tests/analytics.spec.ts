@@ -33,6 +33,7 @@ test(`analytics help is modal, preserves layout and returns keyboard focus at ${
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible({timeout: 1500});
   await expect(dialog.getByRole('heading', {name: 'Как считаем показатели'})).toBeVisible();
+  await expect(dialog.getByRole('heading', {name: 'Как считаем показатели'})).toBeFocused({timeout: 1500});
   const box = await dialog.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(width);
@@ -40,11 +41,14 @@ test(`analytics help is modal, preserves layout and returns keyboard focus at ${
   expect((await trigger.boundingBox())!.x).toBeCloseTo(before!.x, 0);
   expect((await trigger.boundingBox())!.y).toBeCloseTo(before!.y, 0);
   expect((await page.locator('.analytics-funnels').boundingBox())!.y).toBeCloseTo(funnels!.y, 0);
-  await expect(dialog.getByRole('button', {name: 'Закрыть пояснение'})).toBeFocused();
   await page.keyboard.press('Tab');
-  expect(await page.evaluate(() => !!document.activeElement?.closest('dialog'))).toBe(true);
+  const close = dialog.getByRole('button', {name: 'Закрыть пояснение'});
+  await expect(close).toBeFocused();
+  expect(await close.evaluate(element => element.matches(':focus-visible'))).toBe(true);
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', {name: 'Понятно'})).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  expect(await page.evaluate(() => !!document.activeElement?.closest('dialog'))).toBe(true);
+  await expect(close).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();

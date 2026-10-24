@@ -91,6 +91,7 @@ export function AnalyticsSectionHeading({title, topic, onHelp}: {
 
 export function AnalyticsHelpDialog({topic, onClose}: {topic: AnalyticsHelpTopic | null; onClose: () => void}) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   useEffect(() => {
     if (!topic || !dialog.current) return;
@@ -104,6 +105,7 @@ export function AnalyticsHelpDialog({topic, onClose}: {topic: AnalyticsHelpTopic
     if (gutter > 0) body.style.paddingRight = `${parseFloat(getComputedStyle(body).paddingRight) + gutter}px`;
     body.style.overflow = "hidden";
     element.showModal();
+    heading.current?.focus({preventScroll: true});
     return () => {
       element.close();
       body.style.overflow = overflow;
@@ -120,7 +122,7 @@ export function AnalyticsHelpDialog({topic, onClose}: {topic: AnalyticsHelpTopic
       const box = event.currentTarget.getBoundingClientRect();
       if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose();
     }}>
-    <header><h2 id={titleId}>{help.title}</h2><button type="button" className="analytics-dialog-close" aria-label="Закрыть пояснение" autoFocus onClick={onClose}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg></button></header>
+    <header><h2 ref={heading} id={titleId} tabIndex={-1}>{help.title}</h2><button type="button" className="analytics-dialog-close" aria-label="Закрыть пояснение" onClick={onClose}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg></button></header>
     <div className="analytics-help-body">{help.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}</div>
     <footer><button type="button" className="button primary" onClick={onClose}>Понятно</button></footer>
   </dialog>;
