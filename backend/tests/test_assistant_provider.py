@@ -213,3 +213,54 @@ def test_actual_intake_schema_is_accepted_by_a_strict_transport(monkeypatch):
     assert actual.suggested_fields.amount_kopecks == 200_000_000
     assert actual.suggested_fields.term_months == 24
     assert 'purpose' not in actual.evidence
+
+
+@pytest.mark.parametrize('enabled', [None, False, True])
+def test_openrouter_reasoning_is_only_sent_when_explicit(monkeypatch, enabled):
+    config = configured()
+    config.llm_reasoning_enabled = enabled
+    def handler(request):
+        body = json.loads(request.content)
+        if enabled is None:
+            assert 'reasoning' not in body
+        else:
+            assert body['reasoning'] == {'enabled': enabled}
+        return completion()
+    provider(monkeypatch, handler, config).generate_json(system='s', user='u', schema={})
+
+
+def test_other_provider_does_not_receive_openrouter_reasoning(monkeypatch):
+    config = configured()
+    config.llm_base_url = 'https://model.test/v1'
+    config.llm_reasoning_enabled = False
+    def handler(request):
+        assert 'reasoning' not in json.loads(request.content)
+        return completion()
+    provider(monkeypatch, handler, config).generate_json(system='s', user='u', schema={})
+
+
+@pytest.mark.parametrize('status,content,category', [(200, 'not JSON', 'invalid_response'), (429, '', 'rate_limit'), (401, '', 'authentication'), (503, '', 'unavailable')])
+def test_safe_diagnostics_distinguish_case_format_from_outage(monkeypatch, status, content, category):
+    from app.assistant.provider import AssistantUnavailable
+    response = completion(content) if status == 200 else httpx.Response(status, text='private detail')
+    with pytest.raises(AssistantUnavailable) as exc:
+        provider(monkeypatch, lambda request: response).generate_json(system='s', user='u', schema={})
+    assert exc.value.diagnostic_category == category
+    assert exc.value.status_code == 503
+    assert exc.value.detail['code'] == 'assistant_unavailable'
+    assert 'private' not in str(exc.value.detail)
+
+
+def test_timeout_diagnostic_is_transport(monkeypatch):
+    from app.assistant.provider import AssistantUnavailable
+    def handler(request):
+        raise httpx.ReadTimeout('private detail')
+    with pytest.raises(AssistantUnavailable) as exc:
+        provider(monkeypatch, handler).generate_json(system='s', user='u', schema={})
+    assert exc.value.diagnostic_category == 'transport'
+
+
+def test_diagnostic_category_cannot_copy_arbitrary_provider_text():
+    from app.assistant.provider import AssistantUnavailable
+    error = AssistantUnavailable('private provider text')
+    assert error.diagnostic_category == 'unavailable'

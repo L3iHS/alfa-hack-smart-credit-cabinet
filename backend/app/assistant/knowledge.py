@@ -37,7 +37,10 @@ PROCESS = {
 
 def build_knowledge(catalog_version: str) -> list[Source]:
     catalog = get_catalog(catalog_version)
-    sources = []
+    sources = [Source(id='catalog:products', title='Состав версии каталога продуктов',
+        text=f'Версия каталога {catalog_version}. Полный перечень продуктов этой версии: ' +
+            ', '.join(f'{product.name} ({product.code})' for product in catalog.values()) +
+            '. Продукты вне этого перечня в данной версии отсутствуют.', version=catalog_version)]
     for product in catalog.values():
         documents = ', '.join(f'{DOCUMENTS[kind][0]} ({kind})' for kind in product.required_document_types)
         text = (f'{product.name}. {product.purpose_description}. Демонстрационные условия каталога. '

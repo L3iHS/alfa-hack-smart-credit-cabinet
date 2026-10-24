@@ -11,6 +11,14 @@ services:
   backend:
     environment:
       COOKIE_SECURE: "true"
+      LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-1200}
+      LLM_JSON_MODE: ${LLM_JSON_MODE:-json_object}
+      LLM_REASONING_ENABLED: ${LLM_REASONING_ENABLED:-}
       FORWARDED_ALLOW_IPS: "*"
     restart: unless-stopped
     logging: *bounded-logs

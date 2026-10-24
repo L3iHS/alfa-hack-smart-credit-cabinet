@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Browser } from '@playwright/test';
 const password = process.env.DEMO_PASSWORD || 'AlfaDemo2026!';
 async function login(page: Page, staff = true) {
   await page.goto('/login');
@@ -7,7 +7,64 @@ async function login(page: Page, staff = true) {
   await page.getByRole('button', { name: 'Войти', exact: true }).click();
   await expect(page).toHaveURL(staff ? /\/staff\/applications$/ : /\/applications$/);
 }
-test('staff analytics has honest funnels and immutable conditions', async ({ page }) => {
+// Каждый потребитель таблицы сам готовит реальное непросмотренное предложение.
+// API-запросы не создают клиентское событие просмотра и не подменяют отчёт аналитики.
+async function prepareUnviewedOffer(browser: Browser) {
+  const context = await browser.newContext({baseURL: process.env.BASE_URL || 'http://localhost:8080'});
+  const api = context.request;
+  try {
+    async function authorize(email: string) {
+      const initial = await (await api.get('/api/v1/auth/csrf')).json();
+      const response = await api.post('/api/v1/auth/login', {
+        headers: {'X-CSRF-Token': initial.csrf_token}, data: {email, password},
+      });
+      expect(response.status()).toBe(200);
+      return (await response.json()).csrf_token as string;
+    }
+    let token = await authorize('demo-a@example.test');
+    const today = new Date();
+    const periodStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 3, 1)).toISOString().slice(0, 10);
+    const periodEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0)).toISOString().slice(0, 10);
+    const created = await api.post('/api/v1/applications', {
+      headers: {'X-CSRF-Token': token},
+      data: {product_code: 'overdraft', purpose: 'Проверка таблицы контрпредложений',
+        amount_kopecks: 50000000, term_months: 2, period_start: periodStart, period_end: periodEnd,
+        revenue_kopecks: 240000000, operating_expenses_kopecks: 90000000, existing_debt_payments_kopecks: 15000000},
+    });
+    expect(created.status()).toBe(201);
+    const draft = await created.json();
+    let version = draft.version;
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN4b6gCAANXAUWe8DG4AAAAAElFTkSuQmCC', 'base64');
+    for (const document of ['financial_statement', 'bank_statement']) {
+      const uploaded = await api.post(`/api/v1/applications/${draft.id}/documents?document_type=${document}&expected_version=${version}&filename=analytics.png`, {
+        headers: {'X-CSRF-Token': token, 'Content-Type': 'image/png'}, data: png,
+      });
+      expect(uploaded.status()).toBe(201);
+      version = (await uploaded.json()).application_version;
+    }
+    const policy = await (await api.get('/api/v1/submission-policy')).json();
+    const submitted = await api.post(`/api/v1/applications/${draft.id}/submit`, {
+      headers: {'X-CSRF-Token': token, 'Idempotency-Key': crypto.randomUUID()},
+      data: {expected_version: version, data_confirmed: true, bki_consent: true, consent_version: policy.consent_version},
+    });
+    expect(submitted.status()).toBe(202);
+    await expect.poll(async () => (await (await api.get(`/api/v1/applications/${draft.id}`)).json()).status,
+      {timeout: 15000}).toBe('manual_review');
+    token = await authorize('staff@example.test');
+    const current = await (await api.get(`/api/v1/applications/${draft.id}`)).json();
+    const offered = await api.post(`/api/v1/applications/${draft.id}/offers`, {
+      headers: {'X-CSRF-Token': token, 'Idempotency-Key': crypto.randomUUID()},
+      data: {expected_version: current.version, amount_kopecks: 40000000, term_months: 2, reason: 'Условия для проверки таблицы'},
+    });
+    expect(offered.status()).toBe(201);
+    return draft.id as string;
+  } finally {
+    await context.close();
+  }
+}
+
+test('staff analytics has honest funnels and immutable conditions', async ({ page, browser }) => {
+  await prepareUnviewedOffer(browser);
   await login(page);
   await page.getByRole('link', { name: 'Аналитика', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Оформление заявки', exact: true })).toBeVisible();
@@ -330,7 +387,8 @@ test('dates stay Russian independent of browser locale and query uses Moscow cal
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
-test('all four offer stages and all five columns fit normal laptop', async ({page}) => {
+test('all four offer stages and all five columns fit normal laptop', async ({page, browser}) => {
+  await prepareUnviewedOffer(browser);
   await page.setViewportSize({width: 1265, height: 712}); await login(page); await page.goto('/staff/analytics');
   await expect(page.locator('.analytics-funnel')).toHaveCount(2);
   const caption = await page.locator('.analytics-funnel').last().locator('.funnel-caption').last().boundingBox();

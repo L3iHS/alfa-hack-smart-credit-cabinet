@@ -21,6 +21,16 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
       DOCUMENT_STORAGE_PATH: /data/documents
+      LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-1200}
+      LLM_JSON_MODE: ${LLM_JSON_MODE:-json_object}
+      LLM_REASONING_ENABLED: ${LLM_REASONING_ENABLED:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - document_data:/data/documents
     depends_on:
@@ -39,6 +49,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+  ollama:
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    profiles: [ollama]
+    volumes:
+      - ollama_data:/root/.ollama
 volumes:
+  ollama_data:
   postgres_data:
   document_data:

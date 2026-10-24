@@ -1,6 +1,6 @@
 import json
 from threading import BoundedSemaphore
-from typing import Protocol
+from typing import Literal, Protocol
 from urllib.parse import urlsplit
 
 import httpx
@@ -12,8 +12,14 @@ _MAX_RESPONSE_BYTES = 128 * 1024
 _slots = BoundedSemaphore(2)
 
 
+DiagnosticCategory = Literal['unavailable', 'invalid_response', 'authentication', 'rate_limit', 'transport']
+
+
 class AssistantUnavailable(HTTPException):
-    def __init__(self):
+    def __init__(self, diagnostic_category: DiagnosticCategory = 'unavailable'):
+        # Только безопасная категория для локальной оценки; HTTP-контракт неизменен.
+        self.diagnostic_category = (diagnostic_category if diagnostic_category in
+            ('unavailable', 'invalid_response', 'authentication', 'rate_limit', 'transport') else 'unavailable')
         super().__init__(503, {'code': 'assistant_unavailable',
                               'message': 'Помощник временно недоступен. Продолжите заполнение формы или повторите позже.'})
 
@@ -88,6 +94,8 @@ class LLMProvider:
             if openrouter:
                 if not headers:
                     raise AssistantUnavailable()
+                if config.llm_reasoning_enabled is not None:
+                    payload['reasoning'] = {'enabled': config.llm_reasoning_enabled}
                 payload['provider'] = {'allow_fallbacks': False, 'data_collection': 'deny',
                                        'max_price': {'prompt': 0, 'completion': 0, 'request': 0}}
         return endpoint, payload, headers
@@ -102,12 +110,14 @@ class LLMProvider:
                               trust_env=False) as client:
                 with client.stream('POST', endpoint, json=payload, headers=headers) as response:
                     if response.status_code != 200:
-                        raise AssistantUnavailable()
+                        category = ('rate_limit' if response.status_code == 429 else
+                                    'authentication' if response.status_code in (401, 403) else 'unavailable')
+                        raise AssistantUnavailable(category)
                     body = bytearray()
                     for chunk in response.iter_bytes(chunk_size=8192):
                         body.extend(chunk)
                         if len(body) > _MAX_RESPONSE_BYTES:
-                            raise AssistantUnavailable()
+                            raise AssistantUnavailable('invalid_response')
             envelope = _parse_json(body)
             if self.config.llm_provider == 'ollama':
                 content = envelope['message']['content']
@@ -118,8 +128,10 @@ class LLMProvider:
             return _parse_json(content)
         except AssistantUnavailable:
             raise
-        except (httpx.HTTPError, ValueError, TypeError, KeyError, IndexError, RecursionError):
-            raise AssistantUnavailable() from None
+        except httpx.HTTPError:
+            raise AssistantUnavailable('transport') from None
+        except (ValueError, TypeError, KeyError, IndexError, RecursionError):
+            raise AssistantUnavailable('invalid_response') from None
         finally:
             _slots.release()
 

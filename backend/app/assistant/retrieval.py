@@ -20,6 +20,8 @@ _SYNONYMS = (
 def retrieve(db: Session, question: str, catalog_version: str, limit: int = 5) -> list[Source]:
     sources = build_knowledge(catalog_version)
     selected = [canonical for pattern, canonical in _SYNONYMS if re.search(pattern, question.lower())]
+    if re.search(r'каталог|перечень|список\s+продукт', question.lower()):
+        selected.append('состав версии каталога')
     # Каждый элемент становится отдельным plainto_tsquery; между предметами действует OR.
     terms = selected or re.findall(r'[а-яёa-z]+', question.lower())
     if not terms or limit <= 0:

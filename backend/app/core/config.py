@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = Field(default=30, ge=5, le=120)
     llm_max_tokens: int = Field(default=1200, ge=128, le=4096)
     llm_json_mode: Literal['json_object', 'json_schema'] = 'json_object'
+    llm_reasoning_enabled: bool | None = None
+
+    @field_validator('llm_reasoning_enabled', mode='before')
+    @classmethod
+    def blank_reasoning_is_unset(cls, value):
+        return None if value == '' else value
+
     document_storage_path: Path = Path("/tmp/credit-documents")
 
 

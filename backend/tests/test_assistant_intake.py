@@ -330,3 +330,9 @@ def test_real_financing_noun_forms_keep_the_explicit_loan_term(client, fake, tex
     assert response.status_code == 200
     assert response.json()['suggested_fields']['term_months'] == 24
     assert response.json()['evidence']['term_months'] == '24 месяца'
+
+
+def test_customer_word_does_not_turn_explicit_term_into_payback():
+    from app.assistant.intake import _term_supported
+    assert _term_supported('Нужен овердрафт 900 тысяч рублей на 3 месяца до оплаты покупателем', 'на 3 месяца', 3)
+    assert not _term_supported('Купить оборудование 900 тысяч рублей, окупаемость на 3 месяца', 'на 3 месяца', 3)
