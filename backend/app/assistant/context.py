@@ -20,6 +20,8 @@ class ApplicationContext:
     version: int
     catalog_version: str
     sources: list[Source]
+    product_code: str = ''
+    status: str = ''
 
 
 # Узкий словарь предметов кабинета: id сам по себе не делает снимок релевантным.
@@ -80,7 +82,7 @@ def build_application_context(db: Session, user: User, application_id: uuid.UUID
         if output.status == 'counteroffer' and item.status == 'active' and item.revision_id == revision_id:
             add(f'offer:{item.id}', 'Действующее предложение', item.model_dump(exclude={
                 'responded_at', 'decline_reason', 'created_at'}))
-    return ApplicationContext(application.id, output.version, output.catalog_version, sources)
+    return ApplicationContext(application.id, output.version, output.catalog_version, sources, output.product_code, output.status)
 
 
 def revalidate_access(db: Session, request: Request, user_id: uuid.UUID, role: str,

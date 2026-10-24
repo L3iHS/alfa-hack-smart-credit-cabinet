@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
@@ -118,3 +119,13 @@ class GeneratedAnswer(AssistantSchema):
         if not value.strip():
             raise ValueError('Ответ пуст')
         return value
+
+
+class SummaryInput(AssistantSchema):
+    expected_version: Annotated[StrictInt, Field(ge=1, le=2_147_483_647)]
+
+
+class SummaryOutput(AnswerOutput):
+    revision_id: uuid.UUID | None
+    processing_run_id: uuid.UUID | None
+    generated_at: datetime
