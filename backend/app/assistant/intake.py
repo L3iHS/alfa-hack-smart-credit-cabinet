@@ -15,8 +15,17 @@ _AMOUNT = re.compile(
     r'(млн\.?|миллион(?:а|ов)?|тыс\.?|тысяч(?:а|и)?|руб(?:лей|ля|ль)?\.?|₽)(?!\w)', re.I,
 )
 _TERM = re.compile(r'(?<![\w.,+\-])(\d+)\s*(месяц(?:а|ев)?|мес\.?|год(?:а|ов)?|лет)(?!\w)', re.I)
-_PAYBACK = re.compile(r'окуп\w*', re.I)
-_LOAN = re.compile(r'кредит\w*|з[аё]м\w*|срок\w*|погаш\w*|выплат\w*|верну\w*', re.I)
+_OTHER_DURATION = re.compile(
+    r'окуп\w*|работ\w*|существ\w*|возраст\w*|основан\w*|зарегистр\w*|эксплуатац\w*|служб\w*|стаж\w*', re.I,
+)
+_LOAN_TERM_PREFIX = re.compile(
+    r'(?:\bна|\bсрок\s+(?:кредит\w*|з[аё]м\w*|финансирован\w*)|'
+    r'\b(?:кредит\w*|з[аё]м\w*)\s+сроком|\b(?:погаш\w*|верну\w*|выплат\w*)\s+(?:за|через))'
+    r'\s*[:—–-]?\s*$', re.I,
+)
+_LOAN_TERM_SUFFIX = re.compile(
+    r'^\s*[-—–:=]?\s*(?:это\s+)?срок\s+(?:кредит\w*|з[аё]м\w*|финансирован\w*)\b', re.I,
+)
 _QUESTIONS = {
     'product_code': 'Какой вид финансирования вам нужен?',
     'amount_kopecks': 'Уточните сумму финансирования в рублях в пределах выбранного продукта.',
@@ -48,12 +57,12 @@ def _term_supported(text: str, quote: str, value: int) -> bool:
         months = int(match[1]) * (1 if match[2].lower().startswith('мес') else 12)
         if months != value or re.search(r'[-−]\s*$', text[:match.start()]):
             continue
-        # Контекст исходного предложения сохраняет слово «окупаемость» за границей цитаты.
-        prefix = re.split(r'[;.!?\n]', text[max(0, match.start() - 160):match.start()])[-1]
-        payback, loan = list(_PAYBACK.finditer(prefix)), list(_LOAN.finditer(prefix))
-        if payback and (not loan or payback[-1].start() > loan[-1].start()):
+        # Число связывается с ближайшей фразой с обеих сторон, а не с ранним словом «кредит».
+        prefix = re.split(r'[,;.!?\n]', text[max(0, match.start() - 160):match.start()])[-1]
+        suffix = re.split(r'[,;.!?\n]', text[match.end():match.end() + 160])[0]
+        if _OTHER_DURATION.search(prefix) or _OTHER_DURATION.search(suffix):
             continue
-        if loan or re.search(r'\bна\s*$', prefix, re.I):
+        if _LOAN_TERM_PREFIX.search(prefix) or _LOAN_TERM_SUFFIX.search(suffix):
             return True
     return False
 
@@ -76,13 +85,14 @@ def extract_intake(body: IntakeInput, provider: Provider) -> IntakeOutput:
             system=system, user=body.text, schema=ExtractedIntake.model_json_schema(),
         ))
         values = raw.suggested_fields.model_dump()
+        quotes = raw.evidence.model_dump(exclude_none=True)
         evidence = {}
         questions = list(raw.questions)
         if raw.unsupported_need:
             return IntakeOutput(suggested_fields=SuggestedFields(), evidence={}, questions=questions,
                                 unsupported_need=True, model=provider.model, catalog_version=body.catalog_version)
         for field, value in values.items():
-            quote = raw.evidence.get(field)
+            quote = quotes.get(field)
             valid = value is not None and quote is not None and bool(quote.strip()) and quote in body.text
             if valid and field == 'amount_kopecks':
                 valid = _amount_supported(body.text, quote, value)

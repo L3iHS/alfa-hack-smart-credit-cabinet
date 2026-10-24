@@ -36,10 +36,12 @@ class SuggestedFields(AssistantSchema):
     purpose: str | None = Field(default=None, min_length=1, max_length=2000)
 
 
-class ExtractedFields(SuggestedFields):
-    # Неизвестное название можно безопасно отбросить, не превращая его в код каталога.
-    product_code: str | None = Field(default=None, max_length=100)
-    term_months: StrictInt | None = None
+class ExtractedFields(AssistantSchema):
+    # Все ключи обязательны для строгого транспорта; неизвестный факт обозначается null.
+    product_code: str | None = Field(max_length=100)
+    amount_kopecks: Money | None
+    term_months: StrictInt | None
+    purpose: str | None = Field(min_length=1, max_length=2000)
 
 
 FieldName = Literal['product_code', 'amount_kopecks', 'term_months', 'purpose']
@@ -47,9 +49,16 @@ Quote = Annotated[str, Field(min_length=1, max_length=240)]
 Question = Annotated[str, Field(min_length=1, max_length=500)]
 
 
+class ExtractedEvidence(AssistantSchema):
+    product_code: Quote | None
+    amount_kopecks: Quote | None
+    term_months: Quote | None
+    purpose: Quote | None
+
+
 class ExtractedIntake(AssistantSchema):
     suggested_fields: ExtractedFields
-    evidence: dict[FieldName, Quote]
+    evidence: ExtractedEvidence
     questions: list[Question] = Field(max_length=10)
     unsupported_need: StrictBool
 

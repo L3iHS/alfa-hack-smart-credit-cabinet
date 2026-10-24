@@ -168,3 +168,48 @@ def test_json_object_mode_supplies_the_shape_to_the_model(monkeypatch):
         return completion()
 
     assert provider(monkeypatch, handler).generate_json(system='rules', user='data', schema=schema) == {'ok': True}
+
+
+def test_actual_intake_schema_is_accepted_by_a_strict_transport(monkeypatch):
+    from app.assistant.intake import extract_intake
+    from app.assistant.schemas import IntakeInput
+
+    config = configured()
+    config.llm_json_mode = 'json_schema'
+
+    def check_objects(node):
+        if isinstance(node, dict):
+            if node.get('type') == 'object':
+                assert node.get('additionalProperties') is False
+                assert set(node.get('required', [])) == set(node.get('properties', {}))
+            assert 'default' not in node
+            for child in node.values():
+                check_objects(child)
+        elif isinstance(node, list):
+            for child in node:
+                check_objects(child)
+
+    def handler(request):
+        body = json.loads(request.content)
+        structured = body['response_format']['json_schema']
+        assert structured['strict'] is True
+        schema = structured['schema']
+        check_objects(schema)
+        evidence_ref = schema['properties']['evidence']['$ref'].rsplit('/', 1)[-1]
+        evidence = schema['$defs'][evidence_ref]
+        assert set(evidence['properties']) == {'product_code', 'amount_kopecks', 'term_months', 'purpose'}
+        assert all({'type': 'null'} in value['anyOf'] for value in evidence['properties'].values())
+        fields_ref = schema['properties']['suggested_fields']['$ref'].rsplit('/', 1)[-1]
+        assert all({'type': 'null'} in value['anyOf'] for value in schema['$defs'][fields_ref]['properties'].values())
+        result = {'suggested_fields': {'product_code': 'equipment', 'amount_kopecks': 200_000_000,
+                                        'term_months': 24, 'purpose': None},
+                  'evidence': {'product_code': 'оборудование', 'amount_kopecks': '2 млн',
+                               'term_months': '24 месяца', 'purpose': None},
+                  'questions': [], 'unsupported_need': False}
+        return completion(json.dumps(result, ensure_ascii=False))
+
+    actual = extract_intake(IntakeInput(text='Нужен кредит на оборудование на 24 месяца, 2 млн'),
+                            provider(monkeypatch, handler, config))
+    assert actual.suggested_fields.amount_kopecks == 200_000_000
+    assert actual.suggested_fields.term_months == 24
+    assert 'purpose' not in actual.evidence

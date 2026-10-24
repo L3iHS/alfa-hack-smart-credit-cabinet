@@ -42,7 +42,11 @@ def fake():
 
         def generate_json(self, *, system, user, schema):
             self.calls.append((system, user, schema))
-            return self.result
+            # Тестовый провайдер возвращает фиксированный nullable-контракт генерации.
+            fields = dict.fromkeys(('product_code', 'amount_kopecks', 'term_months', 'purpose'))
+            return {**self.result,
+                    'suggested_fields': {**fields, **self.result['suggested_fields']},
+                    'evidence': {**fields, **self.result['evidence']}}
 
     provider = Provider()
     app.dependency_overrides[get_provider] = lambda: provider
@@ -220,3 +224,50 @@ def test_term_citation_cannot_hide_sign_or_leading_digits(client, fake, duration
     response = post(client, 'Нужен кредит. Кредит ' + TEXT.replace('12 месяцев', duration))
     assert response.status_code == 200
     assert response.json()['suggested_fields']['term_months'] is None
+
+
+@pytest.mark.parametrize('text,term,quote', [
+    ('Нужен кредит на оборудование, 12 месяцев — срок окупаемости', 12, '12 месяцев'),
+    ('Нужен кредит на оборудование, 12 месяцев окупаемости проекта', 12, '12 месяцев'),
+    ('Нужен кредит на оборудование, бизнес работает 5 лет', 60, '5 лет'),
+    ('Нужен кредит на оборудование бизнес работает 5 лет', 60, '5 лет'),
+    ('Нужен кредит на оборудование, компании 5 лет', 60, '5 лет'),
+    ('Нужен кредит на оборудование, срок службы оборудования 3 года', 36, '3 года'),
+    ('Кредит на оборудование на 12 месяцев — срок окупаемости', 12, '12 месяцев'),
+])
+def test_duration_requires_a_local_loan_reference(client, fake, text, term, quote):
+    fake.result = {'suggested_fields': {'product_code': 'investment' if term > 36 else 'equipment', 'amount_kopecks': None,
+                                       'term_months': term, 'purpose': None},
+                   'evidence': {'product_code': 'оборудование', 'term_months': quote},
+                   'questions': [], 'unsupported_need': False}
+    response = post(client, text)
+    assert response.status_code == 200
+    assert response.json()['suggested_fields']['term_months'] is None
+    assert 'term_months' not in response.json()['evidence']
+    assert any('срок' in question.lower() for question in response.json()['questions'])
+
+
+@pytest.mark.parametrize('text', [
+    'Нужен кредит на оборудование на 24 месяца',
+    'Оборудование, 24 месяца — срок кредита',
+    'Оборудование, срок кредита 24 месяца; бизнес работает 5 лет',
+])
+def test_loan_duration_can_be_bound_on_either_side(client, fake, text):
+    fake.result = {'suggested_fields': {'product_code': 'equipment', 'amount_kopecks': None,
+                                       'term_months': 24, 'purpose': None},
+                   'evidence': {'product_code': 'оборудование' if 'оборудование' in text else 'Оборудование',
+                                'term_months': '24 месяца'},
+                   'questions': [], 'unsupported_need': False}
+    response = post(client, text)
+    assert response.status_code == 200
+    assert response.json()['suggested_fields']['term_months'] == 24
+    assert response.json()['evidence']['term_months'] == '24 месяца'
+
+
+def test_nullable_wire_evidence_does_not_change_public_output(client, fake):
+    fake.result['suggested_fields']['purpose'] = None
+    fake.result['evidence']['purpose'] = None
+    response = post(client)
+    assert response.status_code == 200
+    assert response.json()['suggested_fields']['purpose'] is None
+    assert 'purpose' not in response.json()['evidence']
