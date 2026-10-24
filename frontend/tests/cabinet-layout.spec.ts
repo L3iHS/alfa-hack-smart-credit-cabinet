@@ -142,7 +142,7 @@ test("staff_long_name_and_header_controls_fit_320", async ({ page }) => {
     if (inner) {
       await page.goto("/staff/applications/00000000-0000-0000-0000-000000000000");
       await expect(page.getByRole("heading", { name: "Заявка не найдена" })).toBeVisible();
-      await expect(page.locator(".topbar .back-link")).toHaveAccessibleName("Очередь заявок");
+      await expect(page.locator(".topbar .back-link")).toHaveAccessibleName("Заявки");
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
     for (const selector of [".account-menu", ".company-name", ".logout"]) {

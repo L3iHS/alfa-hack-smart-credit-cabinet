@@ -29,7 +29,7 @@ export default function StaffApplicationsPage() {
   return (
     <>
       <PageHeading
-        title="Заявки на рассмотрение"
+        title="Заявки"
         subtitle="Рабочая очередь сотрудника банка"
       />
       {error ? (
@@ -76,7 +76,7 @@ export default function StaffApplicationsPage() {
               <div className="empty-icon" aria-hidden="true">
                 ▤
               </div>
-              <h2>Заявок на рассмотрение пока нет</h2>
+              <h2>Заявок пока нет</h2>
               <p>
                 Здесь появятся заявки, которые клиенты отправят в банк.
                 Черновики остаются в кабинете компании.

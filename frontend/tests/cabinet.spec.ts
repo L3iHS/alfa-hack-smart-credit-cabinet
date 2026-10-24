@@ -67,7 +67,7 @@ test("staff_queue_does_not_include_drafts", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
   await login(page, "staff@example.test");
   await expect(
-    page.getByRole("heading", { name: "Заявки на рассмотрение", exact: true }),
+    page.getByRole("heading", { name: "Заявки", exact: true }),
   ).toBeVisible();
   await expect(
     page.locator(".application-row").filter({ hasText: id.slice(0, 8) }),
@@ -78,7 +78,7 @@ test("staff_navigation_fits_narrow_viewport", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
   await login(page, "staff@example.test");
   await expect(
-    page.getByRole("link", { name: "Заявки на рассмотрение", exact: true }),
+    page.getByRole("link", { name: "Заявки", exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -312,7 +312,7 @@ for (const viewport of [
     await login(page, "staff@example.test");
     await expect(
       page.getByRole("heading", {
-        name: "Заявки на рассмотрение",
+        name: "Заявки",
         exact: true,
       }),
     ).toBeVisible();

@@ -28,7 +28,7 @@ export default function AppShell() {
   const backLabel = editMatch
     ? "К заявке"
     : staff
-      ? "Очередь заявок"
+      ? "Заявки"
       : "Мои заявки";
   const company = useResource(
     () => (staff ? Promise.resolve(null) : api<Company>("/company")),
@@ -58,7 +58,7 @@ export default function AppShell() {
                 strokeLinejoin="round"
               />
             </svg>
-            {staff ? "Заявки на рассмотрение" : "Мои заявки"}
+            {staff ? "Заявки" : "Мои заявки"}
           </NavLink>
         {staff && <NavLink to="/staff/analytics"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20V12h4v8M10 20V8h4v12M16 20V4h4v16" stroke="currentColor" strokeWidth="1.6" /></svg>Аналитика</NavLink>}
         </nav>
@@ -78,7 +78,7 @@ export default function AppShell() {
             <div className="company-name">
               <strong>
                 {staff
-                  ? "Рабочее место сотрудника"
+                  ? "Сотрудник банка"
                   : company.data?.name || user?.display_name}
               </strong>
               <span>
