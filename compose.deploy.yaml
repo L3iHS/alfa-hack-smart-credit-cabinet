@@ -19,6 +19,7 @@ services:
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-1200}
       LLM_JSON_MODE: ${LLM_JSON_MODE:-json_object}
       LLM_REASONING_ENABLED: ${LLM_REASONING_ENABLED:-}
+      LLM_DATA_COLLECTION: ${LLM_DATA_COLLECTION:-deny}
       FORWARDED_ALLOW_IPS: "*"
     restart: unless-stopped
     logging: *bounded-logs

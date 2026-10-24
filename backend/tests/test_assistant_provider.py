@@ -4,7 +4,7 @@ from threading import Event
 
 import httpx
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from app.core.config import Settings, settings
 
@@ -32,6 +32,40 @@ def provider(monkeypatch, handler, config=None):
 
 def completion(content='{"ok": true}'):
     return httpx.Response(200, json={'choices': [{'message': {'content': content}}]})
+
+
+@pytest.mark.parametrize('policy', ['deny', 'allow'])
+def test_openrouter_data_collection_setting_preserves_free_only(monkeypatch, policy):
+    def handler(request):
+        routing = json.loads(request.content)['provider']
+        assert routing == {'data_collection': policy, 'allow_fallbacks': False,
+                           'max_price': {'prompt': 0, 'completion': 0, 'request': 0}}
+        return completion()
+
+    config = configured(llm_data_collection=policy)
+    provider(monkeypatch, handler, config).generate_json(system='s', user='u', schema={})
+
+
+def test_invalid_data_collection_setting_is_rejected():
+    with pytest.raises(ValidationError):
+        configured(llm_data_collection='yes')
+
+
+@pytest.mark.parametrize('kind', ['openai', 'ollama'])
+def test_data_collection_setting_is_not_sent_to_other_providers(monkeypatch, kind):
+    config = configured(llm_data_collection='allow')
+    config.llm_provider = kind
+    config.llm_base_url = 'https://model.test/v1'
+
+    def handler(request):
+        body = json.loads(request.content)
+        assert 'provider' not in body
+        assert 'data_collection' not in body
+        if kind == 'ollama':
+            return httpx.Response(200, json={'message': {'content': '{"ok": true}'}})
+        return completion()
+
+    provider(monkeypatch, handler, config).generate_json(system='s', user='u', schema={})
 
 
 def test_openrouter_uses_explicit_free_model_and_zero_price(monkeypatch):

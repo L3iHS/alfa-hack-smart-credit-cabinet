@@ -96,7 +96,7 @@ class LLMProvider:
                     raise AssistantUnavailable()
                 if config.llm_reasoning_enabled is not None:
                     payload['reasoning'] = {'enabled': config.llm_reasoning_enabled}
-                payload['provider'] = {'allow_fallbacks': False, 'data_collection': 'deny',
+                payload['provider'] = {'allow_fallbacks': False, 'data_collection': config.llm_data_collection,
                                        'max_price': {'prompt': 0, 'completion': 0, 'request': 0}}
         return endpoint, payload, headers
 

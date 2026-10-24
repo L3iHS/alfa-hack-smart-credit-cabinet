@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     llm_max_tokens: int = Field(default=1200, ge=128, le=4096)
     llm_json_mode: Literal['json_object', 'json_schema'] = 'json_object'
     llm_reasoning_enabled: bool | None = None
+    llm_data_collection: Literal['deny', 'allow'] = 'deny'
 
     @field_validator('llm_reasoning_enabled', mode='before')
     @classmethod

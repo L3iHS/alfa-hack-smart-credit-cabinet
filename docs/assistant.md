@@ -17,11 +17,48 @@ LLM_TIMEOUT_SECONDS=45
 LLM_MAX_TOKENS=1200
 LLM_JSON_MODE=json_schema
 LLM_REASONING_ENABLED=false
+LLM_DATA_COLLECTION=deny
 ```
 
-Для OpenRouter backend разрешает только HTTPS, точный endpoint и модель `:free`; передаёт нулевую максимальную цену для prompt/completion/request, `allow_fallbacks=false` и `data_collection=deny`. Бесплатные квоты и доступность не гарантируются; backend не переключается на платную модель. Указание `:free` само по себе не подтверждает лицензию весов: проверяйте лицензию выбранной модели отдельно.
+Для OpenRouter backend разрешает только HTTPS, точный endpoint и модель `:free`; передаёт нулевую максимальную цену для prompt/completion/request, `allow_fallbacks=false` и `data_collection` из `LLM_DATA_COLLECTION` (по умолчанию `deny`). Бесплатные квоты и доступность не гарантируются; backend не переключается на платную модель. Указание `:free` само по себе не подтверждает лицензию весов: проверяйте лицензию выбранной модели отдельно.
 
 `LLM_JSON_MODE=json_schema` передаёт строгую JSON-схему. `json_object` добавляет схему в системную инструкцию и всё равно проходит те же серверные проверки ответа. Пустое `LLM_REASONING_ENABLED` сохраняет поведение провайдера; явные `true`/`false` отправляются только OpenRouter. Другие совместимые API используют тот же контракт без этого параметра. Ошибка формата, источников или транспорта возвращает безопасную техническую ошибку без ответа провайдера.
+
+## Смена модели через environment-файл
+
+Для синтетического стенда можно явно разрешить провайдеров, сохраняющих запросы и ответы: `LLM_DATA_COLLECTION=allow`. Это требуется некоторым бесплатным NVIDIA-провайдерам OpenRouter. Значение `deny` сохраняет исходное ограничение; другие значения не допускаются. Параметр относится только к OpenRouter, не меняет его квоты и не разрешает платные вызовы.
+
+Пример настройки для проб Nemotron Ultra (сохраните свой существующий `LLM_API_KEY`):
+
+```dotenv
+LLM_PROVIDER=openai
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+LLM_DATA_COLLECTION=allow
+LLM_JSON_MODE=json_object
+LLM_REASONING_ENABLED=true
+LLM_MAX_TOKENS=4096
+LLM_TIMEOUT_SECONDS=120
+```
+
+Для другой модели замените `LLM_MODEL` точным ID из OpenRouter с суффиксом `:free`. Код под каждую модель менять не нужно, но поддержка JSON-схемы и reasoning различается: `json_object` служит альтернативой `json_schema`, пустое `LLM_REASONING_ENABLED` оставляет выбор провайдеру. Доступность в каталоге не гарантирует свободную квоту или качество ответа.
+
+После сохранения настроек пересоздайте только backend. Обычный `restart` не перечитывает Compose-переменные. При смене только настроек сборка образов и `git pull` не нужны; новое значение применяется к новым запросам, уже показанные ответы не пересчитываются.
+
+Для стандартного локального Compose, если общие параметры находятся в `.env`, а параметры модели в `.env.llm`:
+
+```sh
+docker compose --env-file .env --env-file .env.llm up -d --no-deps --force-recreate --wait backend
+```
+
+Для VPS выполните на самом сервере, сохраняя существующие `.env.deploy` и имя Compose-проекта:
+
+```sh
+cd /srv/credit-cabinet
+sudo docker compose --env-file .env.deploy --env-file .env.llm -f compose.yaml -f compose.deploy.yaml up -d --no-deps --force-recreate --wait backend
+```
+
+Второй файл содержит только `LLM_*` и имеет приоритет над первым. Если все настройки модели записаны непосредственно в `.env.deploy`, уберите `--env-file .env.llm`. Изменение файла на ноутбуке не меняет серверный файл. Не публикуйте файлы с ключами. Команды предполагают уже собранный backend с поддержкой соответствующих параметров; после обновления кода сначала выполните обычное обновление со сборкой.
 
 ## Локальный Ollama
 
