@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
 
+from app.assistant.router import router as assistant_router
 from app.analytics.router import router as analytics_router
 from app.applications.router import router as applications_router
 from app.companies.router import router as companies_router
@@ -44,6 +45,7 @@ app = FastAPI(
     dependencies=[Depends(require_csrf)],
     responses={status: {"model": ErrorOutput} for status in (401, 403, 422, 500, 503)},
 )
+app.include_router(assistant_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(products_router, prefix="/api/v1")

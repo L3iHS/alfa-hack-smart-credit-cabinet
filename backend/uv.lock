@@ -759,6 +759,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "pillow" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pwdlib", extra = ["argon2"] },
@@ -783,7 +784,6 @@ ml = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
 ]
 
@@ -792,6 +792,7 @@ requires-dist = [
     { name = "alembic", specifier = "==1.15.2" },
     { name = "catboost", marker = "extra == 'ml'", specifier = "==1.2.8" },
     { name = "fastapi", specifier = "==0.151.0" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "joblib", marker = "extra == 'ml'", specifier = "==1.5.2" },
     { name = "matplotlib", marker = "extra == 'ml'", specifier = "==3.10.7" },
     { name = "numpy", marker = "extra == 'ml'", specifier = "==2.2.6" },
@@ -811,10 +812,7 @@ requires-dist = [
 provides-extras = ["ml"]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "httpx", specifier = "==0.28.1" },
-    { name = "pytest", specifier = "==8.3.5" },
-]
+dev = [{ name = "pytest", specifier = "==8.3.5" }]
 
 [[package]]
 name = "sqlalchemy"
