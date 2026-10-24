@@ -78,10 +78,15 @@ def build_application_context(db: Session, user: User, application_id: uuid.UUID
             add(f'clarification:{item.id}', 'Открытый запрос уточнений', {
                 'message': item.message, 'requested_fields': item.requested_fields,
                 'requested_document_types': item.requested_document_types})
-    for item in output.offers:
-        if output.status == 'counteroffer' and item.status == 'active' and item.revision_id == revision_id:
-            add(f'offer:{item.id}', 'Действующее предложение', item.model_dump(exclude={
-                'responded_at', 'decline_reason', 'created_at'}))
+    offer_status = {'counteroffer': 'active', 'approved': 'accepted'}.get(output.status)
+    offers = [item for item in output.offers if item.status == offer_status and item.revision_id == revision_id]
+    if offer_status == 'accepted' and offers:
+        # Согласованные условия выбираются одинаково для клиентского чата и сводки.
+        offers = [max(offers, key=lambda item: (item.application_version, item.created_at))]
+    for item in offers:
+        title = 'Согласованные условия: принятое предложение' if item.status == 'accepted' else 'Действующее предложение'
+        add(f'offer:{item.id}', title, item.model_dump(exclude={
+            'responded_at', 'decline_reason', 'created_at'}))
     return ApplicationContext(application.id, output.version, output.catalog_version, sources, output.product_code, output.status)
 
 

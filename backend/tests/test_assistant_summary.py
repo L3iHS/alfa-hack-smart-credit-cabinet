@@ -12,7 +12,7 @@ from app.auth.models import AuthSession, User
 from app.core.db import SessionLocal
 from app.processing.models import Offer
 from test_application_drafts import authenticate, create
-from test_assistant_chat import fake
+from test_assistant_chat import chat, fake
 from test_auth import csrf
 from test_processing import prepared, process
 
@@ -232,30 +232,83 @@ def test_existing_assistant_routes_remain_compatible(client, fake):
     assert client.post('/api/v1/intake', json={'text': 'Нужны деньги'}, headers=headers).status_code == 404
 
 
-def test_accepted_offer_is_current_agreed_terms_with_its_own_risk(client, fake):
+def accepted_offer(client):
     from test_review import command
-    headers, current, _ = ready(client)
-    made = command(client, headers, f"/api/v1/applications/{current['id']}/offers", {
-        'expected_version': current['version'], 'amount_kopecks': 10000000,
-        'term_months': current['term_months'], 'reason': 'Проверенное предложение', 'risk_acknowledged': True})
+    headers, original, submitted = ready(client)
+    made = command(client, headers, f"/api/v1/applications/{original['id']}/offers", {
+        'expected_version': original['version'], 'amount_kopecks': 10000000,
+        'term_months': original['term_months'] + 6, 'reason': 'Проверенное предложение', 'risk_acknowledged': True})
     assert made.status_code == 201, made.text
     offer = made.json()['offer']
     client_headers = authenticate(client, 'demo-d@example.test')
-    current = client.get(f"/api/v1/applications/{current['id']}").json()
+    current = client.get(f"/api/v1/applications/{original['id']}").json()
     accepted = command(client, client_headers, f"/api/v1/offers/{offer['id']}/accept", {
         'expected_version': current['version'], 'offer_version': offer['version']})
     assert accepted.status_code == 200, accepted.text
-    current = client.get(f"/api/v1/applications/{current['id']}").json()
+    current = client.get(f"/api/v1/applications/{original['id']}").json()
+    return client_headers, current, original, offer, submitted
+
+
+def test_accepted_offer_is_shared_by_client_chat_and_summary_with_its_own_risk(client, db, fake):
+    headers, current, original, offer, submitted = accepted_offer(client)
+    assert (current['amount_kopecks'], current['term_months']) == (original['amount_kopecks'], original['term_months'])
+    assert (offer['amount_kopecks'], offer['term_months']) != (original['amount_kopecks'], original['term_months'])
+    response = chat(client, headers, current, question='Какую сумму и срок я запросил и какие условия согласованы?')
+    assert response.status_code == 200, response.text
+    sources = json.loads(fake.calls[-1][1])['sources']
+    offer_sources = [source for source in sources if ':offer:' in source['id']]
+    assert len(offer_sources) == 1
+    agreed = offer_sources[0]
+    agreed_data = json.loads(agreed['text'])
+    assert agreed['title'] == 'Согласованные условия: принятое предложение'
+    assert agreed['version'] == str(current['version'])
+    assert agreed_data['status'] == 'accepted' and agreed_data['version'] == offer['version'] + 1
+    assert (agreed_data['amount_kopecks'], agreed_data['term_months']) == (10000000, original['term_months'] + 6)
+    requested = json.loads(next(source['text'] for source in sources if source['id'].endswith(':request')))
+    assert (requested['amount_kopecks'], requested['term_months']) == (original['amount_kopecks'], original['term_months'])
+    assert 'probability' not in str(sources) and 'risk_assessment_id' not in str(sources)
+
     headers = authenticate(client, 'staff@example.test')
     response = summary(client, headers, current)
     assert response.status_code == 200, response.text
+    sources = json.loads(fake.calls[-1][1])['sources']
+    assert [source for source in sources if ':offer:' in source['id']] == [agreed]
     data = facts(fake)
     assert data['state']['status'] == 'approved'
+    risk = data['offered_terms']['data']
     assert data['offered_terms']['status'] == 'succeeded'
-    assert data['offered_terms']['data']['terms']['amount_kopecks'] == offer['amount_kopecks']
-    assert data['requested_terms']['data']['terms']['amount_kopecks'] == current['amount_kopecks']
-    offer_sources = [source for source in json.loads(fake.calls[-1][1])['sources'] if ':offer:' in source['id']]
-    assert len(offer_sources) == 1 and json.loads(offer_sources[0]['text'])['status'] == 'accepted'
+    assert risk['assessment_id'] == str(db.get(Offer, uuid.UUID(offer['id'])).risk_assessment_id)
+    assert risk['revision_id'] == submitted['revision_id'] and risk['processing_run_id'] == submitted['processing_run_id']
+    assert risk['offer_version'] == offer['version']
+    assert (risk['terms']['amount_kopecks'], risk['terms']['term_months']) == (offer['amount_kopecks'], offer['term_months'])
+    assert (data['requested_terms']['data']['terms']['amount_kopecks'], data['requested_terms']['data']['terms']['term_months']) == (original['amount_kopecks'], original['term_months'])
+
+
+@pytest.mark.parametrize('offer_status,application_status,previous_revision', [
+    ('declined', 'approved', False), ('superseded', 'approved', False),
+    ('active', 'approved', False), ('accepted', 'counteroffer', False),
+    ('accepted', 'manual_review', False), ('accepted', 'approved', True),
+    ('active', 'counteroffer', True),
+])
+def test_noncurrent_offers_are_excluded_from_both_consumers(client, db, fake, offer_status, application_status, previous_revision):
+    headers, current, _, offer, _ = accepted_offer(client)
+    row = db.get(Offer, uuid.UUID(offer['id']))
+    row.status = offer_status
+    if previous_revision:
+        latest = db.get(ApplicationRevision, row.revision_id)
+        previous = ApplicationRevision(application_id=latest.application_id, application_version=latest.application_version - 1,
+            submitted_by=latest.submitted_by, created_at=latest.created_at, snapshot=latest.snapshot)
+        db.add(previous)
+        db.flush()
+        row.revision_id = previous.id
+    db.execute(update(Application).where(Application.id == uuid.UUID(current['id'])).values(status=application_status))
+    db.commit()
+    assert chat(client, headers, current, question='Какие условия предложения действуют по моей заявке?').status_code == 200
+    assert not any(':offer:' in source['id'] for source in json.loads(fake.calls[-1][1])['sources'])
+    headers = authenticate(client, 'staff@example.test')
+    assert summary(client, headers, current).status_code == 200
+    assert not any(':offer:' in source['id'] for source in json.loads(fake.calls[-1][1])['sources'])
+    assert facts(fake)['offered_terms']['status'] == 'missing'
 
 
 def test_current_open_clarification_and_missing_finances_are_explicit(client, fake):
