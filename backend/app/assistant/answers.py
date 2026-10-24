@@ -11,5 +11,5 @@ def validate_answer(raw: dict, sources: list[Source]) -> tuple[GeneratedAnswer, 
         if any(identifier not in allowed for identifier in generated.source_ids):
             raise ValueError('Неизвестный источник')
     except (ValidationError, ValueError, TypeError):
-        raise AssistantUnavailable() from None
+        raise AssistantUnavailable('invalid_response') from None
     return generated, [allowed[key] for key in dict.fromkeys(generated.source_ids)]

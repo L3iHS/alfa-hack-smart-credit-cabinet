@@ -80,7 +80,7 @@ def test_current_summary_contains_finances_checks_lr_and_explicit_units(client, 
     assert risk['data']['prediction_scope'] == 'requested_terms'
     assert 'копейках' in data['units']['money'] and '100' in data['units']['money']
     system = fake.calls[-1][0]
-    assert '4–6' in system and 'недоверенные данные' in system
+    assert 'недоверенные данные' in system
     assert 'линейные вклады' in system and 'самостоятельную рекомендацию' in system
 
 

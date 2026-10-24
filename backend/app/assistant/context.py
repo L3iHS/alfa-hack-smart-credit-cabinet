@@ -2,7 +2,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException, Request
 from sqlalchemy.orm import Session
@@ -45,6 +45,10 @@ def version_conflict():
 
 def _date_text(value):
     if isinstance(value, datetime):
+        # В справочных источниках используем московское время кабинета, а не UTC из БД.
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone(timedelta(hours=3)))
+            return value.strftime('%d.%m.%Y %H:%M МСК')
         return value.strftime('%d.%m.%Y %H:%M')
     if isinstance(value, date):
         return value.strftime('%d.%m.%Y')

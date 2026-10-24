@@ -1,8 +1,20 @@
 import json
+from datetime import date, datetime, timezone
 
 import pytest
 
 from app.core.config import Settings
+
+
+@pytest.mark.parametrize('value,expected', [
+    (datetime(2026, 10, 24, 17, 36, tzinfo=timezone.utc), '24.10.2026 20:36 МСК'),
+    (datetime(2026, 10, 24, 23, 45, tzinfo=timezone.utc), '25.10.2026 02:45 МСК'),
+    (date(2026, 10, 24), '24.10.2026'),
+    (datetime(2026, 10, 24, 20, 36), '24.10.2026 20:36'),
+])
+def test_source_dates_match_moscow_cabinet_time(value, expected):
+    from app.assistant.context import _date_text
+    assert _date_text(value) == expected
 
 
 @pytest.mark.parametrize('value,expected', [('', None), ('false', False), ('true', True)])

@@ -1,4 +1,5 @@
 import json
+import logging
 from threading import BoundedSemaphore
 from typing import Literal, Protocol
 from urllib.parse import urlsplit
@@ -10,6 +11,7 @@ from app.core.config import Settings, settings
 
 _MAX_RESPONSE_BYTES = 128 * 1024
 _slots = BoundedSemaphore(2)
+_logger = logging.getLogger(__name__)
 
 
 DiagnosticCategory = Literal['unavailable', 'invalid_response', 'authentication', 'rate_limit', 'transport']
@@ -20,6 +22,8 @@ class AssistantUnavailable(HTTPException):
         # Только безопасная категория для локальной оценки; HTTP-контракт неизменен.
         self.diagnostic_category = (diagnostic_category if diagnostic_category in
             ('unavailable', 'invalid_response', 'authentication', 'rate_limit', 'transport') else 'unavailable')
+        # Категория помогает диагностировать сбой; ключи, вопросы и ответы в журнал не попадают.
+        _logger.warning('Assistant unavailable: %s', self.diagnostic_category)
         super().__init__(503, {'code': 'assistant_unavailable',
                               'message': 'Помощник временно недоступен. Продолжите заполнение формы или повторите позже.'})
 

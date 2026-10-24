@@ -10,10 +10,13 @@ from app.core.config import Settings, settings
 
 
 def configured(**kwargs):
+    # Настройки теста не должны наследовать рабочие ценовые ограничения из окружения.
+    limits = {'llm_polza_max_prompt_rub': 0, 'llm_polza_max_completion_rub': 0}
+    limits.update(kwargs)
     return Settings(_env_file=None, database_url=settings.database_url,
                     demo_password=settings.demo_password, llm_provider='openai',
                     llm_base_url='https://openrouter.ai/api/v1', llm_model='vendor/model:free',
-                    llm_api_key=SecretStr('private-key'), **kwargs)
+                    llm_api_key=SecretStr('private-key'), **limits)
 
 
 def provider(monkeypatch, handler, config=None):
@@ -175,7 +178,7 @@ def test_unsafe_configuration_never_sends_http(monkeypatch, model, url):
     httpx.Response(200, content=b'x' * (128 * 1024 + 1)),
     completion(' {"nested": ' + '[' * 2000 + '0' + ']' * 2000 + '}'),
 ])
-def test_transport_and_json_failures_are_safe_without_retry(monkeypatch, response):
+def test_transport_and_json_failures_are_safe_without_retry(monkeypatch, response, caplog):
     from app.assistant.provider import AssistantUnavailable
     calls = []
 
@@ -187,6 +190,8 @@ def test_transport_and_json_failures_are_safe_without_retry(monkeypatch, respons
         provider(monkeypatch, handler).generate_json(system='s', user='u', schema={})
     assert 'private' not in str(exc.value)
     assert len(calls) == 1
+    assert exc.value.diagnostic_category in caplog.text
+    assert 'private' not in caplog.text
 
 
 def test_timeout_is_safe(monkeypatch):
