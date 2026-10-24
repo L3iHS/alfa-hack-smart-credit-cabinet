@@ -16,7 +16,7 @@ import type {
 import RiskAssessmentPanel from "./RiskAssessmentPanel";
 import PaymentTermsView, { amountLabel } from "./PaymentTermsView";
 import { documentLabels } from "./ApplicationDocuments";
-import { dateTime, money, statusLabels } from "./shared";
+import { dateTime, money } from "./shared";
 import { readStored, useReviewCommand, writeStored } from "./useReviewCommand";
 
 import { useVisibleObservation, viewOffer } from "../analytics/observations";
@@ -414,7 +414,7 @@ export default function ReviewActions({
               </tr>
             </tbody>
           </table>
-          <PaymentTermsView terms={offer.payment_terms} />
+          <PaymentTermsView terms={offer.payment_terms} collapseAssumptions />
         </div>
       )}
       {!staff && can("respond_information") && (
@@ -716,11 +716,6 @@ export default function ReviewActions({
               </p>
             ))}
         </details>
-      )}
-      {staff && item.available_actions.length === 0 && (
-        <p className="muted">
-          {statusLabels[item.status]}. Доступных команд сейчас нет
-        </p>
       )}
     </section>
   );

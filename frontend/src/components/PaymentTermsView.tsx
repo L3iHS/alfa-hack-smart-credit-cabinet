@@ -6,6 +6,8 @@ export function amountLabel(kind: PaymentTerms["payment_kind"]) {
 }
 
 export default function PaymentTermsView({ terms, collapseAssumptions = false }: { terms: PaymentTerms; collapseAssumptions?: boolean }) {
+  const assumptions = terms.assumptions.map(text => text === 'Исторические аннуитетные условия восстановлены из сохранённого предложения без пересчёта.'
+    ? 'Показаны условия на дату предложения. Повторный расчёт не выполнялся.' : text);
   const guarantee = terms.payment_kind === "guarantee";
   const revolving = terms.payment_kind === "revolving";
   return (
@@ -28,9 +30,9 @@ export default function PaymentTermsView({ terms, collapseAssumptions = false }:
       </dl>
       {revolving && <p className="muted">Расчётная нагрузка включает резерв возврата лимита для оценки заявки. Это не ежемесячный платёж.</p>}
       {guarantee && <p className="muted">При выплате по гарантии может возникнуть обязанность возместить её сумму.</p>}
-      {terms.assumptions.length > 0 && (collapseAssumptions
-        ? <details className="payment-assumptions-details"><summary>Как рассчитаны условия</summary><ul className="payment-assumptions">{terms.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul></details>
-        : <ul className="payment-assumptions">{terms.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul>)}
+      {assumptions.length > 0 && (collapseAssumptions
+        ? <details className="payment-assumptions-details"><summary>Как рассчитаны условия</summary><ul className="payment-assumptions">{assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul></details>
+        : <ul className="payment-assumptions">{assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul>)}
     </div>
   );
 }

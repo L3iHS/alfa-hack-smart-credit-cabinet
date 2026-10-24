@@ -1,6 +1,7 @@
+import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
 const password = process.env.DEMO_PASSWORD || 'Demo-credit-2026!';
-const evidence = '../.superpowers/sdd/plan/task-4-evidence';
+const evidence = fileURLToPath(new URL('../../.superpowers/sdd/plan/task-4-evidence', import.meta.url));
 async function login(page: Page, staff = false) {
   await page.goto('/login'); await page.getByLabel('Электронная почта').fill(staff ? 'staff@example.test' : 'client1@example.test');
   await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Войти', exact: true }).click();
@@ -11,6 +12,10 @@ const answer = (version: number | null = null) => ({ status: 'answered', answer:
 async function openIntake(page: Page) { await page.goto('/applications/new'); await page.getByText('Опишите задачу', { exact: true }).click(); await page.getByLabel('Что нужно вашему бизнесу').fill('Купить две печи за 2 млн'); }
 async function analyze(page: Page) { await page.getByRole('button', { name: 'Разобрать описание' }).click(); }
 // Подмена HTTP проверяет поведение интерфейса, а не качество модели.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/assistant/**', route => route.fulfill({ status: 503, json: { code: 'assistant_unavailable', message: 'Помощник временно недоступен' } }));
+  await page.route('**/api/v1/applications/*/summary', route => route.fulfill({ status: 503, json: { code: 'assistant_unavailable', message: 'Помощник временно недоступен' } }));
+});
 test('intake compares fields applies only on confirmation and preserves null', async ({ page }) => {
   await login(page); await page.route('**/api/v1/assistant/intake', route => route.fulfill({ json: intake() })); await openIntake(page);
   await page.locator('#amount_kopecks').fill('500000'); await page.locator('#term_months').fill('12'); await page.locator('#purpose').fill('Старая цель'); await analyze(page);
@@ -43,10 +48,11 @@ test('unsupported need cannot apply', async ({ page }) => {
 });
 for (const width of [390, 1366]) test(`chat safe sources keyboard layout ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 }); await login(page); await page.route('**/api/v1/assistant/chat', route => route.fulfill({ json: answer() })); const panel = page.locator('.assistant-chat');
-  await panel.getByText('Помощник', { exact: true }).focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Tab'); await expect(panel.getByLabel('Ваш вопрос')).toBeFocused(); expect(await panel.getByLabel('Ваш вопрос').evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  await panel.getByText('Помощник', { exact: true }).focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Tab'); await expect(panel.getByRole('button', { name: 'Закрыть помощника' })).toBeFocused(); await page.keyboard.press('Tab'); await expect(panel.getByLabel('Ваш вопрос')).toBeFocused(); expect(await panel.getByLabel('Ваш вопрос').evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
   await panel.getByLabel('Ваш вопрос').fill('Какое оборудование?'); await panel.getByRole('button', { name: 'Спросить' }).click(); await expect(panel).toContainText('<b>Текст ответа</b>'); await panel.getByText('Источники (2)', { exact: true }).click();
   await expect(panel).toContainText('2 000 000 ₽'); await expect(panel).toContainText('12%'); await expect(panel).toContainText('Нужен счёт на оборудование. <img'); await expect(panel.locator('img, b')).toHaveCount(0); await expect(panel).not.toContainText('secret-uuid'); await expect(panel).not.toContainText('terms_fingerprint');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await panel.screenshot({ path: `${evidence}/chat-${width}.png` });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await panel.getByRole('dialog').screenshot({ path: `${evidence}/chat-${width}.png` });
+  await page.screenshot({ path: `${evidence}/chat-page-${width}.png` });
   await page.goto('/applications/new'); await page.getByText('Опишите задачу', { exact: true }).click(); await page.route('**/api/v1/assistant/intake', route => route.fulfill({ json: intake() })); await page.getByLabel('Что нужно вашему бизнесу').fill('Купить две печи за 2 млн'); await analyze(page); await expect(page.getByRole('button', { name: 'Применить к форме' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.locator('.intake-panel').screenshot({ path: `${evidence}/intake-${width}.png` }); await page.screenshot({ path: `${evidence}/form-page-${width}.png`, fullPage: true });
 });
@@ -72,7 +78,7 @@ test('identity change removes pending and completed intake suggestions', async (
 });
 test('chat unavailable retry malformed and insufficient context remain usable', async ({ page }) => {
   await login(page); const panel = page.locator('.assistant-chat'); await panel.getByText('Помощник', { exact: true }).click(); await panel.getByLabel('Ваш вопрос').fill('Что такое кредит?');
-  // Настоящий disabled-провайдер проверяет деградацию на выделенном стенде.
+  // Ответ недоступного провайдера подменён: UI-проверка не расходует квоту модели.
   await panel.getByRole('button', { name: 'Спросить' }).click(); await expect(panel.getByRole('alert')).toBeVisible();
   await page.route('**/api/v1/assistant/chat', route => route.fulfill({ json: { ...answer(), sources: [null] } })); await panel.getByRole('button', { name: 'Спросить' }).click(); await expect(panel).toContainText('Не удалось прочитать ответ помощника');
   await page.route('**/api/v1/assistant/chat', route => route.fulfill({ json: { ...answer(), status: 'insufficient_context', sources: [], model: null, answer: 'В доступных сведениях нет ответа' } })); await panel.getByRole('button', { name: 'Спросить' }).click(); await expect(panel).toContainText('В доступных сведениях нет ответа'); await expect(panel.locator('.assistant-sources')).toHaveCount(0);
@@ -88,4 +94,41 @@ test('chat discards in-flight response after question change or navigation', asy
   await login(page); let release: (() => void) | undefined; await page.route('**/api/v1/assistant/chat', async route => { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: answer() }).catch(() => {}); });
   const panel = page.locator('.assistant-chat'); await panel.getByText('Помощник', { exact: true }).click(); await panel.getByLabel('Ваш вопрос').fill('Старый вопрос'); await panel.getByRole('button', { name: 'Спросить' }).click(); await expect.poll(() => Boolean(release)).toBe(true); await panel.getByLabel('Ваш вопрос').fill('Новый вопрос'); release!(); await page.waitForTimeout(100); await expect(panel).not.toContainText('подходит кредит');
   release = undefined; await panel.getByRole('button', { name: 'Спросить' }).click(); await expect.poll(() => Boolean(release)).toBe(true); await page.goto('/applications/new'); release!(); await page.goto('/applications'); await expect(page.locator('.assistant-chat')).not.toContainText('подходит кредит');
+});
+
+for (const width of [390, 1366]) test(`floating assistant stays inside viewport and closes with Escape ${width}`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 800 }); await login(page);
+  const panel = page.locator('.assistant-chat');
+  expect(await panel.evaluate(element => getComputedStyle(element).position)).toBe('fixed');
+  await panel.getByText('Помощник', { exact: true }).click();
+  const dialog = panel.getByRole('dialog'); await expect(dialog).toBeVisible();
+  const box = await dialog.boundingBox(); expect(box).not.toBeNull();
+  expect(box!.height).toBeLessThanOrEqual(600);
+  expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+  await panel.getByLabel('Ваш вопрос').fill('Как выбрать продукт?');
+  await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible();
+  await expect(panel.locator('.assistant-launcher')).toBeFocused();
+  await page.keyboard.press('Enter'); await expect(dialog).toBeVisible();
+  await expect(panel.getByLabel('Ваш вопрос')).toHaveValue('Как выбрать продукт?');
+  await panel.getByRole('button', { name: 'Закрыть помощника' }).click(); await expect(dialog).not.toBeVisible();
+});
+
+test('staff summary error has its own full-width row and clear wording', async ({ page }) => {
+  await login(page); await page.goto('/applications/new'); await page.getByRole('button', { name: 'Сохранить черновик' }).click();
+  await expect(page).toHaveURL(/\/applications\/[a-f0-9-]+$/); const id = page.url().split('/').at(-1)!;
+  const original = await (await page.request.get(`/api/v1/applications/${id}`)).json();
+  await page.getByRole('button', { name: 'Выйти' }).click(); await login(page, true);
+  await page.route(`**/api/v1/applications/${id}`, route => route.fulfill({ json: { ...original, status: 'approved', available_actions: [] } }));
+  await page.route(`**/api/v1/applications/${id}/assessment`, route => route.fulfill({ json: { application_id: id, revision_id: null, runs: [], risk_assessment: null } }));
+  await page.goto(`/staff/applications/${id}`);
+  const panel = page.locator('.staff-summary'); const button = panel.getByRole('button', { name: 'Сформировать сводку' });
+  await button.click(); const alert = panel.getByRole('alert'); await expect(alert).toBeVisible();
+  const actionBox = await button.boundingBox(); const errorBox = await alert.boundingBox();
+  expect(errorBox!.y - actionBox!.y - actionBox!.height).toBeGreaterThanOrEqual(12);
+  expect(errorBox!.x + errorBox!.width).toBeGreaterThanOrEqual(actionBox!.x + actionBox!.width - 1);
+  await expect(page.getByText('Доступных команд сейчас нет', { exact: false })).toHaveCount(0);
+  await expect(alert).not.toContainText('..'); await expect(alert).not.toContainText('заполнение формы');
+  await panel.screenshot({ path: `${evidence}/staff-summary-error.png` });
 });

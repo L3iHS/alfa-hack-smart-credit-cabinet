@@ -436,3 +436,14 @@ for (const status of [503, 429]) {
     await expect(page.getByText(`Сохранение после CSRF ${status}`, {exact: true})).toBeVisible();
   });
 }
+
+for (const width of [390, 1366]) test(`counteroffer count shares heading row ${width}`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 850 }); await login(page); await page.goto('/staff/analytics');
+  const section = page.locator('.analytics-offers');
+  const count = section.locator('.analytics-total'); await expect(count).toBeVisible();
+  const title = section.getByRole('heading', { name: 'Контрпредложения', exact: true });
+  const a = await title.boundingBox(); const b = await count.boundingBox();
+  expect(Math.abs(a!.y + a!.height / 2 - b!.y - b!.height / 2)).toBeLessThan(6);
+  await expect(section).not.toContainText('Запрошенные и предложенные условия');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

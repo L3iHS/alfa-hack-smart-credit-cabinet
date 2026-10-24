@@ -83,7 +83,7 @@ export function useAssistantRequest<T>(scope: string) {
       const result = await request(abort.signal);
       if (valid()) setState({ scope, result, busy: false });
     } catch (error) {
-      if (valid()) setState({ scope, error: error instanceof ApiError && error.status === 409 ? 'Заявка изменилась. Дождитесь обновления данных и повторите запрос' : error instanceof Error ? error.message : 'Помощник временно недоступен. Попробуйте позже', busy: false });
+      if (valid()) setState({ scope, error: error instanceof ApiError && error.status === 409 ? 'Заявка изменилась. Дождитесь обновления данных и повторите запрос' : error instanceof ApiError && error.status === 503 ? 'Помощник временно недоступен. Попробуйте позже' : error instanceof Error ? error.message.replace(/[.!?…]+\s*$/u, '') : 'Помощник временно недоступен. Попробуйте позже', busy: false });
     }
   }
   return { busy: state?.scope === scope ? state.busy : false, result: state?.scope === scope ? state.result : undefined, error: state?.scope === scope ? state.error : undefined, run };

@@ -173,7 +173,7 @@ test("offer_compare_and_stale_conflict_preserve_form", async ({ page }) => {
           principal_due_at_end_kopecks: 0, last_payment_kopecks: 6500000,
           total_payment_kopecks: 117000000, total_cost_kopecks: 27000000,
           assessment_monthly_burden_kopecks: 6500000,
-          contingent_liability_kopecks: 0, assumptions: [],
+          contingent_liability_kopecks: 0, assumptions: ['Исторические аннуитетные условия восстановлены из сохранённого предложения без пересчёта.'],
         },
         reason: "Допустимая нагрузка",
         created_at: new Date().toISOString(),
@@ -192,6 +192,12 @@ test("offer_compare_and_stale_conflict_preserve_form", async ({ page }) => {
   await page.goto(`/applications/${id}`);
   await page.setViewportSize({ width: 320, height: 844 });
   await expect(page.getByRole("table")).toBeVisible();
+  const calculationNote = page.getByText('Показаны условия на дату предложения. Повторный расчёт не выполнялся.', { exact: true });
+  await expect(calculationNote).not.toBeVisible();
+  await page.getByText('Как рассчитаны условия', { exact: true }).click();
+  await expect(calculationNote).toBeVisible();
+  await expect(page.getByText('Исторические аннуитетные условия', { exact: false })).toHaveCount(0);
+
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(320);
