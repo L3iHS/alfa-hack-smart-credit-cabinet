@@ -29,7 +29,12 @@ for (const width of [390, 1366]) test(`assistant exchanges launcher for compact 
   await expect(dialog.getByRole('heading')).toBeFocused();
   await page.keyboard.press('Tab'); await expect(dialog.getByRole('button', { name: 'Закрыть помощника' })).toBeFocused();
   const input = dialog.getByLabel('Ваш вопрос');
+  const submit = dialog.getByRole('button', { name: 'Спросить', exact: true });
+  await expect(submit).toBeDisabled();
+  await expect(submit).toHaveCSS('cursor', 'default');
   await input.fill('Как выбрать финансирование?');
+  await expect(submit).toBeEnabled();
+  await expect(submit).toHaveCSS('cursor', 'pointer');
   expect(await input.evaluate(element => getComputedStyle(element).resize)).toBe('none');
   const box = await dialog.boundingBox();
   expect(box!.height).toBeLessThanOrEqual(600);
