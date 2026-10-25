@@ -90,10 +90,23 @@ class AnswerOutput(AssistantSchema):
     application_version: int | None
 
 
+class ChatExchange(AssistantSchema):
+    question: str = Field(min_length=1, max_length=2000)
+    answer: str = Field(min_length=1, max_length=6000)
+
+    @field_validator('question', 'answer')
+    @classmethod
+    def text_is_not_blank(cls, value):
+        if not value.strip():
+            raise ValueError('Реплика истории не может быть пустой')
+        return value
+
+
 class ChatInput(AssistantSchema):
     question: str = Field(min_length=1, max_length=2000)
     application_id: uuid.UUID | None = Field(default=None, strict=False)
     expected_version: Annotated[StrictInt, Field(ge=1, le=2_147_483_647)] | None = None
+    history: list[ChatExchange] = Field(default_factory=list, max_length=6)
 
     @field_validator('question')
     @classmethod
@@ -106,6 +119,10 @@ class ChatInput(AssistantSchema):
     def application_requires_version(self):
         if (self.application_id is None) != (self.expected_version is None):
             raise ValueError('Укажите заявку вместе с её версией')
+        if self.history and self.application_id is None:
+            raise ValueError('История доступна только вместе с заявкой и её версией')
+        if sum(len(item.question) + len(item.answer) for item in self.history) > 12000:
+            raise ValueError('История не должна превышать 12000 символов')
         return self
 
 

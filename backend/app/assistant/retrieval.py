@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.assistant.knowledge import build_knowledge
-from app.assistant.schemas import Source
+from app.assistant.schemas import ChatExchange, Source
 
 # Из полного вопроса выбираем известный предмет поиска вместо AND по всей фразе.
 _SYNONYMS = (
@@ -15,6 +15,33 @@ _SYNONYMS = (
     (r'инвестици|долгосрочн|развити\w*\s+бизнес', 'инвестиционный'),
     (r'тендер|гаранти', 'тендерная гарантия'),
 )
+
+# Только короткие продолжения наследуют предмет. Произвольный новый вопрос
+# (в том числе посторонний) не объединяется с прошлыми вопросами автоматически.
+_FOLLOWUP = re.compile(
+    r'(?:(?:а|и)\s+)?(?:почему(?:\s+(?:так|ты\s+так\s+считаешь|вы\s+так\s+считаете))?|'
+    r'что\s+это\s+значит|(?:можешь|можете)\s+подробнее(?:\s+об\s+этом)?|'
+    r'подробнее|поподробнее|объясни(?:те)?(?:\s+подробнее)?|'
+    r'расскажи(?:те)?\s+подробнее|что\s+(?:дальше|теперь)|что\s+делать(?:\s+дальше)?|'
+    r'(?:какие\s+)?документы(?:\s+ещ[её])?(?:\s+нужны)?|'
+    r'(?:какие\s+)?условия|(?:какой\s+)?срок|(?:какая\s+)?(?:сумма|ставка)|'
+    r'что\s+(?:с\s+)?(?:документами|условиями|суммой|сроком|дальнейшими\s+действиями))',
+    re.IGNORECASE,
+)
+
+
+def dialog_question(question: str, history: list[ChatExchange]) -> str:
+    """Предмет ближайшего вопроса для одного поиска; старые ответы не участвуют."""
+    def continuation(value):
+        return _FOLLOWUP.fullmatch(re.sub(r'[^\w\s]', '', value).strip()) is not None
+
+    if continuation(question):
+        for exchange in reversed(history):
+            if not continuation(exchange.question):
+                # Первый самостоятельный вопрос ограничивает текущую тему,
+                # даже когда он посторонний. Не перескакиваем через него назад.
+                return f'{exchange.question}\n{question}'
+    return question
 
 
 def retrieve(db: Session, question: str, catalog_version: str, limit: int = 5) -> list[Source]:

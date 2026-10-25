@@ -78,7 +78,7 @@ def build_application_context(db: Session, user: User, application_id: uuid.UUID
         'public_reasons': output.public_reasons, 'available_actions': output.available_actions,
         'processing_status': output.processing_status})
     for item in output.information_requests:
-        if item.status == 'open' and item.revision_id == revision_id:
+        if output.status != 'withdrawn' and item.status == 'open' and item.revision_id == revision_id:
             add(f'clarification:{item.id}', 'Открытый запрос уточнений', {
                 'message': item.message, 'requested_fields': item.requested_fields,
                 'requested_document_types': item.requested_document_types})
