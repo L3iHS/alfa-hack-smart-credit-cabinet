@@ -4,7 +4,6 @@ import { api, ApiError, errorMessage } from "../api/client";
 import type {
   Application,
   Catalog,
-  Company,
   DraftFields,
   FormValues,
   Product,
@@ -82,12 +81,11 @@ function monthDate(value: string, end: boolean) {
 export default function ApplicationFormPage() {
   const { id } = useParams();
   const { data, error, reload } = useResource(async () => {
-    const [catalog, company, application] = await Promise.all([
+    const [catalog, application] = await Promise.all([
       api<Catalog>("/products"),
-      api<Company>("/company"),
       id ? api<Application>(`/applications/${id}`) : Promise.resolve(null),
     ]);
-    return { catalog, company, application };
+    return { catalog, application };
   }, id || "new");
   if (error) return <ErrorPanel error={error} retry={reload} />;
   if (!data) return <Loading />;
@@ -114,11 +112,9 @@ export default function ApplicationFormPage() {
 }
 function DraftEditor({
   catalog,
-  company,
   application,
 }: {
   catalog: Catalog;
-  company: Company;
   application: Application | null;
 }) {
   const { user, recovery } = useSession();
@@ -145,6 +141,7 @@ function DraftEditor({
   const [conflict, setConflict] = useState(false);
   const [reloadError, setReloadError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [selectionOpened, setSelectionOpened] = useState(false);
   const product = catalog.items.find(
     (item) => item.code === values.product_code,
   )!;
@@ -352,6 +349,7 @@ function DraftEditor({
       <form onSubmit={save} noValidate>
         <div className="form-layout">
           <div className="form-main">
+            <IntakePanel catalog={catalog} values={values} owner={user!.id} applicationKey={`${record?.id || 'new'}:${record?.version || 0}`} productLocked={record?.status === "needs_info"} onApply={applyIntake} />
             <section className="panel form-panel" ref={termsRef}>
               <h2>Выбор продукта</h2>
               <fieldset className="product-options">
@@ -394,6 +392,13 @@ function DraftEditor({
                   maxLength: 3,
                 })}
               </div>
+              {(!record || record.status === "draft") && (
+                <details className="product-selection-help" onToggle={event => { if (event.currentTarget.open) setSelectionOpened(true); }}>
+                  <summary>Помочь выбрать</summary>
+                  <p className="selection-hint">Укажите сумму и срок выше. Для сравнения доступных условий заполните финансы компании ниже. Подбор запускается только по кнопке.</p>
+                  {selectionOpened && <RecommendationPanel form={values} onApply={applyRecommendation} />}
+                </details>
+              )}
               {field("purpose", "Цель финансирования", {
                 hint: "Например, закупка сырья или покупка оборудования",
                 maxLength: 2000,
@@ -428,7 +433,6 @@ function DraftEditor({
                 </small>
               </label>
             </section>
-            <IntakePanel catalog={catalog} values={values} owner={user!.id} applicationKey={`${record?.id || 'new'}:${record?.version || 0}`} productLocked={record?.status === "needs_info"} onApply={applyIntake} />
             <section className="panel form-panel" ref={financesRef}>
               <h2>Финансы компании</h2>
               <p className="section-description">
@@ -481,9 +485,6 @@ function DraftEditor({
                 },
               )}
             </section>
-        {(!record || record.status === "draft") && (
-          <RecommendationPanel form={values} onApply={applyRecommendation} />
-        )}
           </div>
           <aside className="form-aside">
             <section className="panel terms-panel">
@@ -520,12 +521,6 @@ function DraftEditor({
                   <dd>{(product.upfront_fee_bps / 100).toLocaleString("ru-RU")}% {product.payment_kind === "guarantee" ? "от суммы гарантии" : product.payment_kind === "revolving" ? "от лимита" : "от суммы"}</dd>
                 </div>}
               </dl>
-            </section>
-            <section className="company-summary">
-              <h3>{company.name}</h3>
-              <p>ИНН {company.inn}</p>
-              <p>{company.industry}</p>
-              <span>Компания определена по вашей учётной записи</span>
             </section>
           </aside>
         </div>

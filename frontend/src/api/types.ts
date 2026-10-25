@@ -145,6 +145,7 @@ export interface DraftFields {
 }
 export interface Application extends DraftFields {
   id: string;
+  display_number: string;
   version: number;
   status: ApplicationStatus;
   updated_at: string;

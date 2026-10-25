@@ -584,7 +584,7 @@ test("real_information_working_copy_and_extra_document_wait_for_explicit_respons
       .getByRole("button", { name: "Отправить ответ", exact: true })
       .click();
     await expect(page.locator(".page-heading .status")).toHaveText(
-      "На рассмотрении сотрудника",
+      "На рассмотрении",
       { timeout: 10000 },
     );
     await page.getByText("Отправленные ответы", { exact: true }).click();
@@ -597,7 +597,7 @@ test("real_information_working_copy_and_extra_document_wait_for_explicit_respons
       page.getByRole("button", { name: "Удалить extra.png", exact: true }),
     ).toHaveCount(0);
     await expect(staff.locator(".page-heading .status")).toHaveText(
-      "На рассмотрении сотрудника",
+      "На рассмотрении",
       { timeout: 10000 },
     );
     await staff.getByText("Отправленные ответы", { exact: true }).click();

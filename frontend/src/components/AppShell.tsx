@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useSession } from "../auth/session";
 import { api, errorMessage } from "../api/client";
 import type { Company } from "../api/types";
@@ -20,24 +20,15 @@ export function Brand() {
 export default function AppShell() {
   const { user, logout } = useSession();
   const staff = user?.role === "staff";
-  const { pathname } = useLocation();
-  const listPath = staff ? "/staff/applications" : "/applications";
-  const editMatch = pathname.match(/^\/applications\/([^/]+)\/edit$/);
-  const backPath = editMatch ? `/applications/${editMatch[1]}` : listPath;
-  const showBack = pathname !== listPath;
-  const backLabel = editMatch
-    ? "К заявке"
-    : staff
-      ? "Заявки"
-      : "Мои заявки";
   const company = useResource(
     () => (staff ? Promise.resolve(null) : api<Company>("/company")),
     user!.id,
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   return (
-    <div className={`shell${showBack ? " shell-inner" : ""}`}>
+    <div className="shell">
       <a className="skip-link" href="#content">
         К содержимому
       </a>
@@ -62,16 +53,8 @@ export default function AppShell() {
           </NavLink>
         {staff && <NavLink to="/staff/analytics"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20V12h4v8M10 20V8h4v12M16 20V4h4v16" stroke="currentColor" strokeWidth="1.6" /></svg>Аналитика</NavLink>}
         </nav>
-      </aside>
-      <div className="workspace">
-        <header className="topbar">
-          {showBack && (
-            <Link className="back-link" to={backPath} aria-label={backLabel}>
-              <span aria-hidden="true">‹</span>
-              <span className="back-label">{backLabel}</span>
-            </Link>
-          )}
-          <div className="account-menu">
+        <button className="mobile-account-toggle" aria-expanded={accountOpen} aria-controls="cabinet-account" onClick={() => setAccountOpen(value => !value)}>Аккаунт</button>
+          <div id="cabinet-account" className={`account-menu${accountOpen ? " account-open" : ""}`}>
             <div className="company-avatar" aria-hidden="true">
               {staff ? "Б" : "К"}
             </div>
@@ -114,7 +97,8 @@ export default function AppShell() {
               </svg>
             </button>
           </div>
-        </header>
+      </aside>
+      <div className="workspace">
         <main id="content" tabIndex={-1}>
           <RouteFocus />
           {error && (

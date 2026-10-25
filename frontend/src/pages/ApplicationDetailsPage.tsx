@@ -17,6 +17,7 @@ import type {
   SubmissionPolicy,
 } from "../api/types";
 import {
+  ApplicationNumber,
   date,
   dateTime,
   ErrorPanel,
@@ -136,7 +137,7 @@ function Details({
     <>
       <PageHeading
         title={product?.name || "Кредитная заявка"}
-        subtitle={`Заявка № ${item.id.slice(0, 8)} · ${dateTime(item.updated_at)}`}
+        metadata={<><ApplicationNumber number={item.display_number} /><time dateTime={item.updated_at}>Изменена {dateTime(item.updated_at)}</time></>}
       >
         <Status status={item.status} />
       </PageHeading>
@@ -157,7 +158,7 @@ function Details({
                 </div>
               )}
             <div className="section-top">
-              <h2>{staff ? "Данные заявки" : "Ваша заявка"}</h2>
+              <h2>Запрошенные условия</h2>
               {!locked && item.available_actions.includes("edit_draft") && (
                 <Link
                   className="button secondary edit-draft"

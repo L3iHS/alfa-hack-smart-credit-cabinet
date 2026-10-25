@@ -117,10 +117,10 @@ test("profile_A_equipment_approves_and_staff_sees_calculation", async ({ page, b
 
 test("profile_B_client_accepts_staff_offer_after_risk_review", async ({ page, browser }) => {
   const { id } = await createAndSubmit(page, "b");
-  await status(page, "На рассмотрении сотрудника");
+  await status(page, "На рассмотрении");
   const staff = await staffPage(browser, id);
   await staffOffer(staff.page, "2342000", "24");
-  await status(page, "Предложены другие условия");
+  await status(page, "Другие условия");
   await expect(page.getByRole("cell", { name: "2 342 000 ₽", exact: true })).toBeVisible();
   await expect(page.getByText("123 824,11 ₽", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Принять условия", exact: true }).click();
@@ -133,13 +133,13 @@ test("profile_B_client_accepts_staff_offer_after_risk_review", async ({ page, br
 
 test("profile_B_decline_returns_to_staff_then_staff_rejects", async ({ page, browser }) => {
   const { id } = await createAndSubmit(page, "b");
-  await status(page, "На рассмотрении сотрудника");
+  await status(page, "На рассмотрении");
   const offerStaff = await staffPage(browser, id);
   await staffOffer(offerStaff.page, "2342000", "24");
   await offerStaff.context.close();
-  await status(page, "Предложены другие условия");
+  await status(page, "Другие условия");
   await page.getByRole("button", { name: "Отклонить предложение", exact: true }).click();
-  await status(page, "На рассмотрении сотрудника");
+  await status(page, "На рассмотрении");
   const item = await evidence(page, id);
   expect(item.offers.some((o: { status: string }) => o.status === "declined")).toBe(true);
   const staff = await staffPage(browser, id);
@@ -167,7 +167,7 @@ test("profile_C_correction_creates_new_revision_and_keeps_first_run", async ({ p
   expect(answered.status()).toBe(202);
   const newSubmission = await answered.json();
   expect(newSubmission.revision_id).not.toBe(submission.revision_id);
-  await status(page, "На рассмотрении сотрудника");
+  await status(page, "На рассмотрении");
   const staff = await staffPage(browser, id);
   await page.getByText("Отправленные ответы", { exact: true }).click();
   await staff.page.getByText("Отправленные ответы", { exact: true }).click();
@@ -190,7 +190,7 @@ test("profile_C_correction_creates_new_revision_and_keeps_first_run", async ({ p
 
 test("profile_D_short_history_staff_approves", async ({ page, browser }) => {
   const { id } = await createAndSubmit(page, "d");
-  await status(page, "На рассмотрении сотрудника");
+  await status(page, "На рассмотрении");
   const staff = await staffPage(browser, id);
   await staff.page.getByLabel("Основание решения или предложения").fill("Синтетические данные нового бизнеса рассмотрены");
   await staff.page.getByRole("checkbox", { name: "Изучена оценка риска исходных условий", exact: true }).check();
@@ -202,7 +202,7 @@ test("profile_D_short_history_staff_approves", async ({ page, browser }) => {
 
 test("profile_D_staff_requests_document_and_client_explicitly_responds", async ({ page, browser }) => {
   const { id, submission } = await createAndSubmit(page, "d");
-  await status(page, "На рассмотрении сотрудника");
+  await status(page, "На рассмотрении");
   const staff = await staffPage(browser, id);
   await staff.page.getByText("Запросить уточнения", { exact: true }).click();
   await staff.page.getByLabel("Сообщение клиенту").fill("Приложите новые финансовые сведения");
@@ -214,7 +214,7 @@ test("profile_D_staff_requests_document_and_client_explicitly_responds", async (
   await page.getByLabel("Сообщение к ответу").fill("Дополнительные сведения приложены");
   await confirmations(page);
   await page.getByRole("button", { name: "Отправить ответ", exact: true }).click();
-  await status(page, "На рассмотрении сотрудника");
+  await status(page, "На рассмотрении");
   const item = await evidence(page, id);
   expect(item.information_requests[0].status).toBe("answered");
   const assessment = await (await staff.page.request.get(`/api/v1/applications/${id}/assessment`)).json();
@@ -225,10 +225,10 @@ test("profile_D_staff_requests_document_and_client_explicitly_responds", async (
 
 test("profile_D_staff_offer_is_accepted_by_client", async ({ page, browser }) => {
   const { id } = await createAndSubmit(page, "d");
-  await status(page, "На рассмотрении сотрудника");
+  await status(page, "На рассмотрении");
   const staff = await staffPage(browser, id);
   await staffOffer(staff.page, "400000", "12");
-  await status(page, "Предложены другие условия");
+  await status(page, "Другие условия");
   await page.getByRole("button", { name: "Принять условия", exact: true }).click();
   await status(page, "Одобрена");
   await status(staff.page, "Одобрена");

@@ -62,7 +62,7 @@ async function upload(page: Page, label = "Финансовая отчётнос
   await expect(picker.getByText("Файл не выбран", { exact: true })).toBeVisible();
 }
 async function openQueuedApplication(page: Page, id: string) {
-  const row = page.getByRole("link").filter({ hasText: id.slice(0, 8) });
+  const row = page.locator(`.application-title[href="/staff/applications/${id}"]`);
   const next = page.getByRole("button", { name: "Далее", exact: true });
   while (!(await row.isVisible())) {
     await expect
@@ -73,10 +73,10 @@ async function openQueuedApplication(page: Page, id: string) {
       )
       .toBe(true);
     if (await row.isVisible()) break;
-    const first = page.locator(".application-row small").first();
-    const previous = await first.innerText();
+    const first = page.locator(".application-title").first();
+    const previous = await first.getAttribute("href");
     await next.click();
-    await expect(first).not.toHaveText(previous);
+    await expect(first).not.toHaveAttribute("href", previous!);
   }
   await row.click();
 }
@@ -477,7 +477,7 @@ async function submissionEvidence(
     expect(assessment.runs[0].revision_id).toBe(original.revision_id);
     if (checkAuthors) {
       await expect(staff.locator(".page-heading .status")).toHaveText(
-        "На рассмотрении сотрудника",
+        "На рассмотрении",
       );
       await staff
         .getByLabel("Основание решения или предложения")
@@ -579,7 +579,7 @@ test("committed_submit_survives_delayed_response_session_switch_and_has_readable
     .click();
   await expect.poll(() => committed).toBe(true);
   await expect(page.locator(".page-heading .status")).toHaveText(
-    "На рассмотрении сотрудника",
+    "На рассмотрении",
   );
   const original = await page.evaluate(
     (key) => JSON.parse(sessionStorage.getItem(key) || "null"),
@@ -619,7 +619,7 @@ test("committed_submit_survives_delayed_response_session_switch_and_has_readable
   await login(page, "demo-d@example.test");
   await page.goto(`/applications/${id}`);
   await expect(page.locator(".page-heading .status")).toHaveText(
-    "На рассмотрении сотрудника",
+    "На рассмотрении",
   );
   await page
     .getByRole("button", { name: "Повторить отправку", exact: true })
@@ -673,7 +673,7 @@ test("unknown_submit_survives_retry_401_and_reuses_original_submission", async (
     .getByRole("button", { name: "Отправить заявку", exact: true })
     .click();
   await expect(page.locator(".page-heading .status")).toHaveText(
-    "На рассмотрении сотрудника",
+    "На рассмотрении",
   );
   await page
     .getByRole("button", { name: "Повторить отправку", exact: true })

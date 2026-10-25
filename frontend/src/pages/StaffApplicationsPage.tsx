@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { Application, Catalog, PageResult } from "../api/types";
 import {
+  ApplicationNumber,
   ErrorPanel,
   Loading,
   PageHeading,
@@ -47,28 +48,25 @@ export default function StaffApplicationsPage() {
                 <span>Изменена</span>
               </div>
               {data.applications.items.map((item) => (
-                <Link
+                <article
                   className="application-row"
                   key={item.id}
-                  to={`/staff/applications/${item.id}`}
                 >
                   <div>
-                    <strong>
+                    <Link className="application-title" to={`/staff/applications/${item.id}`}><strong>
                       {data.catalog.items.find(
                         (product) => product.code === item.product_code,
                       )?.name || item.product_code}
-                    </strong>
-                    <small>№ {item.id.slice(0, 8)}</small>
+                    </strong></Link>
+                    <ApplicationNumber number={item.display_number} />
                   </div>
                   <span className="amount">{money(item.amount_kopecks)}</span>
                   <Status status={item.status} />
                   <time dateTime={item.updated_at}>
                     {dateTime(item.updated_at)}
                   </time>
-                  <span className="row-chevron" aria-hidden="true">
-                    ›
-                  </span>
-                </Link>
+
+                </article>
               ))}
             </section>
           ) : (

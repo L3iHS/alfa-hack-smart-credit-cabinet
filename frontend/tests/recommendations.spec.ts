@@ -10,6 +10,7 @@ test("recommendation panel applies an equipment offer to the form", async ({ pag
   await expect(page).toHaveURL(/\/applications$/);
 
   await page.goto("/applications/new");
+  await page.getByText("Помочь выбрать", { exact: true }).click();
   const panel = page.locator(".recommendation-panel");
   await expect(panel).toBeVisible();
 

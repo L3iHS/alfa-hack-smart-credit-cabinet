@@ -45,13 +45,13 @@ export default function AssessmentPanel({
             <summary>
               {runLabels[run.status]} · {dateTime(run.created_at)}
             </summary>
-            <p className="muted">
-              {run.revision_id === data.revision_id
-                ? "Текущая отправка"
-                : "Предыдущая отправка"}{" "}
-              {run.revision_id.slice(0, 8)} · Правила {run.policy_version} ·
-              Источник {run.source_version}
-            </p>
+            <p className="muted">{run.revision_id === data.revision_id ? "Текущее рассмотрение" : "Предыдущее рассмотрение"}</p>
+            {run.decision && (
+              <div className="assessment-decision">
+                <h3>Результат рассмотрения</h3>
+                <p className="multiline">{run.decision.internal_reason}</p>
+              </div>
+            )}
             {(run.risk_assessments || []).map((risk) => (
               <RiskAssessmentPanel key={risk.assessment_id} assessment={risk} />
             ))}
@@ -68,8 +68,7 @@ export default function AssessmentPanel({
             )}
             {run.error_code && (
               <div className="notice error">
-                Обработка не завершена: {run.error_code}. Это технический сбой,
-                кредитное решение не принято.
+                Обработка не завершена из-за технического сбоя. Кредитное решение не принято. Код ошибки доступен в технических сведениях.
               </div>
             )}
             <ul className="check-list">
@@ -78,20 +77,18 @@ export default function AssessmentPanel({
                   <strong>
                     {
                       {
-                        registry: "Реестр компаний",
+                        registry: "Проверка компании",
                         tax: "Налоговые сведения",
-                        bki: "БКИ",
+                        bki: "Кредитная история",
                       }[check.kind]
                     }
                   </strong>
-                  <span>Проверка выполнена</span>
                   {"registered_at" in check.data ? (
                     <p>
-                      Дата регистрации: {date(check.data.registered_at)}.
-                      Ликвидация: {check.data.liquidated ? "да" : "нет"}
+                      {check.data.liquidated ? "В реестре указана ликвидация" : "Ликвидация не указана"}. Дата регистрации: {date(check.data.registered_at)}.
                     </p>
                   ) : "overdue_days" in check.data ? (
-                    <p>Просрочка: {check.data.overdue_days} дн.</p>
+                    <p>{check.data.overdue_days === 0 ? "Просрочек не обнаружено" : `Просрочка: ${check.data.overdue_days} дн.`}</p>
                   ) : (
                     <p>
                       Месячная выручка источника:{" "}
@@ -103,6 +100,7 @@ export default function AssessmentPanel({
                 </li>
               ))}
             </ul>
+            <h3 className="assessment-finances-title">Финансовый расчёт</h3>
             {run.calculation ? (
               <dl className="financial-details">
                 <div>
@@ -152,12 +150,16 @@ export default function AssessmentPanel({
               <PaymentTermsView terms={run.calculation.payment_terms} />
               {run.calculation.financial_gate?.guarantee_fee_affordable !== null && run.calculation.financial_gate?.guarantee_fee_affordable !== undefined && <p>Проверка комиссии: {run.calculation.financial_gate.guarantee_fee_affordable ? "пройдена" : "не пройдена"}. Проверка масштаба условного обязательства: {run.calculation.financial_gate.guarantee_liability_within_limit ? "пройдена" : "не пройдена"}.</p>}
             </>}
-            {run.decision && (
-              <div className="assessment-decision">
-                <strong>Основание результата</strong>
-                <p className="multiline">{run.decision.internal_reason}</p>
-              </div>
-            )}
+            <details className="assessment-technical">
+              <summary>Технические сведения</summary>
+              <dl className="financial-details">
+                <div><dt>Версия правил</dt><dd>{run.policy_version}</dd></div>
+                <div><dt>Версия источников</dt><dd>{run.source_version}</dd></div>
+                <div><dt>Версия каталога</dt><dd>{run.catalog_version}</dd></div>
+                <div><dt>Отправка</dt><dd>{run.revision_id}</dd></div>
+                {run.error_code && <div><dt>Код ошибки</dt><dd>{run.error_code}</dd></div>}
+              </dl>
+            </details>
           </details>
         ))
       )}

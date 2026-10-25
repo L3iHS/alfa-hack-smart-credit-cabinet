@@ -70,7 +70,7 @@ test("staff_queue_does_not_include_drafts", async ({ page }) => {
     page.getByRole("heading", { name: "Заявки", exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator(".application-row").filter({ hasText: id.slice(0, 8) }),
+    page.locator(`.application-title[href="/staff/applications/${id}"]`),
   ).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Новая заявка" })).toHaveCount(0);
 });

@@ -157,9 +157,7 @@ export default function RiskAssessmentPanel({
           </p>
         </div>
       )}
-      {risk.scorer_version !== null && <p className="muted risk-model">
-        Модель: {risk.scorer_version}
-      </p>}
+      {risk.scorer_version !== null && <details className="risk-model"><summary>Технические сведения модели</summary><p className="muted">Модель: {risk.scorer_version}</p></details>}
     </article>
   );
 }

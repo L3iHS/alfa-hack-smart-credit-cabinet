@@ -26,7 +26,7 @@ async function geometry(page: Page) {
       return { x, y, width, height, right };
     };
     const dataSelector = document.querySelector(".details-grid") ? ".details-grid" : "#amount_kopecks";
-    return { topbar: bounds(".topbar"), panel: bounds("main .panel"), firstData: bounds(dataSelector), viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth };
+    return { sidebar: bounds(".sidebar"), panel: bounds("main .panel"), firstData: bounds(dataSelector), viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth };
   });
 }
 
@@ -45,10 +45,10 @@ for (const width of [1366, 1440, 320, 390]) {
     expect(editBox!.height).toBeGreaterThanOrEqual(44);
     expect(editBox!.width).toBeGreaterThanOrEqual(44);
     if (width < 700) {
-      await expect(page.locator(".sidebar nav")).toBeHidden();
+      await expect(page.locator(".sidebar nav")).toBeVisible();
       const section = await page.locator(".details-panel .section-top").boundingBox();
-      expect(section!.height).toBeLessThanOrEqual(45);
-      const back = page.locator(".topbar .back-link");
+      expect(section!.height).toBeLessThanOrEqual(70);
+      const back = page.locator(".page-heading .back-link");
       await expect(back).toHaveAccessibleName("Мои заявки");
       const backBox = await back.boundingBox();
       expect(backBox!.width).toBeGreaterThanOrEqual(44);
@@ -61,16 +61,15 @@ for (const width of [1366, 1440, 320, 390]) {
     await writeFile(`${folder}/geometry-${width}.json`, JSON.stringify({ details, form }, null, 2));
     for (const value of [details, form]) {
       expect(value.scrollWidth).toBeLessThanOrEqual(width);
-      expect(value.topbar.right).toBeLessThanOrEqual(width);
+      expect(value.sidebar.right).toBeLessThanOrEqual(width);
       if (width > 700) {
         expect(value.panel.y).toBeLessThanOrEqual(210);
-        expect(value.topbar.height).toBeGreaterThanOrEqual(64);
-        expect(value.topbar.height).toBeLessThanOrEqual(72);
+        expect(value.sidebar.height).toBeGreaterThanOrEqual(768);
       }
     }
     if (width < 700) {
       expect(details.firstData.y).toBeLessThanOrEqual(width === 320 ? 400 : 370);
-      expect(form.firstData.y).toBeLessThanOrEqual(width === 320 ? 620 : 560);
+      await expect(page.locator(".form-main > :first-child")).toHaveClass(/intake-panel/);
     }
     const save = page.getByRole("button", { name: "Сохранить черновик" });
     await save.scrollIntoViewIfNeeded();
@@ -93,23 +92,23 @@ for (const width of [1366, 1440, 320, 390]) {
 
 test("header_navigation_actions_and_both_products", async ({ page }) => {
   await login(page);
-  await expect(page.locator(".topbar .back-link")).toHaveCount(0);
+  await expect(page.locator(".page-heading .back-link")).toHaveCount(0);
   await page.getByRole("link", { name: "Новая заявка" }).first().click();
-  await expect(page.locator(".topbar .back-link")).toHaveAttribute("href", "/applications");
-  await page.locator(".topbar .back-link").click();
+  await expect(page.locator(".page-heading .back-link")).toHaveAttribute("href", "/applications");
+  await page.locator(".page-heading .back-link").click();
   await expect(page).toHaveURL(/\/applications$/);
   for (const product of ["working_capital", "equipment"]) {
     const id = await draft(page, product);
     await page.goto(`/applications/${id}`);
     const edit = page.locator(".details-panel .section-top").getByRole("link", { name: "Редактировать", exact: true });
     await expect(edit).toHaveClass(/secondary/);
-    await expect(page.locator("main .back-link")).toHaveCount(0);
-    await expect(page.locator(".topbar .back-link")).toHaveAttribute("href", "/applications");
+    await expect(page.locator("main .back-link")).toHaveCount(1);
+    await expect(page.locator(".page-heading .back-link")).toHaveAttribute("href", "/applications");
     await edit.focus();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(new RegExp(`/applications/${id}/edit$`));
-    await expect(page.locator(".topbar .back-link")).toHaveAttribute("href", `/applications/${id}`);
-    await page.locator(".topbar .back-link").focus();
+    await expect(page.locator(".page-heading .back-link")).toHaveAttribute("href", `/applications/${id}`);
+    await page.locator(".page-heading .back-link").focus();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(new RegExp(`/applications/${id}$`));
     await expect(page.getByText("PDF, PNG, JPEG · до 10 МБ", { exact: true })).toBeVisible();
@@ -117,11 +116,11 @@ test("header_navigation_actions_and_both_products", async ({ page }) => {
   await page.getByRole("button", { name: "Выйти" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await login(page, "staff@example.test");
-  await expect(page.locator(".topbar .back-link")).toHaveCount(0);
+  await expect(page.locator(".page-heading .back-link")).toHaveCount(0);
   await page.goto("/staff/applications/00000000-0000-0000-0000-000000000000");
   await expect(page.getByRole("heading", { name: "Заявка не найдена" })).toBeVisible();
-  await expect(page.locator(".topbar .back-link")).toHaveAttribute("href", "/staff/applications");
-  await page.locator(".topbar .back-link").click();
+  await expect(page.getByRole("link", { name: "К списку заявок" })).toHaveAttribute("href", "/staff/applications");
+  await page.getByRole("link", { name: "К списку заявок" }).click();
   await expect(page).toHaveURL(/\/staff\/applications$/);
 });
 
@@ -134,6 +133,7 @@ test("staff_long_name_and_header_controls_fit_320", async ({ page }) => {
     await route.fulfill({ response, json: { ...await response.json(), display_name: displayName } });
   });
   await page.reload();
+  await page.getByRole("button", { name: "Аккаунт", exact: true }).click();
   await expect(page.locator(".company-name")).toContainText(displayName);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   const folder = process.env.SCREENSHOT_DIR || "test-results/layout";
@@ -142,7 +142,8 @@ test("staff_long_name_and_header_controls_fit_320", async ({ page }) => {
     if (inner) {
       await page.goto("/staff/applications/00000000-0000-0000-0000-000000000000");
       await expect(page.getByRole("heading", { name: "Заявка не найдена" })).toBeVisible();
-      await expect(page.locator(".topbar .back-link")).toHaveAccessibleName("Заявки");
+      await expect(page.getByRole("link", { name: "К списку заявок" })).toHaveAttribute("href", "/staff/applications");
+      await page.getByRole("button", { name: "Аккаунт", exact: true }).click();
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
     for (const selector of [".account-menu", ".company-name", ".logout"]) {
@@ -171,6 +172,7 @@ test("mobile_long_company_keeps_header_content_visible", async ({ page }) => {
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(`/applications/${id}`);
+    await page.getByRole("button", { name: "Аккаунт", exact: true }).click();
     await expect(page.locator(".company-name")).toContainText(name);
     await expect(page.getByRole("link", { name: "Мои заявки", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Выйти", exact: true })).toBeVisible();

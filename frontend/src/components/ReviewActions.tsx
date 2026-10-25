@@ -552,7 +552,8 @@ export default function ReviewActions({
         </details>
       )}
       {staff && (can("make_offer") || can("approve") || can("reject")) && (
-        <div className="review-form">
+        <div className="review-form decision-form">
+          <h3>Решение и другие условия</h3>
           <label className="field">
             Основание решения или предложения
             <textarea
@@ -576,7 +577,7 @@ export default function ReviewActions({
             </label>
           )}
           {can("make_offer") && (
-            <details>
+            <details className="alternative-offer-form">
               <summary>Предложить другие условия</summary>
               <div className="field-grid">
                 <label className="field">

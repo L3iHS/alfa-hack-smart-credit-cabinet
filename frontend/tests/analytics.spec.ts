@@ -218,11 +218,13 @@ for (const width of [320, 390, 768, 901, 1366]) {
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await screenshot(page, `analytics-${width}`);
+    if (width < 700) await page.getByRole('button', {name: 'Аккаунт', exact: true}).click();
     await page.getByRole('button', {name: 'Выйти', exact: true}).click(); await expect(page).toHaveURL(/\/login$/);
     await login(page, false); await page.goto('/applications/new');
+    await page.getByText('Помочь выбрать', {exact: true}).click();
     const panel = page.locator('.recommendation-panel'); await expect(panel).toBeVisible();
-    const bounds = await panel.boundingBox(); const finance = await page.locator('.form-main > .form-panel').last().boundingBox();
-    expect(Math.abs(bounds!.x - finance!.x)).toBeLessThan(1); expect(Math.abs(bounds!.width - finance!.width)).toBeLessThan(1);
+    const bounds = await panel.boundingBox(); const selection = await page.locator('.product-selection-help').boundingBox();
+    expect(Math.abs(bounds!.x - selection!.x)).toBeLessThan(1); expect(Math.abs(bounds!.width - selection!.width)).toBeLessThan(1);
     const picker = panel.getByRole('combobox'); await picker.click();
     await page.getByRole('option', {name: 'Запуск или развитие проекта'}).click();
     const button = panel.locator('.recommendation-actions .primary');

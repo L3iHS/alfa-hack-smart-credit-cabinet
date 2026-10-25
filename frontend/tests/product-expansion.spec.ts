@@ -48,7 +48,7 @@ for (const product of [
     await page.getByRole("checkbox", { name: /Подтверждаю, что проверил данные/ }).check();
     await page.getByRole("checkbox", { name: /Согласен на проверку кредитной истории/ }).check();
     await page.getByRole("button", { name: "Отправить заявку" }).click();
-    await expect(page.locator(".page-heading .status")).toHaveText("На рассмотрении сотрудника", { timeout: 20000 });
+    await expect(page.locator(".page-heading .status")).toHaveText("На рассмотрении", { timeout: 20000 });
     const context = await browser.newContext({ baseURL: process.env.BASE_URL || "http://127.0.0.1:8086" });
     const staff = await context.newPage();
     await login(staff, "staff@example.test");
@@ -59,8 +59,8 @@ for (const product of [
     await staff.getByLabel("Предлагаемая сумма, ₽").fill(product.offered);
     await staff.getByLabel("Предлагаемый срок, месяцев").fill(product.term);
     await staff.getByRole("button", { name: "Отправить предложение" }).click();
-    await expect(staff.locator(".page-heading .status")).toHaveText("Предложены другие условия", { timeout: 15000 });
-    await expect(page.locator(".page-heading .status")).toHaveText("Предложены другие условия", { timeout: 15000 });
+    await expect(staff.locator(".page-heading .status")).toHaveText("Другие условия", { timeout: 15000 });
+    await expect(page.locator(".page-heading .status")).toHaveText("Другие условия", { timeout: 15000 });
     if (product.code === "tender_guarantee") {
       await expect(page.locator(".offer-comparison")).toContainText("Условное обязательство возмещения");
       await expect(page.locator(".offer-comparison")).not.toContainText("Ежемесячный платёж");
@@ -131,6 +131,7 @@ test("recommendation purpose supports keyboard, escape, tab and outside click", 
   await login(page);
   const options = await (await page.request.get("/api/v1/product-recommendations/options")).json();
   await page.goto("/applications/new");
+  await page.getByText("Помочь выбрать", { exact: true }).click();
   const picker = page.getByRole("combobox", { name: "Что планируете финансировать" });
   await expect(picker).toBeEnabled();
   await picker.focus();
@@ -173,6 +174,7 @@ test("editing an input invalidates recommendation cards", async ({ page }) => {
   await page.locator("#revenue_kopecks").fill("9000000");
   await page.locator("#operating_expenses_kopecks").fill("3000000");
   await page.locator("#existing_debt_payments_kopecks").fill("0");
+  await page.getByText("Помочь выбрать", { exact: true }).click();
   const panel = page.locator(".recommendation-panel");
   await panel.getByRole("button", { name: "Подобрать продукт" }).click();
   await expect(panel.locator(".recommendation-card").first()).toBeVisible();
@@ -204,6 +206,7 @@ test("late recommendation A cannot replace B or clear B loading state", async ({
     await (sequence === 1 ? holdA : holdB);
     try { await route.continue(); } catch { /* Отменённый запрос уже закрыт браузером. */ }
   });
+  await page.getByText("Помочь выбрать", { exact: true }).click();
   const panel = page.locator(".recommendation-panel");
   await panel.getByRole("button", { name: "Подобрать продукт" }).click();
   await expect.poll(() => received).toBe(1);
@@ -245,7 +248,7 @@ for (const product of [
     await page.getByRole("checkbox", { name: /Подтверждаю, что проверил данные/ }).check();
     await page.getByRole("checkbox", { name: /Согласен на проверку кредитной истории/ }).check();
     await page.getByRole("button", { name: "Отправить заявку" }).click();
-    await expect(page.locator(".page-heading .status")).toHaveText("На рассмотрении сотрудника", { timeout: 20000 });
+    await expect(page.locator(".page-heading .status")).toHaveText("На рассмотрении", { timeout: 20000 });
 
     const context = await browser.newContext({ baseURL: process.env.BASE_URL || "http://127.0.0.1:8086" });
     const staff = await context.newPage();

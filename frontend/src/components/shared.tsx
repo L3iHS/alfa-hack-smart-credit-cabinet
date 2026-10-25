@@ -18,6 +18,7 @@ export function ErrorPanel({
   error: unknown;
   retry?: () => void;
 }) {
+  const { pathname } = useLocation();
   const missing = error instanceof ApiError && error.status === 404;
   return (
     <section className="panel state-panel" role="alert">
@@ -32,7 +33,7 @@ export function ErrorPanel({
           Повторить
         </button>
       ) : (
-        <Link className="button secondary" to="/applications">
+        <Link className="button secondary" to={pathname.startsWith("/staff/") ? "/staff/applications" : "/applications"}>
           К списку заявок
         </Link>
       )}
@@ -77,21 +78,48 @@ export function useResource<T>(
 export function PageHeading({
   title,
   subtitle,
+  metadata,
   children,
 }: {
   title: string;
   subtitle?: string;
+  metadata?: ReactNode;
   children?: ReactNode;
 }) {
+  const { pathname } = useLocation();
+  const staff = pathname.startsWith("/staff/");
+  const listPath = staff ? "/staff/applications" : "/applications";
+  const editing = pathname.match(/^\/applications\/([^/]+)\/edit$/);
+  const backPath = editing ? `/applications/${editing[1]}` : listPath;
+  const backLabel = editing ? "К заявке" : staff ? "Заявки" : "Мои заявки";
   return (
     <div className="page-heading">
       <div>
-        <h1>{title}</h1>
+        <div className="page-title-line">
+          {pathname !== listPath && <Link className="back-link" to={backPath} aria-label={backLabel} title={backLabel}><span aria-hidden="true">‹</span></Link>}
+          <h1>{title}</h1>
+        </div>
         {subtitle && <p>{subtitle}</p>}
+        {metadata && <div className="page-metadata">{metadata}</div>}
       </div>
       {children}
     </div>
   );
+}
+export function ApplicationNumber({ number }: { number: string }) {
+  const [feedback, setFeedback] = useState("");
+  return <span className="application-number">
+    <span>{number || "Номер не указан"}</span>
+    <button className="copy-number" type="button" aria-label={`Скопировать номер ${number}`} title="Скопировать номер" disabled={!number} onClick={async () => {
+      try {
+        await navigator.clipboard.writeText(number);
+        setFeedback("Номер скопирован");
+      } catch {
+        setFeedback("Не удалось скопировать. Выделите номер и скопируйте его вручную");
+      }
+    }}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="11" height="13" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="1.6"/></svg></button>
+    <span className="copy-feedback" role="status">{feedback}</span>
+  </span>;
 }
 export function Status({ status = "draft" }: { status?: ApplicationStatus }) {
   return (
@@ -174,8 +202,8 @@ export const statusLabels: Record<ApplicationStatus, string> = {
   submitted: "Отправлена",
   processing: "Проверяем данные",
   needs_info: "Нужны уточнения",
-  manual_review: "На рассмотрении сотрудника",
-  counteroffer: "Предложены другие условия",
+  manual_review: "На рассмотрении",
+  counteroffer: "Другие условия",
   approved: "Одобрена",
   rejected: "Отказ",
 };
