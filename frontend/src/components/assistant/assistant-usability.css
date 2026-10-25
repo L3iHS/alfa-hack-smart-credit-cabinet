@@ -1,0 +1,35 @@
+.assistant-summary-heading { display: flex; align-items: center; gap: 12px; }
+.assistant-summary-heading > div:first-of-type { flex: 1; min-width: 0; }
+.assistant-panel .assistant-summary-heading h2 { margin: 0 0 4px; font-size: 18px; }
+.assistant-summary-heading p { margin: 0; font-size: 13px; }
+.assistant-summary-icon { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 36px; height: 36px; color: #ad2119; background: #fff0ee; border-radius: 10px; }
+.assistant-summary-icon svg { width: 22px; height: 22px; }
+.assistant-summary-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
+.assistant-summary-actions .button { min-height: 40px; padding: 9px 12px; font-size: 13px; }
+.assistant-download { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid #b8bac0; border-radius: 10px; background: #fff; color: #303137; }
+.assistant-download:hover { background: #f3f4f5; }
+.assistant-download svg { width: 20px; height: 20px; }
+.assistant-panel .assistant-sources > summary, .assistant-panel.assistant-chat .assistant-sources > summary { color: #303137; font-size: 13px; }
+.assistant-source-group h4 { margin: 16px 0 4px; font-size: 13px; line-height: 1.5; }
+.assistant-source-group .assistant-source-group { padding-left: 12px; border-left: 2px solid #e5e6e9; }
+.assistant-source-group dl > div { gap: 12px; padding: 6px 0; }
+.assistant-chat-window { max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); }
+.assistant-chat .assistant-chat-heading { gap: 8px; padding: 14px 12px 14px 18px; }
+.assistant-chat-heading p { margin-bottom: 0; }
+.assistant-chat-heading .assistant-close { width: 30px; height: 32px; }
+.assistant-resize-handle { position: absolute; top: 0; left: 0; width: 20px; height: 20px; cursor: nwse-resize; color: #6a6c73; z-index: 1; touch-action: none; }
+.assistant-resize-handle svg { width: 16px; height: 16px; pointer-events: none; }
+.assistant-chat .assistant-composer { padding: 10px 16px 12px; }
+.assistant-chat .field { margin-bottom: 8px; }
+.assistant-chat .assistant-composer textarea { height: 56px; min-height: 56px; max-height: 56px; padding: 7px 10px; }
+.assistant-composer-footer .muted { margin: 0; }
+.assistant-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.assistant-download:focus-visible, .assistant-size-toggle:focus-visible { outline: 3px solid #242426; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .assistant-summary-heading { flex-wrap: wrap; gap: 10px; }
+  .assistant-summary-actions { width: 100%; padding-left: 46px; }
+  .assistant-summary-actions .button { white-space: normal; }
+  .assistant-chat-window { width: calc(100vw - 32px) !important; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px - env(safe-area-inset-bottom)); }
+  .assistant-resize-handle, .assistant-size-toggle { display: none; }
+  .assistant-source-group dl > div { gap: 2px; }
+}

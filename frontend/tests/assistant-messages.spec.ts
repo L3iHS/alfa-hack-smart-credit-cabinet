@@ -124,7 +124,7 @@ test('staff summary renders sections and preserves its generated time and source
   await openCabinet(page, true);
   await page.route('**/api/v1/applications/00000000-0000-4000-8000-000000000048', route => route.fulfill({ json: application(4) }));
   await page.route('**/api/v1/applications/*/assessment', route => route.fulfill({ json: { application_id: application(4).id, revision_id: null, runs: [], risk_assessment: null } }));
-  await page.route('**/api/v1/applications/*/summary', route => route.fulfill({ json: { ...reply('### Запрос клиента\n\nКупить **печь**.\n\n### Финансы\n\n- Выручка не указана.\n- Расходы не указаны.\n\n### Результат и следующий шаг\n\nЗаявка на рассмотрении сотрудника.', 4), generated_at: '2026-10-24T12:00:00Z' } }));
+  await page.route(/\/api\/v1\/applications\/[^/]+\/summary(?:\?|$)/, route => route.fulfill({ json: route.request().method() === 'GET' ? null : { ...reply('### Запрос клиента\n\nКупить **печь**.\n\n### Финансы\n\n- Выручка не указана.\n- Расходы не указаны.\n\n### Результат и следующий шаг\n\nЗаявка на рассмотрении сотрудника.', 4), generated_at: '2026-10-24T12:00:00Z' } }));
   await page.goto('/staff/applications/00000000-0000-4000-8000-000000000048');
   const panel = page.getByRole('region', { name: 'Сводка помощника' }); await panel.getByRole('button', { name: 'Сформировать сводку' }).click();
   await expect(panel.getByRole('heading', { name: 'Запрос клиента', level: 3 })).toBeVisible(); await expect(panel.getByRole('heading', { name: 'Финансы', level: 3 })).toBeVisible();

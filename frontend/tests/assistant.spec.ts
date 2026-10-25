@@ -14,7 +14,7 @@ async function analyze(page: Page) { await page.getByRole('button', { name: 'Р�
 // Подмена HTTP проверяет поведение интерфейса, а не качество модели.
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/assistant/**', route => route.fulfill({ status: 503, json: { code: 'assistant_unavailable', message: 'Помощник временно недоступен' } }));
-  await page.route('**/api/v1/applications/*/summary', route => route.fulfill({ status: 503, json: { code: 'assistant_unavailable', message: 'Помощник временно недоступен' } }));
+  await page.route(/\/api\/v1\/applications\/[^/]+\/summary(?:\?|$)/, route => route.request().method() === 'GET' ? route.fulfill({ json: null }) : route.fulfill({ status: 503, json: { code: 'assistant_unavailable', message: 'Помощник временно недоступен' } }));
 });
 test('intake compares fields applies only on confirmation and preserves null', async ({ page }) => {
   await login(page); await page.route('**/api/v1/assistant/intake', route => route.fulfill({ json: intake() })); await openIntake(page);
@@ -48,7 +48,9 @@ test('unsupported need cannot apply', async ({ page }) => {
 });
 for (const width of [390, 1366]) test(`chat safe sources keyboard layout ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 }); await login(page); await page.route('**/api/v1/assistant/chat', route => route.fulfill({ json: answer() })); const panel = page.locator('.assistant-chat');
-  await panel.getByText('Помощник', { exact: true }).focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Tab'); await expect(panel.getByRole('button', { name: 'Закрыть помощника' })).toBeFocused(); await page.keyboard.press('Tab'); await expect(panel.locator('.assistant-examples button').first()).toBeFocused(); await page.keyboard.press('Tab'); await expect(panel.locator('.assistant-examples button').last()).toBeFocused(); await page.keyboard.press('Tab'); await expect(panel.getByLabel('Ваш вопрос')).toBeFocused(); expect(await panel.getByLabel('Ваш вопрос').evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  await panel.getByText('Помощник', { exact: true }).focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Tab'); await expect(panel.getByRole('button', { name: 'Закрыть помощника' })).toBeFocused();
+  if (width > 640) { await page.keyboard.press('Tab'); await expect(panel.getByRole('button', { name: 'Развернуть помощника' })).toBeFocused(); }
+  await page.keyboard.press('Tab'); await expect(panel.locator('.assistant-examples button').first()).toBeFocused(); await page.keyboard.press('Tab'); await expect(panel.locator('.assistant-examples button').last()).toBeFocused(); await page.keyboard.press('Tab'); await expect(panel.getByLabel('Ваш вопрос')).toBeFocused(); expect(await panel.getByLabel('Ваш вопрос').evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
   await panel.getByLabel('Ваш вопрос').fill('Какое оборудование?'); await panel.getByRole('button', { name: 'Спросить' }).click(); await expect(panel).toContainText('<b>Текст ответа</b>'); await panel.getByText('Источники (2)', { exact: true }).click();
   await expect(panel).toContainText('2 000 000 ₽'); await expect(panel).toContainText('12%'); await expect(panel).toContainText('Нужен счёт на оборудование. <img'); await expect(panel.locator('img, b')).toHaveCount(0); await expect(panel).not.toContainText('secret-uuid'); await expect(panel).not.toContainText('terms_fingerprint');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await panel.getByRole('dialog').screenshot({ path: `${evidence}/chat-${width}.png` });

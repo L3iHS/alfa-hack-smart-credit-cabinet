@@ -45,19 +45,30 @@ export async function analyzeIntake(text: string, catalog: Catalog, signal: Abor
   }
   return value as unknown as IntakeOutput;
 }
-async function answerRequest(path: string, body: unknown, version: number | null, signal: AbortSignal): Promise<AnswerOutput> {
-  const value = await api<unknown>(path, { method: 'POST', body, signal });
+function validateAnswer(value: unknown, version: number | null): AnswerOutput {
   if (!object(value) || !['answered', 'insufficient_context'].includes(String(value.status)) || typeof value.answer !== 'string' || !value.answer.trim() || !Array.isArray(value.sources) || value.application_version !== version) invalid();
   if (!value.sources.every(source => object(source) && ['id', 'title', 'text', 'version'].every(key => typeof source[key] === 'string'))) invalid();
   if (value.status === 'answered' && !value.sources.length) invalid();
   if (value.generated_at !== undefined && (typeof value.generated_at !== 'string' || Number.isNaN(Date.parse(value.generated_at)))) invalid();
   return value as unknown as AnswerOutput;
 }
+async function answerRequest(path: string, body: unknown, version: number | null, signal: AbortSignal): Promise<AnswerOutput> {
+  return validateAnswer(await api<unknown>(path, { method: 'POST', body, signal }), version);
+}
 export function askAssistant(question: string, application: { id: string; version: number } | undefined, signal: AbortSignal) {
   return answerRequest('/assistant/chat', { question, application_id: application?.id ?? null, expected_version: application?.version ?? null }, application?.version ?? null, signal);
 }
-export function summarizeApplication(id: string, version: number, signal: AbortSignal) {
-  return answerRequest(`/applications/${id}/summary`, { expected_version: version }, version, signal);
+function validateSummary(value: unknown, version: number) {
+  const summary = validateAnswer(value, version);
+  if (!summary.generated_at) invalid();
+  return summary;
+}
+export async function summarizeApplication(id: string, version: number, signal: AbortSignal, refresh = false) {
+  return validateSummary(await api<unknown>(`/applications/${id}/summary`, { method: 'POST', body: { expected_version: version, refresh }, signal }), version);
+}
+export async function loadApplicationSummary(id: string, version: number, signal: AbortSignal): Promise<AnswerOutput | null> {
+  const value = await api<unknown>(`/applications/${id}/summary?expected_version=${version}`, { signal });
+  return value === null ? null : validateSummary(value, version);
 }
 
 // Ключ включает весь ввод и владельца. Даже ответ до выполнения cleanup не виден новому контексту.
@@ -73,17 +84,19 @@ export function useAssistantRequest<T>(scope: string) {
     window.addEventListener('credit-identity-changed', invalidate);
     return () => { sequence.current++; controller.current?.abort(); window.removeEventListener('credit-identity-changed', invalidate); };
   }, [scope]);
-  async function run(request: (signal: AbortSignal) => Promise<T>) {
+  async function run(request: (signal: AbortSignal) => Promise<T>, preserveResult = false) {
     controller.current?.abort();
     const abort = new AbortController(); controller.current = abort;
     const requestId = ++sequence.current;
     const valid = () => current.current === scope && sequence.current === requestId && !abort.signal.aborted;
-    setState({ scope, busy: true });
+    setState(previous => ({ scope, busy: true, result: preserveResult && previous?.scope === scope ? previous.result : undefined }));
     try {
       const result = await request(abort.signal);
       if (valid()) setState({ scope, result, busy: false });
     } catch (error) {
-      if (valid()) setState({ scope, error: error instanceof ApiError && error.status === 409 ? 'Заявка изменилась. Дождитесь обновления данных и повторите запрос' : error instanceof ApiError && error.status === 503 ? 'Помощник временно недоступен. Попробуйте позже' : error instanceof Error ? error.message.replace(/[.!?…]+\s*$/u, '') : 'Помощник временно недоступен. Попробуйте позже', busy: false });
+      const invalidated = error instanceof ApiError && [401, 403, 404, 409].includes(error.status);
+      const message = error instanceof ApiError && error.status === 409 ? 'Заявка изменилась. Дождитесь обновления данных и повторите запрос' : error instanceof ApiError && error.status === 503 ? 'Помощник временно недоступен. Попробуйте позже' : error instanceof Error ? error.message.replace(/[.!?…]+\s*$/u, '') : 'Помощник временно недоступен. Попробуйте позже';
+      if (valid()) setState(previous => ({ scope, result: preserveResult && previous?.scope === scope && !invalidated ? previous.result : undefined, error: message, busy: false }));
     }
   }
   return { busy: state?.scope === scope ? state.busy : false, result: state?.scope === scope ? state.result : undefined, error: state?.scope === scope ? state.error : undefined, run };
