@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from './client';
+import { presentAnswer } from './answerPresentation';
 import type { Catalog, ProductCode } from './types';
 
 export interface SuggestedFields {
@@ -50,7 +51,10 @@ function validateAnswer(value: unknown, version: number | null): AnswerOutput {
   if (!value.sources.every(source => object(source) && ['id', 'title', 'text', 'version'].every(key => typeof source[key] === 'string'))) invalid();
   if (value.status === 'answered' && !value.sources.length) invalid();
   if (value.generated_at !== undefined && (typeof value.generated_at !== 'string' || Number.isNaN(Date.parse(value.generated_at)))) invalid();
-  return value as unknown as AnswerOutput;
+  const result = value as unknown as AnswerOutput;
+  const answer = presentAnswer(result.answer, result.sources);
+  if (!answer.trim()) invalid();
+  return { ...result, answer };
 }
 async function answerRequest(path: string, body: unknown, version: number | null, signal: AbortSignal): Promise<AnswerOutput> {
   return validateAnswer(await api<unknown>(path, { method: 'POST', body, signal }), version);

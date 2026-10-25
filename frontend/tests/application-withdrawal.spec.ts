@@ -27,6 +27,7 @@ test('client cancels then confirms withdrawal and sees terminal state and histor
   await action.click(); await dialog.getByRole('button', { name: 'Продолжить рассмотрение' }).click(); await expect(dialog).toBeHidden(); expect(posts).toEqual([]);
   await action.click(); await dialog.getByRole('button', { name: 'Отозвать заявку', exact: true }).click();
   await expect(page.locator('.status-withdrawn')).toHaveText('Отозвана'); await expect(page.getByRole('button', { name: 'Отозвать заявку', exact: true })).toHaveCount(0);
+  await expect(page.locator('.review-panel').getByText('Заявка отозвана клиентом. Рассмотрение прекращено.', { exact: true })).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Отправить ответ' })).toHaveCount(0); await expect(page.locator('main')).not.toContainText('Произошёл технический сбой'); await expect(page.locator('main')).not.toContainText('приложите новый файл');
   await expect(page.locator('.history')).toContainText('Заявка отозвана клиентом'); await expect(page.locator('main')).toContainText('Запрос уточнений до отзыва'); expect(posts).toEqual([{ expected_version: 4 }]);
 });
