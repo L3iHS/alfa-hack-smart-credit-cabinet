@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { presentAnswer } from '../src/api/answerPresentation';
 const id = '00000000-0000-4000-8000-000000000049';
 async function setup(page: Page, application = true) {
   await page.route('**/api/v1/**', route => {
@@ -137,13 +138,16 @@ test('recorded model annotations disappear from chat and next history while huma
   await send(dialog, 'Что дальше?'); await expect(dialog.locator('.assistant-result')).toHaveCount(2);
   const historyAnswer = payloads[1].history[0].answer;
   expect(historyAnswer).not.toContain('product_name'); expect(historyAnswer).not.toContain(recordedSourceId); expect(historyAnswer).toContain(humanDetails);
-  // Идентификатор источника — часть контракта, форматирование его не меняет.
-  const validated = await page.evaluate(async ({ sourceId, applicationId }) => {
-    const api = await import('/src/api/assistant.ts');
-    const answer = await api.askAssistant('Проверка источника', { id: applicationId, version: 4 }, new AbortController().signal);
-    return { ids: answer.sources.map((source: { id: string }) => source.id), answer: answer.answer, sourceId };
-  }, { sourceId: recordedSourceId, applicationId: id });
-  expect(validated.ids).toEqual([recordedSourceId]); expect(validated.answer).not.toContain(recordedSourceId);
+  // Чистый formatter проверяем в runner: собранное приложение не публикует /src.
+  const sources = structuredClone(recordedSources); const originalSources = structuredClone(sources);
+  sources.forEach(source => Object.freeze(source)); Object.freeze(sources);
+  const presentation = presentAnswer(annotatedAnswer, sources);
+  expect(sources).toEqual(originalSources); expect(sources.map(source => source.id)).toEqual([recordedSourceId]);
+  expect(presentation).not.toContain(recordedSourceId); expect(presentation).toBe(historyAnswer);
+  const firstTurn = dialog.locator('.assistant-turn').first(); await firstTurn.getByText('Источники (1)', { exact: true }).click();
+  await expect(firstTurn.getByRole('heading', { name: 'Данные заявки', exact: true })).toBeVisible();
+  await expect(firstTurn.locator('.assistant-source-group').first()).toContainText('Оборотный кредит');
+  await expect(firstTurn.locator('.assistant-source-group').first()).toContainText('1 500 000 ₽');
 });
 
 test('saved staff summary and Markdown export use the same human presentation without changing sources', async ({ page }) => {
