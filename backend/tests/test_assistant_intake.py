@@ -122,6 +122,53 @@ def test_conversational_amount_does_not_accept_counts_or_partial_evidence(text, 
     assert not _amount_supported(text, quote, value)
 
 
+@pytest.mark.parametrize('amount,choice,kopecks', [
+    ('два миллиона или три миллиона', 'два миллиона', 200_000_000),
+    ('два миллиона или три миллиона', 'три миллиона', 300_000_000),
+    ('2 млн либо 3 млн', '2 млн', 200_000_000),
+    ('2 млн либо 3 млн', '3 млн', 300_000_000),
+    ('два или три миллиона', 'три миллиона', 300_000_000),
+    ('от 2 млн до 3 млн', '2 млн', 200_000_000),
+    ('от 2 млн до 3 млн', '3 млн', 300_000_000),
+    ('от 2 до 3 млн', '3 млн', 300_000_000),
+    ('от двух до трёх миллионов', 'трёх миллионов', 300_000_000),
+    ('2–3 млн', '3 млн', 300_000_000),
+    ('2 — 3 млн', '3 млн', 300_000_000),
+])
+@pytest.mark.parametrize('full_quote', [False, True], ids=['choice-quote', 'full-quote'])
+def test_alternative_or_range_requires_one_exact_amount_question(client, fake, amount, choice, kopecks, full_quote):
+    fake.result['suggested_fields']['amount_kopecks'] = kopecks
+    fake.result['evidence']['amount_kopecks'] = amount if full_quote else choice
+    response = post(client, TEXT.replace('500 тысяч', amount))
+    assert response.status_code == 200
+    result = response.json()
+    assert result['suggested_fields'] == {
+        'product_code': 'working_capital', 'amount_kopecks': None,
+        'term_months': 12, 'purpose': 'закупку сырья',
+    }
+    assert 'amount_kopecks' not in result['evidence']
+    assert len(result['questions']) == 1
+    assert 'сумм' in result['questions'][0].lower()
+
+
+@pytest.mark.parametrize('other_facts', [
+    'Выручка два миллиона или три миллиона. Расходы 850 тысяч.',
+    'Выручка от 2 до 3 млн. Расходы 850 тысяч.',
+    'Оборудование стоит три миллиона. Свои средства один миллион.',
+])
+@pytest.mark.parametrize('full_quote', [False, True], ids=['amount-quote', 'full-quote'])
+def test_separate_financial_facts_do_not_invalidate_explicit_requested_amount(client, fake, other_facts, full_quote):
+    text = f'{other_facts} Нужно два миллиона на закупку сырья на 12 месяцев.'
+    fake.result['suggested_fields']['amount_kopecks'] = 200_000_000
+    fake.result['evidence']['amount_kopecks'] = text if full_quote else 'два миллиона'
+    response = post(client, text)
+    assert response.status_code == 200
+    result = response.json()
+    assert result['suggested_fields']['amount_kopecks'] == 200_000_000
+    assert result['evidence']['amount_kopecks'] == fake.result['evidence']['amount_kopecks']
+    assert result['questions'] == []
+
+
 def test_repeated_model_questions_are_replaced_by_missing_field_questions(client, fake):
     fake.result = {
         'suggested_fields': {'product_code': 'equipment', 'amount_kopecks': 200_000_000,

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import MetaData, Table, create_engine, select, text
 from sqlalchemy.orm import Session
 
 from conftest import application_url
@@ -34,8 +34,11 @@ def test_upgrade_preserves_old_offer_and_stores_full_new_terms(db, monkeypatch):
                 user = session.scalar(select(User).where(User.email == 'client1@example.test'))
                 application_id, revision_id, offer_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
                 stamp = datetime.now(timezone.utc)
-                session.execute(Application.__table__.insert().values(
+                # Отражаем старую схему без defaults и sequence из текущей ORM-модели.
+                legacy_applications = Table('applications', MetaData(), autoload_with=session.connection())
+                session.execute(legacy_applications.insert().values(
                     id=application_id, company_id=user.company_id, author_id=user.id,
+                    version=1, status='draft', created_at=stamp, updated_at=stamp,
                     catalog_version='demo-v1', product_code='equipment'))
                 session.execute(ApplicationRevision.__table__.insert().values(
                     id=revision_id, application_id=application_id, application_version=1,

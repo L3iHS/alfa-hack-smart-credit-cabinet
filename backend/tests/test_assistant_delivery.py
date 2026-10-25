@@ -46,6 +46,10 @@ def test_catalog_composition_is_versioned_and_retrievable(db):
     from app.assistant.retrieval import retrieve
     sources = retrieve(db, 'Какие продукты входят в старый каталог?', 'demo-v1')
     source = next(item for item in sources if item.id == 'catalog:products')
-    assert 'equipment' in source.text and 'working_capital' in source.text
-    assert 'credit_line' not in source.text
+    assert 'Кредит на оборудование' in source.text and 'Оборотный кредит' in source.text
+    assert 'Кредитная линия' not in source.text
     assert source.version == 'demo-v1'
+    current_sources = retrieve(db, 'Какие продукты входят в текущий каталог?', 'demo-v2')
+    current = next(item for item in current_sources if item.id == 'catalog:products')
+    assert 'Кредитная линия' in current.text
+    assert current.version == 'demo-v2'

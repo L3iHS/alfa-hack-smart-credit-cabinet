@@ -23,10 +23,17 @@ _NUMBER_WORDS = {
     'полтора': Decimal('1.5'), 'полторы': Decimal('1.5'),
 }
 _NUMBER_WORD = '(?:' + '|'.join(sorted(_NUMBER_WORDS, key=len, reverse=True)) + ')'
+_AMOUNT_NUMBER = (r'(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[,.]\d{1,2})?'
+                  rf'|{_NUMBER_WORD}(?:\s+{_NUMBER_WORD})*')
+_AMOUNT_UNIT = r'(?:млн\.?|миллион(?:а|ов)?|лям(?:а|ов)?|тыс\.?|тысяч(?:а|и)?|тыщ(?:а|и)?|руб(?:лей|ля|ль)?\.?|₽)'
 _AMOUNT = re.compile(
-    r'(?<![\w.,+\-])(?P<number>(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[,.]\d{1,2})?'
-    rf'|{_NUMBER_WORD}(?:\s+{_NUMBER_WORD})*)\s*'
-    r'(?P<unit>млн\.?|миллион(?:а|ов)?|лям(?:а|ов)?|тыс\.?|тысяч(?:а|и)?|тыщ(?:а|и)?|руб(?:лей|ля|ль)?\.?|₽)(?!\w)', re.I,
+    rf'(?<![\w.,+\-])(?P<number>{_AMOUNT_NUMBER})\s*(?P<unit>{_AMOUNT_UNIT})(?!\w)', re.I,
+)
+# Единица может быть общей для обеих границ; это только запрет выбора, не извлечение суммы.
+_AMOUNT_BOUND = rf'(?:{_AMOUNT_NUMBER}|одного|одной|двух|тр[её]х|четыр[её]х|пяти|шести|семи|восьми|девяти|десяти)'
+_AMBIGUOUS_AMOUNT = re.compile(
+    rf'(?<![\w.,+\-]){_AMOUNT_BOUND}\s*(?:{_AMOUNT_UNIT})?'
+    rf'(?:\s*(?:\bили\b|\bлибо\b|\bдо\b|[-–—−])\s*{_AMOUNT_BOUND}\s*(?:{_AMOUNT_UNIT})?)+(?!\w)', re.I,
 )
 _TERM = re.compile(r'(?<![\w.,+\-])(\d+)\s*(месяц(?:а|ев)?|мес\.?|год(?:а|ов)?|лет)(?!\w)', re.I)
 _OTHER_DURATION = re.compile(
@@ -75,8 +82,12 @@ def _amount_number(value: str) -> Decimal | None:
 
 def _amount_supported(text: str, quote: str, value: int) -> bool:
     occurrences = list(re.finditer(re.escape(quote), text))
+    ambiguous = list(_AMBIGUOUS_AMOUNT.finditer(text))
     for match in _AMOUNT.finditer(text):
         if not any(item.start() <= match.start() and match.end() <= item.end() for item in occurrences):
+            continue
+        # Проверяем исходное окружение даже для короткой цитаты одного варианта.
+        if any(item.start() < match.end() and match.start() < item.end() for item in ambiguous):
             continue
         if re.search(r'(?:[-−]|\bминус)\s*$', text[:match.start()], re.I):
             continue

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import MetaData, Table, create_engine, select, text
 from sqlalchemy.orm import sessionmaker
 
 from conftest import application_url
@@ -44,10 +44,12 @@ def test_upgrade_keeps_legacy_submission_and_retries_it(db, monkeypatch, policy_
                 password = user.password_hash
                 # На старой схеме вставляем только существовавшие тогда колонки.
                 application_id = uuid.uuid4()
-                legacy.execute(Application.__table__.insert().values(
-                    id=application_id, company_id=company.id, author_id=user.id, version=2,
-                    status='submitted', catalog_version='demo-v1', **application_fields(profile)))
                 stamp = datetime.now(timezone.utc)
+                legacy_applications = Table('applications', MetaData(), autoload_with=legacy.connection())
+                legacy.execute(legacy_applications.insert().values(
+                    id=application_id, company_id=company.id, author_id=user.id, version=2,
+                    created_at=stamp, updated_at=stamp,
+                    status='submitted', catalog_version='demo-v1', **application_fields(profile)))
                 snapshot = {'application': application_fields(profile), 'company': {'id':str(company.id),'inn':company.inn,
                             'name':company.name,'industry':company.industry,'registered_at':company.registered_at.isoformat()},
                             'documents':[],'confirmations':{'consent_version':'demo-consent-v1','data_confirmed':True,'bki_consent':True}}
