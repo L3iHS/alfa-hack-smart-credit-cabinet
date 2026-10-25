@@ -28,7 +28,8 @@ _FOLLOWUP = re.compile(
     r'что\s+(?:с\s+)?(?:документами|условиями|суммой|сроком|дальнейшими\s+действиями))',
     re.IGNORECASE,
 )
-_SHORT_SUBJECT = re.compile(r'\b(?:документ|услови|срок|сумм|ставк|дальше|действи)', re.IGNORECASE)
+_SHORT_SUBJECT = re.compile(r'\b(?:документ|услови|срок|сумм|ставк)', re.IGNORECASE)
+_NEXT_STEP = re.compile(r'\b(?:дальше|действи)', re.IGNORECASE)
 
 
 def dialog_question(question: str, history: list[ChatExchange]) -> str:
@@ -37,18 +38,27 @@ def dialog_question(question: str, history: list[ChatExchange]) -> str:
         return _FOLLOWUP.fullmatch(re.sub(r'[^\w\s]', '', value).strip()) is not None
 
     if continuation(question):
+        # Общая реплика не добавляет предмет поиска: «дальше» не должно
+        # включать снимок заявки, когда найденный предок — вопрос о Марсе.
+        detail = f'\n{question}' if _SHORT_SUBJECT.search(question) else ''
         short_subject = None
+        next_step = None
         for exchange in reversed(history):
             if not continuation(exchange.question):
                 # Продукт уточняет «А документы?». Посторонняя тема ограничивает
                 # поиск назад, но не отменяет более новый вопрос «Какая сумма?».
                 product_subject = any(re.search(pattern, exchange.question.lower()) for pattern, _ in _SYNONYMS)
                 subject = short_subject if short_subject and not product_subject else exchange.question
-                return f'{subject}\n{question}'
+                return f'{subject}{detail}'
             if short_subject is None and _SHORT_SUBJECT.search(exchange.question):
                 short_subject = exchange.question
-        if short_subject:
-            return f'{short_subject}\n{question}'
+            if next_step is None and _NEXT_STEP.search(exchange.question):
+                next_step = exchange.question
+        # Общий следующий шаг — fallback только без самостоятельного предка;
+        # он продолжает найденную тему и не отменяет посторонний предмет.
+        subject = short_subject or next_step
+        if subject:
+            return f'{subject}{detail}'
     return question
 
 

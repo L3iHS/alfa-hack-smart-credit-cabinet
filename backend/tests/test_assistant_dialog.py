@@ -127,6 +127,41 @@ def test_new_short_subject_after_unrelated_question_supplies_application_context
     assert any(source['id'].endswith(':state') for source in sources)
 
 
+@pytest.mark.parametrize('history,question', [
+    ([], 'Что дальше?'),
+    ([], 'Что с дальнейшими действиями?'),
+    (HISTORY, 'Что дальше?'),
+    (HISTORY, 'Что с дальнейшими действиями?'),
+    ([{'question': 'Что дальше?', 'answer': 'Доступные действия.'}], 'А почему?'),
+    (HISTORY + [{'question': 'Что дальше?', 'answer': 'Доступные действия.'}], 'А почему?'),
+    ([{'question': 'Почему Марс красный?', 'answer': 'Посторонняя тема.'},
+      {'question': 'Какая сумма?', 'answer': 'Сумма заявки.'},
+      {'question': 'Что дальше?', 'answer': 'Доступные действия.'}], 'А почему?'),
+])
+def test_next_step_continuation_preserves_application_subject(client, fake, history, question):
+    headers = authenticate(client)
+    draft = create(client, headers)
+    response = chat(client, headers, draft, question=question, history=history)
+    assert response.status_code == 200 and response.json()['status'] == 'answered', response.text
+    sources = json.loads(fake.calls[-1][1])['sources']
+    assert any(source['id'].endswith(':request') for source in sources)
+    assert any(source['id'].endswith(':state') for source in sources)
+
+
+@pytest.mark.parametrize('continuation', ['Что дальше?', 'Что с дальнейшими действиями?'])
+@pytest.mark.parametrize('ask_why', [False, True])
+def test_generic_next_step_keeps_unrelated_topic_barrier(client, fake, continuation, ask_why):
+    headers = authenticate(client)
+    draft = create(client, headers)
+    history = [{'question': 'Почему Марс красный?', 'answer': 'Посторонняя тема.'}]
+    if ask_why:
+        history.append({'question': continuation, 'answer': 'Продолжение посторонней темы.'})
+    response = chat(client, headers, draft, question='А почему?' if ask_why else continuation, history=history)
+    assert response.status_code == 200, response.text
+    assert response.json()['status'] == 'insufficient_context'
+    assert response.json()['sources'] == [] and not fake.calls
+
+
 @pytest.mark.parametrize('history,question,want,absent', [
     ([{'question': 'Какие условия кредита на оборудование?', 'answer': 'Условия оборудования.'}],
      'А документы?', 'product:equipment', 'product:overdraft'),
