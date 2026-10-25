@@ -30,6 +30,6 @@
   .assistant-summary-actions { width: 100%; padding-left: 46px; }
   .assistant-summary-actions .button { white-space: normal; }
   .assistant-chat-window { width: calc(100vw - 32px) !important; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px - env(safe-area-inset-bottom)); }
-  .assistant-resize-handle, .assistant-size-toggle { display: none; }
+  .assistant-resize-handle, .assistant-chat .assistant-size-toggle { display: none; }
   .assistant-source-group dl > div { gap: 2px; }
 }

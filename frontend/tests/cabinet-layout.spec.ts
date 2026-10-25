@@ -174,7 +174,7 @@ test("mobile_long_company_keeps_header_content_visible", async ({ page }) => {
     await page.goto(`/applications/${id}`);
     await page.getByRole("button", { name: "Аккаунт", exact: true }).click();
     await expect(page.locator(".company-name")).toContainText(name);
-    await expect(page.getByRole("link", { name: "Мои заявки", exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Основная навигация" }).getByRole("link", { name: "Мои заявки", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Выйти", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     const textFits = await page.locator(".company-name").evaluate((element) =>

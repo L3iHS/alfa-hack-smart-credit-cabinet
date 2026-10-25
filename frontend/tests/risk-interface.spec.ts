@@ -44,6 +44,7 @@ function risk(probability = 0.1684, extra: Record<string, unknown> = {}) {
 function app() {
   return {
     id,
+    display_number: "КЗ-000123",
     product_code: "working_capital",
     version: 7,
     status: "manual_review",
@@ -117,6 +118,9 @@ async function open(
   );
   await page.route(`**/api/v1/applications/${id}/assessment`, (route) =>
     route.fulfill({ json: getAssessment() }),
+  );
+  await page.route(`**/api/v1/applications/${id}/summary?*`, (route) =>
+    route.fulfill({ json: null }),
   );
   await page.goto(`${staff ? "/staff" : ""}/applications/${id}`);
 }
@@ -279,7 +283,7 @@ test("historical policy and previous revision are labelled separately", async ({
     page.getByText("Историческая политика без ML", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".assessment-run").first()).toContainText(
-    "Предыдущая отправка",
+    "Предыдущее рассмотрение",
   );
 });
 test("approval needs explicit acknowledgement and resets on application version", async ({
@@ -305,7 +309,7 @@ test("approval needs explicit acknowledgement and resets on application version"
   await page
     .getByRole("button", { name: "Одобрить заявку", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText("Подтвердите");
+  await expect(page.getByRole("region", { name: "Рассмотрение заявки" }).getByRole("alert")).toContainText("Подтвердите");
   expect(body).toBeNull();
   await ack.check();
   await page.getByText("Предложить другие условия", { exact: true }).click();
@@ -445,7 +449,7 @@ test("known model error refreshes failed offered assessment without unknown retr
   await expect(
     page.getByRole("button", { name: "Повторить действие", exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByRole("alert")).toContainText("Решение не принято");
+  await expect(page.getByRole("region", { name: "Рассмотрение заявки" }).getByRole("alert")).toContainText("Решение не принято");
 });
 test("client never requests internal assessment or sees risk", async ({
   page,

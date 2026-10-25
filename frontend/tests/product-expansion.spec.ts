@@ -300,6 +300,7 @@ test("no-match change-amount action focuses the amount field", async ({ page }) 
     actions: [{ kind: "change_amount", label: "Изменить сумму", field: "amount_kopecks", product_code: null, recommendation_id: null }],
     config_version: "test", trace_id: "test", catalog_version: "demo-v2", staff_trace: null,
   } }));
+  await page.getByText("Помочь выбрать", { exact: true }).click();
   await page.getByRole("button", { name: "Подобрать продукт" }).click();
   await page.getByRole("button", { name: "Изменить сумму" }).click();
   await expect(page.locator("#amount_kopecks")).toBeFocused();

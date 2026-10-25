@@ -307,6 +307,13 @@ for (const viewport of [
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
+    if (viewport.width < 700) {
+      const account = page.getByRole("button", { name: "Аккаунт", exact: true });
+      await account.focus();
+      await page.keyboard.press("Enter");
+      await expect(account).toHaveAttribute("aria-expanded", "true");
+      await expect(page.getByRole("button", { name: "Выйти", exact: true })).toBeVisible();
+    }
     await page.getByRole("button", { name: "Выйти" }).click();
     await expect(page).toHaveURL(/\/login$/);
     await login(page, "staff@example.test");
