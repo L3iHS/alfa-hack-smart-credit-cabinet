@@ -10,6 +10,7 @@ from app.applications.models import Application, ApplicationEvent
 from app.applications.schemas import ApplicationOutput, DraftCreate, DraftFields, DraftPatch
 from app.auth.models import User
 from app.products.catalog import CATALOG_VERSION, get_catalog
+from app.processing.schemas import WITHDRAWABLE_STATUSES
 
 
 def require_client(user: User) -> None:
@@ -47,7 +48,9 @@ def application_output(application: Application, user: User) -> ApplicationOutpu
     run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id)) if revision else None
     result.processing_status = run.status if run else None
     decision = db.scalar(select(Decision).where(Decision.application_id == application.id).order_by(Decision.application_version.desc()).limit(1))
-    if decision and revision and decision.revision_id == revision.id:
+    if application.status == 'withdrawn':
+        result.public_reasons = ['Заявка отозвана клиентом. Рассмотрение прекращено.']
+    elif decision and revision and decision.revision_id == revision.id:
         result.public_reasons = decision.public_reasons
     result.information_requests = [InformationRequestOutput.model_validate(item) for item in db.scalars(select(InformationRequest).where(InformationRequest.application_id == application.id).order_by(InformationRequest.created_at))]
     result.offers = [OfferOutput.model_validate(item) for item in db.scalars(select(Offer).where(Offer.application_id == application.id).order_by(Offer.created_at))]
@@ -58,6 +61,8 @@ def application_output(application: Application, user: User) -> ApplicationOutpu
             result.available_actions = ['edit_draft', 'upload_document', 'respond_information']
         elif application.status == 'counteroffer':
             result.available_actions = ['accept_offer', 'decline_offer']
+        if application.status in WITHDRAWABLE_STATUSES:
+            result.available_actions.append('withdraw')
     elif application.status == 'manual_review':
         result.available_actions = ['request_information', 'make_offer', 'approve', 'reject']
     elif run and run.status in ('failed', 'interrupted') and application.status in ('submitted', 'processing'):

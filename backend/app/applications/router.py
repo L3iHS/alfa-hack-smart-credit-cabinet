@@ -10,6 +10,7 @@ from app.applications.schemas import ApplicationOutput, ApplicationPage, DraftCr
 from app.applications.service import application_output, application_query, create_draft, get_application, update_draft
 from app.applications.submission import submit_application
 from app.applications.submission_policy import submission_policy
+from app.applications.withdrawal import WithdrawalInput, withdraw_application
 from app.auth.models import User
 from app.auth.schemas import ErrorOutput
 from app.auth.service import get_current_user
@@ -45,6 +46,11 @@ def application(application_id: uuid.UUID, user: User = Depends(get_current_user
 @router.patch('/applications/{application_id}', response_model=ApplicationOutput)
 def update(application_id: uuid.UUID, body: DraftPatch, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return application_output(update_draft(db, user, application_id, body), user)
+
+
+@router.post('/applications/{application_id}/withdraw', response_model=ApplicationOutput)
+def withdraw(application_id: uuid.UUID, body: WithdrawalInput, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return application_output(withdraw_application(db, user, application_id, body), user)
 
 
 @router.get('/applications/{application_id}/history', response_model=EventPage)

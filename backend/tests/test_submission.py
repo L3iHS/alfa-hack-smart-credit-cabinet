@@ -43,7 +43,7 @@ def test_submission_snapshot_and_staff_access(client, db, product):
     assert result['application_id'] == draft['id']
     assert result['version'] == draft['version'] + 1 and result['status'] == 'submitted'
     application = client.get(f"{BASE}/{draft['id']}").json()
-    assert application['status'] == 'submitted' and application['available_actions'] == []
+    assert application['status'] == 'submitted' and application['available_actions'] == ['withdraw']
     assert patch(client, headers, application, purpose='Подмена').status_code == 409
     assert upload(client, headers, application).status_code == 409
     assert client.delete(f"{BASE}/{draft['id']}/documents/{document['id']}", params={'expected_version': result['version']}, headers=headers).status_code == 409
