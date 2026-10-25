@@ -28,6 +28,7 @@ _FOLLOWUP = re.compile(
     r'что\s+(?:с\s+)?(?:документами|условиями|суммой|сроком|дальнейшими\s+действиями))',
     re.IGNORECASE,
 )
+_SHORT_SUBJECT = re.compile(r'\b(?:документ|услови|срок|сумм|ставк|дальше|действи)', re.IGNORECASE)
 
 
 def dialog_question(question: str, history: list[ChatExchange]) -> str:
@@ -36,11 +37,18 @@ def dialog_question(question: str, history: list[ChatExchange]) -> str:
         return _FOLLOWUP.fullmatch(re.sub(r'[^\w\s]', '', value).strip()) is not None
 
     if continuation(question):
+        short_subject = None
         for exchange in reversed(history):
             if not continuation(exchange.question):
-                # Первый самостоятельный вопрос ограничивает текущую тему,
-                # даже когда он посторонний. Не перескакиваем через него назад.
-                return f'{exchange.question}\n{question}'
+                # Продукт уточняет «А документы?». Посторонняя тема ограничивает
+                # поиск назад, но не отменяет более новый вопрос «Какая сумма?».
+                product_subject = any(re.search(pattern, exchange.question.lower()) for pattern, _ in _SYNONYMS)
+                subject = short_subject if short_subject and not product_subject else exchange.question
+                return f'{subject}\n{question}'
+            if short_subject is None and _SHORT_SUBJECT.search(exchange.question):
+                short_subject = exchange.question
+        if short_subject:
+            return f'{short_subject}\n{question}'
     return question
 
 

@@ -90,6 +90,43 @@ def test_conversational_followups_preserve_the_previous_subject(client, fake, qu
     assert any(source['id'].endswith(want_source) for source in sources)
 
 
+@pytest.mark.parametrize('root_question', ['Какая сумма?', 'Какие документы?', 'Какие условия?'])
+@pytest.mark.parametrize('extra_followup', [False, True])
+def test_short_root_question_keeps_fresh_application_context(client, db, fake, root_question, extra_followup):
+    headers = authenticate(client)
+    draft = create(client, headers, amount_kopecks=50_000_000)
+    first = chat(client, headers, draft, question=root_question)
+    assert first.status_code == 200 and first.json()['status'] == 'answered', first.text
+    history = [{'question': root_question, 'answer': first.json()['answer']}]
+    if extra_followup:
+        history.append({'question': 'Подробнее', 'answer': 'Предыдущее пояснение.'})
+    db.execute(update(Application).where(Application.id == uuid.UUID(draft['id']))
+               .values(amount_kopecks=60_000_000, version=2))
+    db.commit()
+    response = chat(client, headers, {**draft, 'version': 2}, question='А почему?', history=history)
+    assert response.status_code == 200, response.text
+    assert response.json()['status'] == 'answered'
+    sources = json.loads(fake.calls[-1][1])['sources']
+    request = next(source for source in sources if source['id'].endswith(':request'))
+    state = next(source for source in sources if source['id'].endswith(':state'))
+    assert request['version'] == state['version'] == '2'
+    assert json.loads(request['text'])['amount_rubles'] == '600 000 ₽'
+
+
+def test_new_short_subject_after_unrelated_question_supplies_application_context(client, fake):
+    headers = authenticate(client)
+    draft = create(client, headers, amount_kopecks=50_000_000)
+    history = [{'question': 'Почему Марс красный?', 'answer': 'Посторонняя тема.'},
+               {'question': 'Какая сумма?', 'answer': 'Сумма заявки.'}]
+    response = chat(client, headers, draft, question='А почему?', history=history)
+    assert response.status_code == 200, response.text
+    assert response.json()['status'] == 'answered'
+    sources = json.loads(fake.calls[-1][1])['sources']
+    request = next(source for source in sources if source['id'].endswith(':request'))
+    assert json.loads(request['text'])['amount_rubles'] == '500 000 ₽'
+    assert any(source['id'].endswith(':state') for source in sources)
+
+
 @pytest.mark.parametrize('history,question,want,absent', [
     ([{'question': 'Какие условия кредита на оборудование?', 'answer': 'Условия оборудования.'}],
      'А документы?', 'product:equipment', 'product:overdraft'),
@@ -98,6 +135,10 @@ def test_conversational_followups_preserve_the_previous_subject(client, fake, qu
      'А документы?', 'product:overdraft', 'product:equipment'),
     ([{'question': 'Что такое овердрафт?', 'answer': 'Кассовый разрыв.'},
       {'question': 'Подробнее', 'answer': 'Ещё об овердрафте.'}],
+     'А почему?', 'product:overdraft', 'product:equipment'),
+    ([{'question': 'Какие условия кредита на оборудование?', 'answer': 'Условия оборудования.'},
+      {'question': 'Что такое овердрафт?', 'answer': 'Кассовый разрыв.'},
+      {'question': 'А документы?', 'answer': 'Документы для овердрафта.'}],
      'А почему?', 'product:overdraft', 'product:equipment'),
     ([{'question': 'Что такое овердрафт?', 'answer': 'Кассовый разрыв.'}],
      'Какие условия кредита на оборудование?', 'product:equipment', 'product:overdraft'),
@@ -163,6 +204,9 @@ def test_next_turn_materializes_new_values_instead_of_old_answer(client, db, fak
     ('Почему Марс красный?', HISTORY),
     ('космонавтика марсианский вулкан', HISTORY),
     ('А почему?', HISTORY + [{'question': 'Сколько спутников у Марса?', 'answer': 'Два.'}]),
+    ('А почему?', [{'question': 'Какая сумма?', 'answer': 'Сумма заявки.'},
+                   {'question': 'Подробнее', 'answer': 'Пояснение.'},
+                   {'question': 'Почему Марс красный?', 'answer': 'Посторонняя тема.'}]),
 ])
 def test_unrelated_subject_does_not_inherit_application_sources(client, fake, question, history):
     headers = authenticate(client)
