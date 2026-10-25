@@ -1,4 +1,5 @@
 import pytest
+from decimal import Decimal
 from app.products.catalog import get_catalog
 
 
@@ -12,9 +13,12 @@ def test_knowledge_is_meaningful_versioned_and_uses_catalog():
         products = get_catalog(version)
         for code, product in products.items():
             source = next(s for s in sources if s.id == f'product:{code}')
-            assert str(product.min_amount_kopecks) in source.text
-            assert str(product.max_amount_kopecks) in source.text
-            assert all(kind in source.text for kind in product.required_document_types)
+            from app.assistant.knowledge import DOCUMENTS
+            from app.assistant.presentation import _decimal_text
+            assert _decimal_text(Decimal(product.min_amount_kopecks) / 100, grouping=True) in source.text
+            assert _decimal_text(Decimal(product.max_amount_kopecks) / 100, grouping=True) in source.text
+            assert all(DOCUMENTS[kind][0] in source.text for kind in product.required_document_types)
+            assert 'копе' not in source.text and '_invoice' not in source.text
         assert {s.id for s in sources if s.id.startswith('product:')} == {f'product:{code}' for code in products}
 
 
@@ -48,8 +52,8 @@ def test_knowledge_tracks_catalog_changes_without_manual_numbers(monkeypatch):
         'required_document_types': ('financial_statement', 'business_plan')})
     monkeypatch.setattr(knowledge, 'get_catalog', lambda version: catalog)
     source = next(s for s in knowledge.build_knowledge('demo-v2') if s.id == 'product:equipment')
-    assert '123456789' in source.text and '1234567.89' in source.text
-    assert 'business_plan' in source.text and 'equipment_invoice' not in source.text
+    assert '1 234 567,89 ₽' in source.text and '123456789' not in source.text
+    assert 'Бизнес-план' in source.text and 'Счёт на оборудование' not in source.text
 
 
 def test_guarantee_paraphrase_does_not_match_equipment_by_substring(db):

@@ -98,6 +98,54 @@ def test_russian_amounts_have_independent_unit_validation(client, fake, amount, 
     assert response.json()['suggested_fields']['amount_kopecks'] == kopecks
 
 
+@pytest.mark.parametrize('amount,kopecks', [
+    ('два ляма', 200_000_000), ('2 ляма', 200_000_000),
+    ('полтора миллиона', 150_000_000), ('две тысячи', 200_000),
+    ('восемьсот пятьдесят тысяч', 85_000_000), ('2,5 млн', 250_000_000),
+])
+def test_conversational_amount_has_independent_unit_validation(amount, kopecks):
+    from app.assistant.intake import _amount_supported
+    assert _amount_supported(f'Купить две печи за {amount}', amount, kopecks)
+    assert not _amount_supported(f'Купить две печи за {amount}', amount, kopecks + 100)
+
+
+@pytest.mark.parametrize('text,quote,value', [
+    ('минус два ляма', 'два ляма', 200_000_000),
+    ('− два ляма', 'два ляма', 200_000_000),
+    ('двадцать два ляма', 'два ляма', 200_000_000),
+    ('два три миллиона', 'два три миллиона', 300_000_000),
+    ('две печи', 'две печи', 200),
+    ('от одного до двух миллионов', 'двух миллионов', 200_000_000),
+])
+def test_conversational_amount_does_not_accept_counts_or_partial_evidence(text, quote, value):
+    from app.assistant.intake import _amount_supported
+    assert not _amount_supported(text, quote, value)
+
+
+def test_repeated_model_questions_are_replaced_by_missing_field_questions(client, fake):
+    fake.result = {
+        'suggested_fields': {'product_code': 'equipment', 'amount_kopecks': 200_000_000,
+                             'term_months': None, 'purpose': 'две печи'},
+        'evidence': {'product_code': 'две печи', 'amount_kopecks': 'два ляма', 'purpose': 'две печи'},
+        'questions': ['На какой срок вы хотите взять кредит?', 'Уточните срок кредита.'],
+        'unsupported_need': False,
+    }
+    response = post(client, 'Купить хорошо бы, очень надо мне две печи за два ляма')
+    assert response.status_code == 200
+    result = response.json()
+    assert result['suggested_fields']['amount_kopecks'] == 200_000_000
+    assert result['suggested_fields']['term_months'] is None
+    assert len(result['questions']) == 1
+    assert 'срок' in result['questions'][0].lower()
+
+
+def test_validated_loan_term_does_not_keep_model_clarification(client, fake):
+    fake.result['questions'] = ['На какой срок нужен кредит?', 'Уточните срок кредитования']
+    response = post(client)
+    assert response.status_code == 200
+    assert response.json()['questions'] == []
+
+
 @pytest.mark.parametrize('text,quote,term,want', [
     ('Купить две печи за 2 млн, окупить за полтора года', 'окупить за полтора года', 18, None),
     ('Купить оборудование за 2 млн, окупаемость 12 месяцев', '12 месяцев', 12, None),

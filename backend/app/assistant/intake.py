@@ -10,9 +10,23 @@ from app.assistant.provider import AssistantUnavailable, Provider
 from app.assistant.schemas import ExtractedIntake, IntakeInput, IntakeOutput, SuggestedFields
 from app.products.catalog import get_catalog
 
+_NUMBER_WORDS = {
+    'один': 1, 'одна': 1, 'два': 2, 'две': 2, 'три': 3, 'четыре': 4,
+    'пять': 5, 'шесть': 6, 'семь': 7, 'восемь': 8, 'девять': 9,
+    'десять': 10, 'одиннадцать': 11, 'двенадцать': 12, 'тринадцать': 13,
+    'четырнадцать': 14, 'пятнадцать': 15, 'шестнадцать': 16, 'семнадцать': 17,
+    'восемнадцать': 18, 'девятнадцать': 19, 'двадцать': 20, 'тридцать': 30,
+    'сорок': 40, 'пятьдесят': 50, 'шестьдесят': 60, 'семьдесят': 70,
+    'восемьдесят': 80, 'девяносто': 90, 'сто': 100, 'двести': 200,
+    'триста': 300, 'четыреста': 400, 'пятьсот': 500, 'шестьсот': 600,
+    'семьсот': 700, 'восемьсот': 800, 'девятьсот': 900,
+    'полтора': Decimal('1.5'), 'полторы': Decimal('1.5'),
+}
+_NUMBER_WORD = '(?:' + '|'.join(sorted(_NUMBER_WORDS, key=len, reverse=True)) + ')'
 _AMOUNT = re.compile(
-    r'(?<![\w.,+\-])(\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)([,.]\d{1,2})?\s*'
-    r'(млн\.?|миллион(?:а|ов)?|тыс\.?|тысяч(?:а|и)?|руб(?:лей|ля|ль)?\.?|₽)(?!\w)', re.I,
+    r'(?<![\w.,+\-])(?P<number>(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[,.]\d{1,2})?'
+    rf'|{_NUMBER_WORD}(?:\s+{_NUMBER_WORD})*)\s*'
+    r'(?P<unit>млн\.?|миллион(?:а|ов)?|лям(?:а|ов)?|тыс\.?|тысяч(?:а|и)?|тыщ(?:а|и)?|руб(?:лей|ля|ль)?\.?|₽)(?!\w)', re.I,
 )
 _TERM = re.compile(r'(?<![\w.,+\-])(\d+)\s*(месяц(?:а|ев)?|мес\.?|год(?:а|ов)?|лет)(?!\w)', re.I)
 _OTHER_DURATION = re.compile(
@@ -35,9 +49,28 @@ _LOAN_TERM_SUFFIX = re.compile(
 _QUESTIONS = {
     'product_code': 'Какой вид финансирования вам нужен?',
     'amount_kopecks': 'Уточните сумму финансирования в рублях в пределах выбранного продукта.',
-    'term_months': 'На какой срок нужен кредит? Укажите срок кредита отдельно от окупаемости.',
+    'term_months': 'На какой срок нужно финансирование?',
     'purpose': 'Уточните цель финансирования.',
 }
+
+
+def _amount_number(value: str) -> Decimal | None:
+    if value[0].isdigit():
+        return Decimal(re.sub(r'[ \u00a0\u202f]', '', value).replace(',', '.'))
+    parts = [_NUMBER_WORDS[word] for word in value.lower().split()]
+    if len(parts) == 1:
+        return Decimal(parts[0])
+    # Разряды могут идти только по убыванию: «восемьсот пятьдесят», но не «два три».
+    total, previous_rank = 0, 4
+    for part in parts:
+        if not isinstance(part, int):
+            return None
+        rank = 3 if part >= 100 else 2 if part >= 20 else 1
+        if rank >= previous_rank:
+            return None
+        total += part
+        previous_rank = rank
+    return Decimal(total)
 
 
 def _amount_supported(text: str, quote: str, value: int) -> bool:
@@ -45,12 +78,12 @@ def _amount_supported(text: str, quote: str, value: int) -> bool:
     for match in _AMOUNT.finditer(text):
         if not any(item.start() <= match.start() and match.end() <= item.end() for item in occurrences):
             continue
-        if re.search(r'[-−]\s*$', text[:match.start()]):
+        if re.search(r'(?:[-−]|\bминус)\s*$', text[:match.start()], re.I):
             continue
-        number = re.sub(r'[ \u00a0\u202f]', '', match[1]) + (match[2] or '')
-        unit = match[3].lower()
-        multiplier = 1_000_000 if unit.startswith(('млн', 'миллион')) else 1000 if unit.startswith('тыс') else 1
-        if Decimal(number.replace(',', '.')) * multiplier * 100 == value:
+        number = _amount_number(match['number'])
+        unit = match['unit'].lower()
+        multiplier = 1_000_000 if unit.startswith(('млн', 'миллион', 'лям')) else 1000 if unit.startswith(('тыс', 'тыщ')) else 1
+        if number is not None and number * multiplier * 100 == value:
             return True
     return False
 
@@ -96,6 +129,9 @@ def extract_intake(body: IntakeInput, provider: Provider) -> IntakeOutput:
         'term_months, purpose. Каждый факт подтверди точной короткой цитатой в evidence; '
         'неизвестные поля оставь null и задай уточняющий вопрос. Сумма — целое число копеек; '
         'учитывай тысячи, миллионы и десятичную запятую. Срок кредита должен быть явным: '
+        'Понимай разговорный русский и опечатки по смыслу: «две печи за два ляма» — оборудование '
+        'и 200000000 копеек; «полтора миллиона» — 150000000 копеек. Число предметов не является суммой. '
+        'Не выдумывай срок: при неизвестном сроке предложи остальные подтверждённые поля. '
         'окупаемость не является сроком кредита. Purpose возьми дословно из текста, без изменения падежа или добавления слов. Для product_code цитируй слова о виде или цели финансирования, а не сумму. Общая потребность в бизнес-финансировании без конкретной цели не определяет продукт и purpose. '
         'Evidence — только подстрока исходного ввода: без добавленных кавычек, объяснений, префиксов и исправления слов. '
         'Если поле null, его evidence тоже null. Недостаток цели, суммы или срока бизнес-финансирования означает '
@@ -116,8 +152,9 @@ def extract_intake(body: IntakeInput, provider: Provider) -> IntakeOutput:
         values = raw.suggested_fields.model_dump()
         quotes = raw.evidence.model_dump(exclude_none=True)
         evidence = {}
-        questions = list(raw.questions)
+        questions = []
         if raw.unsupported_need:
+            questions = ['Опишите задачу для бизнеса: закупка, оборудование, кассовый разрыв, развитие или участие в тендере.']
             return IntakeOutput(suggested_fields=SuggestedFields(), evidence={}, questions=questions,
                                 unsupported_need=True, model=provider.model, catalog_version=body.catalog_version)
         for field, value in values.items():
@@ -135,8 +172,6 @@ def extract_intake(body: IntakeInput, provider: Provider) -> IntakeOutput:
                 evidence[field] = quote
             else:
                 values[field] = None
-                if _QUESTIONS[field] not in questions:
-                    questions.append(_QUESTIONS[field])
         if values['product_code']:
             # Проверяем диапазоны тем же контрактом, что обычный черновик, без записи заявки.
             try:
@@ -147,8 +182,8 @@ def extract_intake(body: IntakeInput, provider: Provider) -> IntakeOutput:
                 for field in exc.detail['field_errors']:
                     values[field] = None
                     evidence.pop(field, None)
-                    if _QUESTIONS[field] not in questions:
-                        questions.append(_QUESTIONS[field])
+        # Уточнения формируются после проверки: один вопрос на поле, без дублей и уже известных фактов.
+        questions = [_QUESTIONS[field] for field, value in values.items() if value is None]
         return IntakeOutput(suggested_fields=SuggestedFields.model_validate(values), evidence=evidence,
                             questions=questions, unsupported_need=False, model=provider.model,
                             catalog_version=body.catalog_version)

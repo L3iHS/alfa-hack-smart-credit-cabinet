@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.assistant.answers import validate_answer
 from app.assistant.context import application_sources_for_question, build_application_context, revalidate_access
 from app.assistant.provider import Provider
+from app.assistant.presentation import prompt_sources
 from app.assistant.retrieval import retrieve
 from app.assistant.schemas import AnswerOutput, ChatInput, GeneratedAnswer, Source
 from app.auth.models import User
@@ -18,6 +19,9 @@ SYSTEM = '''Ты справочный помощник кредитного ка
 В answer используй русские названия продуктов и статусов из заголовков, описаний и публичных причин источников.
 Не придумывай соответствия программного кода и названия; неизвестное соответствие прямо обозначь как неизвестное.
 Не вставляй UUID, названия программных полей и служебные коды в текст ответа.
+Денежные суммы уже пересчитаны в рубли в полях *_rubles, ставки — в проценты в *_percent.
+Используй готовые значения: не дели их повторно на 100 и не добавляй суммы в копейках в скобках.
+Не объясняй внутренний формат единиц и не выводи названия этих полей.
 Оформляй answer как читаемый текст: короткие абзацы, между ними пустая строка.
 Перечни условий, документов и действий оформляй списком с «- », а не длинным предложением.
 При необходимости используй короткие заголовки «### ...» и выделение **ключевых слов**.
@@ -31,7 +35,7 @@ SYSTEM = '''Ты справочный помощник кредитного ка
 def generate_chat_response(question: str, sources: list[Source], provider: Provider) -> dict:
     # Валидация ответа остаётся после повторной проверки доступа в endpoint.
     return provider.generate_json(system=SYSTEM, user=json.dumps({'question': question,
-        'sources': [source.model_dump() for source in sources]}, ensure_ascii=False),
+        'sources': prompt_sources(sources)}, ensure_ascii=False),
         schema=GeneratedAnswer.model_json_schema())
 
 

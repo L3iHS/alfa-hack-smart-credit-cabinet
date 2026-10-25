@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from app.assistant.schemas import Source
+from app.assistant.presentation import _decimal_text
 from app.products.catalog import get_catalog
 
 DOCUMENTS = {
@@ -38,16 +39,19 @@ PROCESS = {
 def build_knowledge(catalog_version: str) -> list[Source]:
     catalog = get_catalog(catalog_version)
     sources = [Source(id='catalog:products', title='Состав версии каталога продуктов',
-        text=f'Версия каталога {catalog_version}. Полный перечень продуктов этой версии: ' +
-            ', '.join(f'{product.name} ({product.code})' for product in catalog.values()) +
+        text='Полный перечень продуктов этой версии каталога: ' +
+            ', '.join(product.name for product in catalog.values()) +
             '. Продукты вне этого перечня в данной версии отсутствуют.', version=catalog_version)]
     for product in catalog.values():
-        documents = ', '.join(f'{DOCUMENTS[kind][0]} ({kind})' for kind in product.required_document_types)
+        documents = ', '.join(DOCUMENTS[kind][0] for kind in product.required_document_types)
+        payment = {'annuity': 'равные ежемесячные платежи',
+                   'revolving': 'лимит с возвратом основного долга в конце срока',
+                   'guarantee': 'комиссия за гарантию'}[product.payment_kind]
         text = (f'{product.name}. {product.purpose_description}. Демонстрационные условия каталога. '
-                f'Сумма от {product.min_amount_kopecks} до {product.max_amount_kopecks} копеек '
-                f'({Decimal(product.min_amount_kopecks) / 100:f}–{Decimal(product.max_amount_kopecks) / 100:f} рублей). '
+                f'Сумма от {_decimal_text(Decimal(product.min_amount_kopecks) / 100, grouping=True)} '
+                f'до {_decimal_text(Decimal(product.max_amount_kopecks) / 100, grouping=True)} ₽. '
                 f'Срок от {product.min_term_months} до {product.max_term_months} месяцев. '
-                f'Документы: {documents}. Вид платежа: {product.payment_kind}. ')
+                f'Документы: {documents}. Вид платежа: {payment}. ')
         if product.annual_rate_bps is not None:
             text += f'Годовая ставка {product.annual_rate_bps / 100:g}%. '
         if product.upfront_fee_bps:
@@ -55,7 +59,9 @@ def build_knowledge(catalog_version: str) -> list[Source]:
         if product.annual_commission_bps:
             text += f'Годовая комиссия {product.annual_commission_bps / 100:g}%. '
         if product.required_application_fields:
-            text += 'Дополнительные поля: ' + ', '.join(product.required_application_fields) + '.'
+            field_labels = {'project_description': 'описание проекта', 'tender_number': 'номер тендера',
+                            'beneficiary_name': 'заказчик по тендеру'}
+            text += 'Дополнительные сведения: ' + ', '.join(field_labels[field] for field in product.required_application_fields) + '.'
         sources.append(Source(id=f'product:{product.code}', title=product.name, text=text, version=catalog_version))
     used_documents = {kind for product in catalog.values() for kind in product.required_document_types}
     for prefix, entries in (('document', {key: DOCUMENTS[key] for key in sorted(used_documents)}),

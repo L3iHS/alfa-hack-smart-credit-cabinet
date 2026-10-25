@@ -248,7 +248,9 @@ def test_application_id_only_supplies_context_for_application_subject(client, fa
     if want_call:
         sources = json.loads(fake.calls[-1][1])['sources']
         assert all(s['id'].startswith(f"application:{draft['id']}:") for s in sources)
-        assert '50000000' in str(sources)
+        request_source = next(s for s in sources if s['id'].endswith(':request'))
+        assert json.loads(request_source['text'])['amount_rubles'] == '500 000 ₽'
+        assert json.loads(result['sources'][0]['text'])['amount_kopecks'] == 50_000_000
     else:
         assert result['sources'] == [] and result['model'] is None
 
