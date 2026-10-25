@@ -19,11 +19,13 @@ HISTORY = [{'question': 'Какую сумму я запросил по заяв
 @pytest.mark.parametrize('history', [
     [{'question': 'q' * 2000, 'answer': 'a' * 6000}],
     [{'question': 'q' * 1000, 'answer': 'a' * 1000}] * 6,
+    [{'question': 'q', 'answer': 'а' * 5999 + '🙂'}],
+    [{'question': 'q', 'answer': 'а' * 5998 + '🙂'}] * 2,
 ])
 def test_history_accepts_inclusive_pair_and_total_boundaries(history):
     body = ChatInput.model_validate({'question': 'Подробнее', 'application_id': str(uuid.uuid4()),
                                     'expected_version': 1, 'history': history})
-    assert [item.model_dump() for item in body.history] == history
+    assert [item.model_dump(exclude_defaults=True) for item in body.history] == history
 
 
 @pytest.mark.parametrize('history', [
@@ -371,3 +373,78 @@ def test_withdrawn_status_is_retrievable_as_terminal_guidance(db):
     source = next((source for source in sources if source.id == 'status:withdrawn'), None)
     assert source is not None
     assert source.title == 'Отозвана' and 'прекращено' in source.text
+
+
+@pytest.mark.parametrize('question', ['А почему?', 'Что дальше?'])
+def test_actual_insufficient_exchange_keeps_topic_boundary_and_explicit_return(client, fake, question):
+    headers = authenticate(client)
+    draft = create(client, headers)
+    history = []
+    for previous in ['Какую сумму я запросил по заявке?', 'Почему Марс красный?']:
+        response = chat(client, headers, draft, question=previous, history=history)
+        assert response.status_code == 200, response.text
+        result = response.json()
+        pair = {'question': previous, 'answer': result['answer']}
+        if result['status'] == 'insufficient_context':
+            pair['status'] = result['status']
+        history.append(pair)
+    assert history[-1]['status'] == 'insufficient_context'
+    calls = len(fake.calls)
+    response = chat(client, headers, draft, question=question, history=history)
+    assert response.status_code == 200, response.text
+    assert response.json()['status'] == 'insufficient_context'
+    assert response.json()['sources'] == [] and len(fake.calls) == calls
+    history.append({'question': question, 'answer': response.json()['answer'], 'status': 'insufficient_context'})
+    response = chat(client, headers, draft, question='А почему?', history=history)
+    assert response.status_code == 200 and response.json()['status'] == 'insufficient_context', response.text
+    assert response.json()['sources'] == [] and len(fake.calls) == calls
+    response = chat(client, headers, draft, question='Какая сумма?', history=history)
+    assert response.status_code == 200 and response.json()['status'] == 'answered', response.text
+    payload = json.loads(fake.calls[-1][1])
+    assert payload['history'] == history
+    assert any(source['id'].endswith(':request') for source in payload['sources'])
+    system = fake.calls[-1][0]
+    assert 'insufficient_context' in system and 'границ' in system
+
+
+@pytest.mark.parametrize('status', ['pending', 'error', 'system', None, False])
+def test_history_status_rejects_unfinished_or_forged_values(status):
+    with pytest.raises(ValidationError):
+        ChatInput.model_validate({'question': 'Подробнее', 'application_id': str(uuid.uuid4()),
+                                  'expected_version': 1, 'history': [{'question': 'q', 'answer': 'a', 'status': status}]})
+
+
+@pytest.mark.parametrize('catalog_version', ['demo-v1', 'demo-v2'])
+def test_selected_product_is_exact_pinned_catalog_fact_despite_conflicting_history(client, db, fake, monkeypatch, catalog_version):
+    from app.assistant.schemas import Source
+    headers = authenticate(client)
+    draft = create(client, headers, amount_kopecks=150_000_000, term_months=24)
+    db.execute(update(Application).where(Application.id == uuid.UUID(draft['id'])).values(catalog_version=catalog_version))
+    db.commit()
+    # Отличающееся историческое имя обнаружит случайное чтение текущего каталога.
+    from app.products.catalog import get_product
+    original = get_product
+    versions = []
+    def selected(code, version):
+        versions.append((code, version))
+        product = original(code, version)
+        return product.model_copy(update={'name': 'Исторический оборотный кредит'}) if version == 'demo-v1' else product
+    monkeypatch.setattr('app.assistant.context.get_product', selected, raising=False)
+    monkeypatch.setattr('app.assistant.chat.retrieve', lambda db, question, version: [Source(
+        id='product:credit_line', title='Кредитная линия', text='Другой продукт общего справочника', version=version)])
+    history = [{'question': 'Какую сумму и на какой срок я запросил?', 'answer': '1 500 000 ₽, 24 месяца. Продукт — Кредитная линия.'}]
+    response = chat(client, headers, draft, question='А почему ты так считаешь?', history=history)
+    assert response.status_code == 200, response.text
+    system, user, _ = fake.calls[-1]
+    payload = json.loads(user)
+    request = next(source for source in payload['sources'] if source['id'].endswith(':request'))
+    data = json.loads(request['text'])
+    assert data['product_code'] == 'working_capital'
+    assert data['product_name'] == ('Исторический оборотный кредит' if catalog_version == 'demo-v1' else 'Оборотный кредит')
+    assert versions == [('working_capital', catalog_version)]
+    assert data['amount_rubles'] == '1 500 000 ₽' and data['term_months'] == 24
+    assert '_kopecks' not in request['text']
+    assert payload['history'] == history
+    assert 'данные конкретной заявки' in system and 'общими описаниями' in system
+    assert 'исправь' in system.lower() and 'короткие уточнения' in system.lower()
+    assert len([source for source in payload['sources'] if not source['id'].startswith('application:')]) <= 5

@@ -3,11 +3,15 @@ import { ApiError } from '../../api/client';
 import { askAssistant, type AnswerOutput, type HistoryPair } from '../../api/assistant';
 
 interface Turn { id: number; question: string; pending?: boolean; result?: AnswerOutput; error?: string }
+function codepointLength(text: string): number { return Array.from(text).length; }
 export function dialogHistory(turns: Turn[]): HistoryPair[] {
-  const pairs = turns.filter(turn => turn.result?.status === 'answered' && turn.question.trim() && turn.question.length <= 2000 && turn.result.answer.trim() && turn.result.answer.length <= 6000).slice(-6).map(turn => ({ question: turn.question, answer: turn.result!.answer }));
-  let length = pairs.reduce((sum, pair) => sum + pair.question.length + pair.answer.length, 0);
+  const pairs: HistoryPair[] = turns.filter(turn => !turn.pending && !turn.error && turn.result && turn.question.trim() && codepointLength(turn.question) <= 2000 && turn.result.answer.trim() && codepointLength(turn.result.answer) <= 6000).slice(-6).map(turn => ({
+    question: turn.question, answer: turn.result!.answer,
+    ...(turn.result!.status === 'insufficient_context' ? { status: 'insufficient_context' as const } : {}),
+  }));
+  let length = pairs.reduce((sum, pair) => sum + codepointLength(pair.question) + codepointLength(pair.answer), 0);
   // Исключаем целые старые пары: усечение текста может менять смысл продолжения.
-  while (length > 12000) { const pair = pairs.shift()!; length -= pair.question.length + pair.answer.length; }
+  while (length > 12000) { const pair = pairs.shift()!; length -= codepointLength(pair.question) + codepointLength(pair.answer); }
   return pairs;
 }
 export function useAssistantDialog(scope: string, application?: { id: string; version: number }) {

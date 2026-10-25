@@ -12,6 +12,7 @@ from app.assistant.schemas import Source
 from app.auth.models import User
 from app.auth.service import session_from_request
 from app.processing.service import latest_revision
+from app.products.catalog import get_product
 
 
 @dataclass(frozen=True)
@@ -73,7 +74,9 @@ def build_application_context(db: Session, user: User, application_id: uuid.UUID
     fields = ('product_code', 'purpose', 'description', 'tender_number', 'beneficiary_name', 'project_description',
               'amount_kopecks', 'term_months', 'period_start', 'period_end', 'revenue_kopecks',
               'operating_expenses_kopecks', 'existing_debt_payments_kopecks')
-    add('request', 'Данные заявки', {field: getattr(output, field) for field in fields})
+    request_data = {field: getattr(output, field) for field in fields}
+    request_data['product_name'] = get_product(output.product_code, output.catalog_version).name
+    add('request', 'Данные заявки', request_data)
     add('state', 'Состояние и доступные действия', {'status': output.status,
         'public_reasons': output.public_reasons, 'available_actions': output.available_actions,
         'processing_status': output.processing_status})

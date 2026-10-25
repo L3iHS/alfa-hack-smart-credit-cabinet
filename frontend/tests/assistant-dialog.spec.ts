@@ -50,11 +50,11 @@ test('new dialog aborts pending generation and late response cannot enter the fr
   release!(); await send(dialog, 'Новый'); await expect(dialog).toContainText('Новый ответ'); await expect(dialog).not.toContainText('Старый ответ'); expect(histories).toEqual([[], []]);
 });
 
-test('history retains whole recent successful pairs within six and total limits', async ({ page }) => {
+test('history retains whole recent completed pairs within six and total limits', async ({ page }) => {
   const dialog = await setup(page); const histories: { question: string; answer: string }[][] = [];
   await page.route('**/api/v1/assistant/chat', route => { const body = route.request().postDataJSON(); histories.push(body.history); const n = Number(body.question); return route.fulfill({ json: reply(n === 2 ? 'Недостаточно сведений' : n === 3 ? 'x'.repeat(6001) : n === 7 || n === 8 ? 'y'.repeat(5999) : `Ответ ${n}`, 4, n === 2 ? 'insufficient_context' : 'answered') }); });
   for (let n = 1; n <= 15; n++) { await send(dialog, String(n)); await expect(dialog.getByRole('button', { name: 'Спросить', exact: true })).toBeDisabled(); await expect(dialog.getByRole('status')).toHaveCount(0); }
-  expect(histories[4].map(pair => pair.question)).toEqual(['1', '4']);
+  expect(histories[4].map(pair => pair.question)).toEqual(['1', '2', '4']);
   expect(histories[9].map(pair => pair.question)).toEqual(['8', '9']);
   expect(histories[14].map(pair => pair.question)).toEqual(['9', '10', '11', '12', '13', '14']);
   expect(histories.every(pairs => pairs.length <= 6 && pairs.reduce((sum, pair) => sum + pair.question.length + pair.answer.length, 0) <= 12000)).toBe(true);
@@ -76,4 +76,41 @@ for (const width of [390, 1366]) test(`appended messages scroll only the widget 
   const body = dialog.locator('.assistant-body'); expect(await body.evaluate(element => element.scrollTop > 0 && element.scrollHeight - element.scrollTop - element.clientHeight < 2)).toBe(true);
   await expect(dialog.getByLabel('Ваш вопрос')).toBeInViewport(); await expect(dialog.getByRole('button', { name: 'Новый диалог', exact: true })).toBeInViewport();
   await dialog.screenshot({ path: info.outputPath(`dialog-transcript-${width}.png`) });
+});
+
+for (const followup of ['А почему?', 'Что дальше?']) test(`insufficient context preserves the unrelated topic boundary for ${followup} and older retry`, async ({ page }) => {
+  const dialog = await setup(page); const bodies: { question: string; history: unknown[] }[] = []; let failed = false;
+  await page.route('**/api/v1/assistant/chat', route => {
+    const body = route.request().postDataJSON(); bodies.push(body);
+    if (body.question === 'Ошибка' && !failed) { failed = true; return route.fulfill({ status: 503, json: { code: 'assistant_unavailable' } }); }
+    const insufficient = body.question === 'Почему Марс красный?' || body.question === followup;
+    return route.fulfill({ json: reply(insufficient ? 'Недостаточно сведений' : `Ответ ${body.question}`, 4, insufficient ? 'insufficient_context' : 'answered') });
+  });
+  for (const question of ['Какую сумму я запросил по заявке?', 'Почему Марс красный?', 'Ошибка', followup, 'Какая сумма?']) {
+    await send(dialog, question); await expect(dialog.getByRole('status')).toHaveCount(0);
+  }
+  const prefix = [{ question: 'Какую сумму я запросил по заявке?', answer: 'Ответ Какую сумму я запросил по заявке?' }, { question: 'Почему Марс красный?', answer: 'Недостаточно сведений', status: 'insufficient_context' }];
+  expect(bodies[3].history).toEqual(prefix);
+  expect(bodies[4].history).toEqual([...prefix, { question: followup, answer: 'Недостаточно сведений', status: 'insufficient_context' }]);
+  await dialog.getByRole('button', { name: 'Повторить вопрос' }).click(); await expect(dialog).toContainText('Ответ Ошибка');
+  expect(bodies.at(-1)!.history).toEqual(prefix);
+});
+
+for (const answerLength of [5999, 6000]) test(`Unicode codepoint history accepts ${answerLength} character answers and exact total budget`, async ({ page }) => {
+  const dialog = await setup(page); const histories: { question: string; answer: string }[][] = [];
+  const answer = 'а'.repeat(answerLength - 1) + '🙂';
+  await page.route('**/api/v1/assistant/chat', route => { histories.push(route.request().postDataJSON().history); return route.fulfill({ json: reply(answer) }); });
+  for (const question of ['A', 'B', 'C']) { await send(dialog, question); await expect(dialog.getByRole('status')).toHaveCount(0); }
+  expect(histories[1]).toEqual([{ question: 'A', answer }]);
+  expect(histories[2]).toEqual(answerLength === 5999 ? [{ question: 'A', answer }, { question: 'B', answer }] : [{ question: 'B', answer }]);
+});
+
+test('application source uses the authoritative product name once without code labels or kopecks', async ({ page }) => {
+  const dialog = await setup(page);
+  await page.route('**/api/v1/assistant/chat', route => route.fulfill({ json: { ...reply('Сведения заявки'), sources: [{ id: `application:${id}:request`, title: 'Данные заявки', version: '4', text: JSON.stringify({ product_code: 'working_capital', product_name: 'Оборотный кредит', amount_kopecks: 150000000, term_months: 24 }) }] } }));
+  await send(dialog, 'Какой продукт?'); await expect(dialog).toContainText('Сведения заявки');
+  await dialog.getByText('Источники (1)', { exact: true }).click();
+  await expect(dialog.getByText('Оборотный кредит', { exact: true })).toHaveCount(1);
+  await expect(dialog).toContainText('1 500 000 ₽');
+  for (const raw of ['working_capital', 'product_name', 'Продукт не найден', '150000000', 'копеек']) await expect(dialog).not.toContainText(raw);
 });

@@ -55,7 +55,7 @@ function validateAnswer(value: unknown, version: number | null): AnswerOutput {
 async function answerRequest(path: string, body: unknown, version: number | null, signal: AbortSignal): Promise<AnswerOutput> {
   return validateAnswer(await api<unknown>(path, { method: 'POST', body, signal }), version);
 }
-export interface HistoryPair { question: string; answer: string }
+export interface HistoryPair { question: string; answer: string; status?: 'answered' | 'insufficient_context' }
 export function askAssistant(question: string, application: { id: string; version: number } | undefined, signal: AbortSignal, history: HistoryPair[] = []) {
   return answerRequest('/assistant/chat', { question, application_id: application?.id ?? null, expected_version: application?.version ?? null, history: application ? history : [] }, application?.version ?? null, signal);
 }

@@ -4,7 +4,7 @@ import { documentLabels } from '../ApplicationDocuments';
 import { date, dateTime, statusLabels } from '../shared';
 
 const labels: Record<string, string> = {
-  product_code: 'Продукт', purpose: 'Цель финансирования', description: 'Дополнительное описание',
+  product_code: 'Продукт', product_name: 'Продукт', purpose: 'Цель финансирования', description: 'Дополнительное описание',
   amount_kopecks: 'Сумма', term_months: 'Срок, месяцев', period_start: 'Начало периода', period_end: 'Конец периода',
   revenue_kopecks: 'Выручка', operating_expenses_kopecks: 'Операционные расходы', existing_debt_payments_kopecks: 'Платежи по кредитам',
   tender_number: 'Номер тендера', beneficiary_name: 'Заказчик по тендеру', project_description: 'Описание проекта',
@@ -61,6 +61,13 @@ export function formatSource(text: string, catalog: Catalog): SourceGroup {
   let parsed: unknown;
   try { parsed = JSON.parse(text); } catch { return { ...root, text: /^[{\[]/.test(text.trim()) ? 'Не удалось прочитать сведения источника' : text }; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ...root, text: 'Нет доступных сведений для отображения' };
+  function visitFields(data: Record<string, unknown>, group: SourceGroup, depth: number) {
+    const namedProduct = typeof data.product_name === 'string' && data.product_name.trim();
+    Object.entries(data).forEach(([key, value]) => {
+      // Имя из закреплённого серверного каталога заменяет строку кода, не дублирует её.
+      if (key !== 'product_code' || !namedProduct) visit(key, value, group, depth);
+    });
+  }
   function visit(key: string, value: unknown, group: SourceGroup, depth: number) {
     const label = labels[key];
     if (!label || depth > 8 || ['money', 'rates'].includes(key)) return;
@@ -69,7 +76,7 @@ export function formatSource(text: string, catalog: Catalog): SourceGroup {
       else value.forEach(item => visit(key, item, group, depth + 1));
     } else if (value && typeof value === 'object') {
       const childGroup: SourceGroup = { label, rows: [], groups: [] };
-      Object.entries(value).forEach(([child, item]) => visit(child, item, childGroup, depth + 1));
+      visitFields(value as Record<string, unknown>, childGroup, depth + 1);
       if (childGroup.rows.length || childGroup.groups.length) {
         // «Сохранённые сведения» и «Отправленные данные» не добавляют лишний уровень.
         if (['data', 'application', 'results'].includes(key)) {
@@ -93,6 +100,6 @@ export function formatSource(text: string, catalog: Catalog): SourceGroup {
       group.rows.push({ label, value: formatted });
     }
   }
-  Object.entries(parsed).forEach(([key, value]) => visit(key, value, root, 0));
+  visitFields(parsed as Record<string, unknown>, root, 0);
   return root.rows.length || root.groups.length ? root : { ...root, text: 'Нет доступных сведений для отображения' };
 }
