@@ -117,7 +117,7 @@ export function ApplicationNumber({ number }: { number: string }) {
       } catch {
         showToast("Не удалось скопировать. Выделите номер и скопируйте его вручную", true);
       }
-    }}><span>{number || "Номер не указан"}</span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="11" height="13" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="1.6"/></svg></button>
+    }}><span>{number || "Номер не указан"}</span></button>
   </span>;
 }
 export function Status({ status = "draft" }: { status?: ApplicationStatus }) {
