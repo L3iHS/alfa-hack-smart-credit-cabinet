@@ -12,6 +12,7 @@ from app.assistant.cache import fingerprint, read_summary, row_data, save_summar
 from app.assistant.answers import validate_answer
 from app.assistant.context import build_application_context, revalidate_access, version_conflict, _date_text
 from app.assistant.provider import Provider
+from app.assistant.presentation import prompt_sources
 from app.assistant.schemas import GeneratedAnswer, Source, SummaryInput, SummaryOutput
 from app.auth.models import User
 from app.documents.service import active_documents
@@ -43,12 +44,14 @@ SYSTEM = '''Ты составляешь фактологическую свод�
 Сохранённое решение можно описать как факт; не меняй его и не обещай одобрение.
 Отделяй исходно запрошенные условия от предложенных, текущую форму от отправленной редакции.
 Расчёты и проверки относятся к указанному рассмотрению отправленной редакции.
-Денежные поля *_kopecks указаны в копейках: 100 копеек = 1 рубль; не называй их рублями без пересчёта.
+Денежные суммы в *_rubles уже пересчитаны в рубли, ставки в *_percent — в проценты.
+Используй готовые значения без повторного деления на 100. Не дублируй их в копейках или базисных пунктах.
+Не добавляй раздел о технических единицах измерения и не объясняй внутренние имена полей.
 Поля period_start/period_end задают прошедший отчётный период финансов, а не срок кредита.
 Срок финансирования — term_months; не связывай даты отчётности с длительностью кредита.
-revenue_kopecks — введённая пользователем выручка за прошедший отчётный период, не прогноз.
-operating_expenses_kopecks — введённые расходы за тот же период.
-existing_debt_payments_kopecks — платежи по действующим кредитам за этот период, не остаток долга.
+revenue_rubles — введённая пользователем выручка за прошедший отчётный период, не прогноз.
+operating_expenses_rubles — введённые расходы за тот же период.
+existing_debt_payments_rubles — платежи по действующим кредитам за этот период, не остаток долга.
 Не называй введённые финансы подтверждёнными документами и не превращай их в ожидания на будущее.
 probability — доля: в тексте умножь её на 100 и укажи знак %. Не называй риск вероятностью одобрения. Объяснение LogisticRegression — линейные вклады в логарифм шансов,
 не называй их SHAP и не трактуй вклад как изменение вероятности. Файлы вложений не читались:
@@ -70,7 +73,7 @@ not_applicable означает, что модель не применяется
 
 def generate_summary_response(sources: list[Source], provider: Provider) -> dict:
     # Валидация ответа остаётся после повторной проверки доступа в endpoint.
-    return provider.generate_json(system=SYSTEM, user=json.dumps({'sources': [source.model_dump() for source in sources]},
+    return provider.generate_json(system=SYSTEM, user=json.dumps({'sources': prompt_sources(sources)},
         ensure_ascii=False), schema=GeneratedAnswer.model_json_schema())
 
 
@@ -86,12 +89,6 @@ def summary_snapshot(application_id: uuid.UUID, expected_version: int, db: Sessi
         sources.append(Source(id=f'application:{application_id}:summary:{suffix}', title=title,
             text=json.dumps(data, ensure_ascii=False, default=_date_text), version=str(context.version)))
 
-    add('units', 'Единицы величин и границы сведений', {
-        'money': 'Все поля *_kopecks в копейках; 100 копеек = 1 рубль.',
-        'rates': 'Ставки *_bps в базисных пунктах: 100 базисных пунктов = 1%.',
-        'probability': 'Вероятность — доля от 0 до 1; для процентов умножить на 100.',
-        'contributions': 'Линейные вклады LogisticRegression в логарифм шансов, не изменения вероятности.',
-        'missing': 'Сведений нет; not_applicable: модель не применяется; technical_failure: технический сбой.'})
     if revision:
         company = revision.snapshot.get('company', {})
         company = {key: company.get(key) for key in ('name', 'inn', 'industry', 'registered_at')}

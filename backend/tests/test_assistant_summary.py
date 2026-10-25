@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,10 @@ def ready(client, profile='d', *, legacy=False):
     headers = authenticate(client, 'staff@example.test')
     current = client.get(f'/api/v1/applications/{identifier}').json()
     return headers, current, submitted
+
+
+def rubles(data, name):
+    return Decimal(data[name + '_rubles'].replace(' ₽', '').replace(' ', '').replace(',', '.'))
 
 
 def facts(fake):
@@ -68,17 +73,19 @@ def test_current_summary_contains_finances_checks_lr_and_explicit_units(client, 
     assert output['knowledge_version'] == current['catalog_version']
     assert datetime.fromisoformat(output['generated_at']).tzinfo is not None
     sources = json.loads(fake.calls[-1][1])['sources']
-    assert output['sources'] == [sources[0]]
+    assert output['sources'][0]['id'] == sources[0]['id']
+    assert json.loads(output['sources'][0]['text'])['amount_kopecks'] == current['amount_kopecks']
     data = facts(fake)
-    assert data['request']['amount_kopecks'] == current['amount_kopecks']
-    assert data['request']['revenue_kopecks'] == current['revenue_kopecks']
+    assert rubles(data['request'], 'amount') == Decimal(current['amount_kopecks']) / 100
+    assert rubles(data['request'], 'revenue') == Decimal(current['revenue_kopecks']) / 100
     assert set(data['checks']['results']) == {'registry', 'tax', 'bki'}
-    assert data['calculation']['data']['monthly_payment_kopecks'] > 0
+    assert rubles(data['calculation']['data'], 'monthly_payment') > 0
     risk = data['requested_terms']
     assert risk['status'] == 'succeeded' and risk['data']['contributions']
     assert risk['data']['processing_run_id'] == submitted['processing_run_id']
     assert risk['data']['prediction_scope'] == 'requested_terms'
-    assert 'копейках' in data['units']['money'] and '100' in data['units']['money']
+    assert 'units' not in data
+    assert '_kopecks' not in sources[0]['text']
     system = fake.calls[-1][0]
     assert 'недоверенные данные' in system
     assert 'линейные вклады' in system and 'самостоятельную рекомендацию' in system
@@ -95,9 +102,9 @@ def test_initial_and_offered_terms_and_risks_are_separate(client, db, fake):
     current = client.get(f"/api/v1/applications/{current['id']}").json()
     assert summary(client, headers, current).status_code == 200
     data = facts(fake)
-    assert data['request']['amount_kopecks'] == current['amount_kopecks']
-    assert data['requested_terms']['data']['terms']['amount_kopecks'] == current['amount_kopecks']
-    assert data['offered_terms']['data']['terms']['amount_kopecks'] == offer['amount_kopecks']
+    assert rubles(data['request'], 'amount') == Decimal(current['amount_kopecks']) / 100
+    assert rubles(data['requested_terms']['data']['terms'], 'amount') == Decimal(current['amount_kopecks']) / 100
+    assert rubles(data['offered_terms']['data']['terms'], 'amount') == Decimal(offer['amount_kopecks']) / 100
     assert data['offered_terms']['data']['offer_version'] == offer['version']
     db.execute(update(Offer).where(Offer.id == uuid.UUID(offer['id'])).values(status='superseded'))
     db.execute(update(Application).where(Application.id == uuid.UUID(current['id'])).values(status='manual_review'))
@@ -263,9 +270,9 @@ def test_accepted_offer_is_shared_by_client_chat_and_summary_with_its_own_risk(c
     assert agreed['title'] == 'Согласованные условия: принятое предложение'
     assert agreed['version'] == str(current['version'])
     assert agreed_data['status'] == 'accepted' and agreed_data['version'] == offer['version'] + 1
-    assert (agreed_data['amount_kopecks'], agreed_data['term_months']) == (10000000, original['term_months'] + 6)
+    assert (rubles(agreed_data, 'amount'), agreed_data['term_months']) == (100000, original['term_months'] + 6)
     requested = json.loads(next(source['text'] for source in sources if source['id'].endswith(':request')))
-    assert (requested['amount_kopecks'], requested['term_months']) == (original['amount_kopecks'], original['term_months'])
+    assert (rubles(requested, 'amount'), requested['term_months']) == (Decimal(original['amount_kopecks']) / 100, original['term_months'])
     assert 'probability' not in str(sources) and 'risk_assessment_id' not in str(sources)
 
     headers = authenticate(client, 'staff@example.test')
@@ -280,8 +287,8 @@ def test_accepted_offer_is_shared_by_client_chat_and_summary_with_its_own_risk(c
     assert risk['assessment_id'] == str(db.get(Offer, uuid.UUID(offer['id'])).risk_assessment_id)
     assert risk['revision_id'] == submitted['revision_id'] and risk['processing_run_id'] == submitted['processing_run_id']
     assert risk['offer_version'] == offer['version']
-    assert (risk['terms']['amount_kopecks'], risk['terms']['term_months']) == (offer['amount_kopecks'], offer['term_months'])
-    assert (data['requested_terms']['data']['terms']['amount_kopecks'], data['requested_terms']['data']['terms']['term_months']) == (original['amount_kopecks'], original['term_months'])
+    assert (rubles(risk['terms'], 'amount'), risk['terms']['term_months']) == (Decimal(offer['amount_kopecks']) / 100, offer['term_months'])
+    assert (rubles(data['requested_terms']['data']['terms'], 'amount'), data['requested_terms']['data']['terms']['term_months']) == (Decimal(original['amount_kopecks']) / 100, original['term_months'])
 
 
 @pytest.mark.parametrize('offer_status,application_status,previous_revision', [
@@ -315,7 +322,7 @@ def test_current_open_clarification_and_missing_finances_are_explicit(client, fa
     headers, current, _ = ready(client, 'c')
     assert summary(client, headers, current).status_code == 200
     data = facts(fake)
-    assert data['request']['revenue_kopecks'] == current['revenue_kopecks']
+    assert rubles(data['request'], 'revenue') == Decimal(current['revenue_kopecks']) / 100
     sources = json.loads(fake.calls[-1][1])['sources']
     clarifications = [json.loads(source['text']) for source in sources if ':clarification:' in source['id']]
     assert len(clarifications) == 1 and 'revenue_kopecks' in clarifications[0]['requested_fields']
