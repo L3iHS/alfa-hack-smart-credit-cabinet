@@ -4,6 +4,7 @@ import { useSession } from "../auth/session";
 import { api, errorMessage } from "../api/client";
 import type { Company } from "../api/types";
 import { RouteFocus, useResource } from "./shared";
+import { ToastProvider } from "./Toast";
 
 export function Brand() {
   return (
@@ -28,6 +29,7 @@ export default function AppShell() {
   const [busy, setBusy] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   return (
+    <ToastProvider>
     <div className="shell">
       <a className="skip-link" href="#content">
         К содержимому
@@ -74,6 +76,8 @@ export default function AppShell() {
             </div>
             <button
               className="logout"
+              aria-label="Выйти"
+              title="Выйти из аккаунта"
               disabled={busy}
               onClick={async () => {
                 setBusy(true);
@@ -87,7 +91,6 @@ export default function AppShell() {
                 }
               }}
             >
-              Выйти
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path
                   d="M10 5H5v14h5 M10 12h11 M17 8l4 4-4 4"
@@ -110,5 +113,6 @@ export default function AppShell() {
         </main>
       </div>
     </div>
+    </ToastProvider>
   );
 }

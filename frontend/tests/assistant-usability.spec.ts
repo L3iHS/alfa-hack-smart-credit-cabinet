@@ -120,7 +120,11 @@ test('chat explains list context, shows application number, resizes up left and 
   expect(await dialog.getByText('Ваш вопрос', { exact: true }).evaluate(element => element.getBoundingClientRect().width)).toBe(1);
   await input.fill('Черновик'); const initial = (await dialog.boundingBox())!;
   const handle = (await dialog.locator('.assistant-resize-handle').boundingBox())!;
-  await page.mouse.move(handle.x + 7, handle.y + 7); await page.mouse.down(); await page.mouse.move(handle.x - 260, handle.y - 130, { steps: 8 }); await page.mouse.up();
+  expect(handle.width).toBeGreaterThanOrEqual(36);
+  expect(handle.height).toBeGreaterThanOrEqual(36);
+  expect(handle.x).toBeGreaterThan(initial.x + 5);
+  expect(handle.y).toBeGreaterThan(initial.y + 5);
+  await page.mouse.move(handle.x + 18, handle.y + 18); await page.mouse.down(); await page.mouse.move(handle.x - 260, handle.y - 130, { steps: 8 }); await page.mouse.up();
   const resized = (await dialog.boundingBox())!; expect(resized.width).toBeGreaterThan(initial.width + 200); expect(resized.height).toBeGreaterThan(initial.height + 100);
   expect(Math.abs(resized.x + resized.width - initial.x - initial.width)).toBeLessThan(2);
   expect(Math.abs(resized.y + resized.height - initial.y - initial.height)).toBeLessThan(2);

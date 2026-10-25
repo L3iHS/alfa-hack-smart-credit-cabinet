@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { ApplicationStatus } from "../api/types";
 import { ApiError, errorMessage } from "../api/client";
+import { useToast } from "./Toast";
 
 export function Loading() {
   return (
@@ -107,18 +108,16 @@ export function PageHeading({
   );
 }
 export function ApplicationNumber({ number }: { number: string }) {
-  const [feedback, setFeedback] = useState("");
+  const showToast = useToast();
   return <span className="application-number">
-    <span>{number || "Номер не указан"}</span>
     <button className="copy-number" type="button" aria-label={`Скопировать номер ${number}`} title="Скопировать номер" disabled={!number} onClick={async () => {
       try {
         await navigator.clipboard.writeText(number);
-        setFeedback("Номер скопирован");
+        showToast("Номер скопирован");
       } catch {
-        setFeedback("Не удалось скопировать. Выделите номер и скопируйте его вручную");
+        showToast("Не удалось скопировать. Выделите номер и скопируйте его вручную", true);
       }
-    }}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="11" height="13" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="1.6"/></svg></button>
-    <span className="copy-feedback" role="status">{feedback}</span>
+    }}><span>{number || "Номер не указан"}</span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="11" height="13" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="1.6"/></svg></button>
   </span>;
 }
 export function Status({ status = "draft" }: { status?: ApplicationStatus }) {

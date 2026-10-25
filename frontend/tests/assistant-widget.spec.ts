@@ -27,7 +27,12 @@ for (const width of [390, 1366]) test(`assistant exchanges launcher for compact 
   await dialog.evaluate(element => Promise.all(element.getAnimations().map(animation => animation.finished)));
   await expect(launcher).toBeHidden();
   await expect(dialog.getByRole('heading')).toBeFocused();
-  await page.keyboard.press('Tab'); await expect(dialog.getByRole('button', { name: 'Закрыть помощника' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  if (width > 640) {
+    await expect(dialog.getByRole('button', { name: 'Развернуть помощника' })).toBeFocused();
+    await page.keyboard.press('Tab');
+  }
+  await expect(dialog.getByRole('button', { name: 'Закрыть помощника' })).toBeFocused();
   const input = dialog.getByLabel('Ваш вопрос');
   const submit = dialog.getByRole('button', { name: 'Спросить', exact: true });
   await expect(submit).toBeDisabled();

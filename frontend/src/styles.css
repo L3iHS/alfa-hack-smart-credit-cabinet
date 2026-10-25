@@ -2304,11 +2304,13 @@ dd {
 
 /* Компактный кабинет: навигация и аккаунт собраны в левой панели. */
 .sidebar { gap: 0; overflow-y: auto; }
-.sidebar .account-menu { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; margin: auto 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
-.sidebar .company-avatar { width: 36px; height: 36px; background: #e5e7eb; color: #41454d; }
+.sidebar .account-menu { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; gap: 8px; margin: auto 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
+.sidebar .company-avatar { width: 36px; height: 36px; background: #fff0ee; color: #b8241b; }
 .sidebar .company-name { font-size: 13px; }
 .sidebar .company-name > span { font-size: 11px; }
-.sidebar .logout { grid-column: 1 / -1; justify-content: flex-start; min-height: 44px; padding: 8px 4px; gap: 10px; }
+.sidebar .logout { justify-content: center; width: 36px; min-height: 44px; padding: 8px; border-radius: 10px; color: #b8241b; }
+.sidebar .logout:hover { background: #fff0ee; color: #971d16; }
+.sidebar .logout svg { width: 20px; height: 20px; }
 .sidebar nav { margin-bottom: 28px; }
 .mobile-account-toggle { display: none; }
 .workspace main { padding-top: 28px; min-height: 100vh; }
@@ -2316,18 +2318,22 @@ dd {
 .page-title-line h1 { min-width: 0; overflow-wrap: anywhere; font-size: 32px; }
 .page-title-line .back-link { width: 44px; min-height: 44px; justify-content: center; font-size: 32px; margin-left: -8px; }
 .page-metadata { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin-top: 7px; color: var(--muted); font-size: 12px; }
-.application-number { display: inline-flex; position: relative; flex-wrap: wrap; gap: 0 5px; align-items: center; color: var(--muted); font-size: 12px; max-width: 100%; }
-.copy-number { display: inline-grid; place-items: center; width: 32px; height: 36px; border: 0; border-radius: 7px; background: transparent; color: #626773; flex: none; }
-.copy-number:hover { background: #e9ebee; color: #242426; }
-.copy-number svg { width: 17px; height: 17px; }
-.copy-feedback:empty { display: none; }
-.copy-feedback { flex-basis: 100%; max-width: 100%; color: #444a53; padding: 2px 0; font-size: 12px; line-height: 1.4; }
+.application-number { display: inline-flex; position: relative; align-items: center; color: var(--muted); font-size: 12px; max-width: 100%; }
+.copy-number { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 5px 6px; margin-left: -6px; border: 0; border-radius: 7px; background: transparent; color: #626773; font-size: inherit; white-space: nowrap; }
+.copy-number:hover { background: #fff0ee; color: #b8241b; }
+.copy-number svg { width: 15px; height: 15px; flex-shrink: 0; }
+.toast-region { position: fixed; z-index: 100; top: 20px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); pointer-events: none; }
+.toast { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 12px; background: #242426; color: #fff; box-shadow: 0 6px 24px #18181b26; font-size: 14px; line-height: 1.45; }
+.toast svg { width: 20px; height: 20px; flex-shrink: 0; color: #94dbaf; }
+.toast-error svg { color: #ffbbb4; }
 .list-heading, .application-row { grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr) minmax(145px, 1.1fr) 120px; gap: 18px; }
-.application-row { min-height: 96px; padding-top: 17px; padding-bottom: 17px; }
+.application-row { min-height: 96px; padding-top: 17px; padding-bottom: 17px; isolation: isolate; }
 .application-row > div { min-width: 0; }
 .application-title { display: inline-block; max-width: 100%; color: #242426; }
 .application-title:hover { color: #b8241b; text-decoration: underline; text-underline-offset: 3px; }
-.application-row .application-number { display: flex; width: fit-content; }
+.application-title::after { content: ""; position: absolute; inset: 0; z-index: 1; }
+.application-row:has(.application-title:focus-visible) { outline: 3px solid #2273ce; outline-offset: -3px; }
+.application-row .application-number { display: flex; width: fit-content; z-index: 2; }
 .application-row time, .list-heading > :last-child { text-align: right; }
 .status, .analytics-outcome, .risk-band { width: fit-content; justify-self: start; align-self: center; }
 .page-heading > .status { flex-shrink: 0; }
@@ -2409,7 +2415,7 @@ dd {
   .application-row .amount { grid-column: 1; grid-row: 2; font-size: 15px; }
   .application-row .status { grid-column: 1; grid-row: 3; }
   .application-row time { grid-column: 2; grid-row: 2 / 4; display: block; align-self: end; font-size: 11px; }
-  .copy-number { width: 36px; height: 36px; }
+  .copy-number { min-height: 40px; }
   .form-main, .details-main { gap: 20px; }
   .form-panel, .details-panel, .review-panel, .assessment-panel, .documents-panel { padding: 20px; }
   .form-aside { position: static; }

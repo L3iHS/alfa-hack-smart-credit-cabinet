@@ -12,7 +12,7 @@ export function useAssistantSize() {
   const drag = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   function start(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || window.innerWidth <= 640) return;
-    const box = event.currentTarget.parentElement!.getBoundingClientRect();
+    const box = event.currentTarget.closest('.assistant-chat-window')!.getBoundingClientRect();
     drag.current = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };
     event.currentTarget.setPointerCapture(event.pointerId);
     event.preventDefault();
