@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.applications.service import require_client
@@ -8,7 +8,7 @@ from app.assistant.chat import answer_chat
 from app.assistant.intake import extract_intake
 from app.assistant.provider import Provider, get_provider
 from app.assistant.schemas import AnswerOutput, ChatInput, IntakeInput, IntakeOutput, SummaryInput, SummaryOutput
-from app.assistant.summary import summarize_application
+from app.assistant.summary import saved_application_summary, summarize_application
 from app.auth.models import User
 from app.auth.service import get_current_user
 from app.core.db import get_db
@@ -36,3 +36,11 @@ def summary(application_id: uuid.UUID, body: SummaryInput, request: Request,
             user: User = Depends(get_current_user), db: Session = Depends(get_db),
             provider: Provider = Depends(get_provider)):
     return summarize_application(application_id, body, request, db, user, provider)
+
+
+@router.get('/applications/{application_id}/summary', response_model=SummaryOutput | None)
+def saved_summary(application_id: uuid.UUID, request: Request,
+                  expected_version: int = Query(ge=1, le=2_147_483_647),
+                  user: User = Depends(get_current_user), db: Session = Depends(get_db),
+                  provider: Provider = Depends(get_provider)):
+    return saved_application_summary(application_id, expected_version, request, db, user, provider)

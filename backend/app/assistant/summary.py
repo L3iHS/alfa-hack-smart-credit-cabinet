@@ -7,8 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.applications.submission_models import ProcessingRun
+from app.applications.service import get_application
+from app.assistant.cache import fingerprint, read_summary, row_data, save_summary
 from app.assistant.answers import validate_answer
-from app.assistant.context import build_application_context, revalidate_access, _date_text
+from app.assistant.context import build_application_context, revalidate_access, version_conflict, _date_text
 from app.assistant.provider import Provider
 from app.assistant.schemas import GeneratedAnswer, Source, SummaryInput, SummaryOutput
 from app.auth.models import User
@@ -72,11 +74,9 @@ def generate_summary_response(sources: list[Source], provider: Provider) -> dict
         ensure_ascii=False), schema=GeneratedAnswer.model_json_schema())
 
 
-def summarize_application(application_id: uuid.UUID, body: SummaryInput, request: Request,
-                          db: Session, user: User, provider: Provider) -> SummaryOutput:
+def summary_snapshot(application_id: uuid.UUID, expected_version: int, db: Session, user: User):
     require_staff(user)
-    user_id, role = user.id, user.role
-    context = build_application_context(db, user, application_id, body.expected_version)
+    context = build_application_context(db, user, application_id, expected_version)
     current = assessment(db, user, application_id)
     revision = latest_revision(db, application_id)
     run = next((item for item in reversed(current.runs) if item.revision_id == current.revision_id), None)
@@ -155,11 +155,60 @@ def summarize_application(application_id: uuid.UUID, body: SummaryInput, request
         add(scope, 'Риск исходных условий' if scope == 'requested_terms' else 'Риск действующего предложения', {
             'status': status, 'note': notes[status], 'data': risk.model_dump() if risk else None})
 
+    # Включаем исходные входы риска и попытку обработки: они могут измениться внутри одной версии заявки.
+    risks = list(db.scalars(select(RiskAssessment).where(
+        RiskAssessment.processing_run_id == run.id).order_by(RiskAssessment.id))) if run else []
+    facts = {'sources': [source.model_dump() for source in sources],
+        'run': row_data(run_row), 'assessment': current.model_dump(mode='json'),
+        'revision': row_data(revision), 'risks': [row_data(row) for row in risks],
+        'documents': [row_data(row) for row in sorted(documents, key=lambda row: str(row.id))],
+        'product': product.model_dump(mode='json')}
+    return context, current, run, sources, facts
+
+
+def _locked_snapshot(application_id, expected_version, request, db, user_id, role):
+    user = revalidate_access(db, request, user_id, role)
+    require_staff(user)
+    # Все штатные изменения рассмотрения сначала блокируют строку заявки.
+    get_application(db, user, application_id, lock=True)
+    return summary_snapshot(application_id, expected_version, db, user)
+
+
+def saved_application_summary(application_id: uuid.UUID, expected_version: int, request: Request,
+                              db: Session, user: User, provider: Provider) -> SummaryOutput | None:
+    require_staff(user)
+    user_id, role = user.id, user.role
+    db.rollback()
+    context, _, _, _, facts = _locked_snapshot(application_id, expected_version, request, db, user_id, role)
+    key = fingerprint(facts, provider, SYSTEM, GeneratedAnswer.model_json_schema())
+    return read_summary(db, application_id, context.version, key)
+
+
+def summarize_application(application_id: uuid.UUID, body: SummaryInput, request: Request,
+                          db: Session, user: User, provider: Provider) -> SummaryOutput:
+    require_staff(user)
+    user_id, role = user.id, user.role
+    started_at = datetime.now(timezone.utc)
+    db.rollback()
+    context, current, run, sources, facts = _locked_snapshot(
+        application_id, body.expected_version, request, db, user_id, role)
+    key = fingerprint(facts, provider, SYSTEM, GeneratedAnswer.model_json_schema())
+    if not body.refresh:
+        cached = read_summary(db, application_id, context.version, key)
+        if cached:
+            return cached
+    # Ни блокировка заявки, ни блокировка сессии не удерживаются во время сети.
     db.rollback()
     raw = generate_summary_response(sources, provider)
-    revalidate_access(db, request, user_id, role, context)
+    _, _, _, _, latest_facts = _locked_snapshot(
+        application_id, body.expected_version, request, db, user_id, role)
+    if fingerprint(latest_facts, provider, SYSTEM, GeneratedAnswer.model_json_schema()) != key:
+        raise version_conflict()
     generated, cited = validate_answer(raw, sources)
-    return SummaryOutput(status='answered', answer=generated.answer, sources=cited, model=provider.model,
+    result = SummaryOutput(status='answered', answer=generated.answer, sources=cited, model=provider.model,
         knowledge_version=context.catalog_version, application_version=context.version,
         revision_id=current.revision_id, processing_run_id=run.id if run else None,
         generated_at=datetime.now(timezone.utc))
+    result = save_summary(db, application_id, context.version, key, started_at, result)
+    db.commit()
+    return result

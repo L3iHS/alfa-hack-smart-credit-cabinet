@@ -123,6 +123,7 @@ class GeneratedAnswer(AssistantSchema):
 
 class SummaryInput(AssistantSchema):
     expected_version: Annotated[StrictInt, Field(ge=1, le=2_147_483_647)]
+    refresh: StrictBool = False
 
 
 class SummaryOutput(AnswerOutput):

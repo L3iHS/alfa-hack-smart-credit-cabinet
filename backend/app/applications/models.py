@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Sequence, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -10,6 +10,8 @@ from app.core.db import Base
 class Application(Base):
     __tablename__ = 'applications'
     __table_args__ = (
+        UniqueConstraint('number', name='unique_application_number'),
+        CheckConstraint('number > 0', name='positive_application_number'),
         CheckConstraint('version > 0', name='positive_application_version'),
         CheckConstraint('amount_kopecks >= 0', name='nonnegative_application_amount'),
         CheckConstraint('term_months > 0', name='positive_application_term'),
@@ -19,6 +21,8 @@ class Application(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    number: Mapped[int] = mapped_column(BigInteger, Sequence('application_number_seq'),
+        server_default=Sequence('application_number_seq').next_value())
     company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('companies.id'), index=True)
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('users.id'))
     version: Mapped[int] = mapped_column(default=1)
@@ -39,6 +43,10 @@ class Application(Base):
     revenue_kopecks: Mapped[int | None] = mapped_column(BigInteger)
     operating_expenses_kopecks: Mapped[int | None] = mapped_column(BigInteger)
     existing_debt_payments_kopecks: Mapped[int | None] = mapped_column(BigInteger)
+
+    @property
+    def display_number(self) -> str:
+        return f'КЗ-{self.number:06d}'
 
 
 class ApplicationEvent(Base):

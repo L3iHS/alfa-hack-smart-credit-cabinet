@@ -53,6 +53,7 @@ class DraftPatch(DraftFields):
 
 class ApplicationOutput(DraftFields):
     id: uuid.UUID
+    display_number: str
     version: int
     status: ApplicationStatus
     updated_at: datetime
