@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { ApplicationStatus } from "../api/types";
 import { ApiError, errorMessage } from "../api/client";
@@ -209,8 +209,49 @@ export const statusLabels: Record<ApplicationStatus, string> = {
 };
 
 export function StatusFilter({ value, staff = false, onChange }: { value: ApplicationStatus | ''; staff?: boolean; onChange: (status: ApplicationStatus | '') => void }) {
-  return <select className="application-status-filter" aria-label="Статус" value={value} onChange={event => onChange(event.target.value as ApplicationStatus | '')}>
-    <option value="">Все статусы</option>
-    {Object.entries(statusLabels).filter(([status]) => !staff || status !== 'draft').map(([status, label]) => <option key={status} value={status}>{label}</option>)}
-  </select>;
+  const id = useId();
+  const root = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const options: { value: ApplicationStatus | ''; label: string }[] = [
+    { value: '', label: 'Все статусы' },
+    ...Object.entries(statusLabels).filter(([status]) => !staff || status !== 'draft').map(([status, label]) => ({ value: status as ApplicationStatus, label })),
+  ];
+  const selected = Math.max(0, options.findIndex(option => option.value === value));
+  useEffect(() => {
+    if (!open) return;
+    function outside(event: PointerEvent) { if (!root.current?.contains(event.target as Node)) setOpen(false); }
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, [open]);
+  useEffect(() => {
+    const option = list.current?.children[active] as HTMLElement | undefined;
+    if (!open || !option || !list.current) return;
+    if (option.offsetTop < list.current.scrollTop) list.current.scrollTop = option.offsetTop;
+    else if (option.offsetTop + option.offsetHeight > list.current.scrollTop + list.current.clientHeight) list.current.scrollTop = option.offsetTop + option.offsetHeight - list.current.clientHeight;
+  }, [active, open]);
+  function choose(index: number) { onChange(options[index].value); setOpen(false); }
+  function keyboard(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'Tab') { setOpen(false); return; }
+    if (event.key === 'Escape') { if (open) { event.preventDefault(); event.stopPropagation(); } setOpen(false); return; }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault(); const direction = event.key === 'ArrowDown' ? 1 : -1;
+      setActive(((open ? active : selected) + direction + options.length) % options.length); setOpen(true);
+    } else if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault(); setActive(event.key === 'Home' ? 0 : options.length - 1); setOpen(true);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault(); if (open) choose(active); else { setActive(selected); setOpen(true); }
+    }
+  }
+  return <div className="purpose-picker status-picker" ref={root} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
+    <button type="button" className="purpose-trigger" role="combobox" aria-label="Статус" aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? `${id}-options` : undefined} aria-activedescendant={open ? `${id}-option-${active}` : undefined} onClick={() => { setActive(selected); setOpen(current => !current); }} onKeyDown={keyboard}>
+      <span>{options[selected].label}</span><span className="purpose-chevron" aria-hidden="true" />
+    </button>
+    {open && <ul ref={list} id={`${id}-options`} className="purpose-options status-options" role="listbox" aria-label="Статус">
+      {options.map((option, index) => <li id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value === value} className={active === index ? 'active' : ''} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(index)} onClick={() => choose(index)}>
+        <span className="status-option-check" aria-hidden="true">{option.value === value && <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="m3 8 3 3 7-7" /></svg>}</span><span>{option.label}</span>
+      </li>)}
+    </ul>}
+  </div>;
 }

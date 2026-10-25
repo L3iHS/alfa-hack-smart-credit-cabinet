@@ -35,8 +35,7 @@ export default function StaffApplicationsPage() {
       <PageHeading
         title="Заявки"
         subtitle="Рабочая очередь сотрудника банка"
-      />
-      <div className="application-filters"><StatusFilter staff value={status} onChange={filter} /></div>
+      ><div className="application-list-actions"><StatusFilter staff value={status} onChange={filter} /></div></PageHeading>
       {error ? (
         <ErrorPanel error={error} retry={reload} />
       ) : !data ? (

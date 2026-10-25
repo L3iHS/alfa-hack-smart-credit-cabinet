@@ -141,7 +141,10 @@ function Details({
         title={product?.name || "Кредитная заявка"}
         metadata={<><ApplicationNumber number={item.display_number} /><time dateTime={item.updated_at}>Изменена {dateTime(item.updated_at)}</time></>}
       >
-        <Status status={item.status} />
+        <div className="application-heading-actions">
+          <Status status={item.status} />
+          {!staff && <WithdrawalAction application={item} locked={locked} lock={setWithdrawalLocked} changed={refresh} />}
+        </div>
       </PageHeading>
       {refreshError && (
         <div className="notice error" role="status">
@@ -254,7 +257,6 @@ function Details({
             locked={withdrawalLocked}
             lock={setReviewLocked}
           />
-          {!staff && <WithdrawalAction application={item} locked={locked} lock={setWithdrawalLocked} changed={refresh} />}
           <div ref={documentsRef}><ApplicationDocuments
             application={item}
             required={product?.required_document_types || []}

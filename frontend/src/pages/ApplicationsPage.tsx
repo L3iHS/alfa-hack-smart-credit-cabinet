@@ -39,11 +39,13 @@ export default function ApplicationsPage() {
         title="Мои заявки"
         subtitle="Здесь всё, что нужно для продолжения работы с кредитом"
       >
-        <Link className="button primary" to="/applications/new">
-          <span aria-hidden="true">＋</span> Новая заявка
-        </Link>
+        <div className="application-list-actions">
+          <StatusFilter value={status} onChange={filter} />
+          <Link className="button primary" to="/applications/new">
+            <span aria-hidden="true">＋</span> Новая заявка
+          </Link>
+        </div>
       </PageHeading>
-      <div className="application-filters"><StatusFilter value={status} onChange={filter} /></div>
       {data && <AssistantPanel owner={user!.id} catalog={data.catalog} />}
       {error ? (
         <ErrorPanel error={error} retry={reload} />

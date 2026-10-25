@@ -19,8 +19,10 @@ async function setup(page: Page, staff = false, conflict = false) {
   return { posts, withdraw: () => { withdrawn = true; } };
 }
 
-test('client cancels then confirms withdrawal and sees terminal state and history', async ({ page }) => {
-  const { posts } = await setup(page); const action = page.getByRole('button', { name: 'Отозвать заявку', exact: true }); await action.click();
+test('client cancels then confirms withdrawal and sees terminal state and history', async ({ page }, testInfo) => {
+  const { posts } = await setup(page); const action = page.getByRole('button', { name: 'Отозвать заявку', exact: true });
+  await expect(page.locator('.page-heading').getByRole('button', { name: 'Отозвать заявку', exact: true })).toBeVisible();
+  await expect(action).toBeInViewport(); await page.screenshot({ path: testInfo.outputPath('withdrawal-top.png') }); await action.click();
   const dialog = page.getByRole('dialog', { name: 'Отозвать заявку?' }); await expect(dialog.getByRole('button', { name: 'Продолжить рассмотрение' })).toBeFocused();
   await page.keyboard.press('Tab'); await expect(dialog.getByRole('button', { name: 'Отозвать заявку', exact: true })).toBeFocused(); await page.keyboard.press('Tab'); await expect(dialog.getByRole('button', { name: 'Продолжить рассмотрение' })).toBeFocused();
   await page.keyboard.press('Escape'); await expect(dialog).toBeHidden(); expect(posts).toEqual([]); await expect(action).toBeFocused();
@@ -35,6 +37,12 @@ test('client cancels then confirms withdrawal and sees terminal state and histor
 test('version conflict prevents blind repeat and requires refreshing details', async ({ page }) => {
   const { posts } = await setup(page, false, true); await page.getByRole('button', { name: 'Отозвать заявку', exact: true }).click(); const dialog = page.getByRole('dialog', { name: 'Отозвать заявку?' }); await dialog.getByRole('button', { name: 'Отозвать заявку', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Заявка изменилась'); await expect(dialog.getByRole('button', { name: 'Отозвать заявку', exact: true })).toBeDisabled(); await dialog.getByRole('button', { name: 'Обновить сведения' }).click(); await expect(dialog.getByRole('alert')).toHaveCount(0); expect(posts).toHaveLength(1);
+});
+
+for (const width of [320, 390]) test(`withdrawal is visible in the card heading ${width}`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 800 }); await setup(page);
+  await expect(page.locator('.page-heading').getByRole('button', { name: 'Отозвать заявку', exact: true })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('staff sees withdrawal history and neutral interrupted processing without client commands', async ({ page }) => {
@@ -64,10 +72,35 @@ for (const staff of [false, true]) test(`withdrawn status is available in ${staf
   });
   await page.goto(staff ? '/staff/applications' : '/applications'); await expect(page.locator('.application-row .status-withdrawn')).toHaveText('Отозвана');
   await page.getByRole('button', { name: 'Далее', exact: true }).click(); await expect(page.getByText('21–21 из 21', { exact: true })).toBeVisible();
-  const select = page.getByLabel('Статус'); await expect(select.getByRole('option', { name: 'Отозвана', exact: true })).toHaveCount(1);
-  await expect(select.getByRole('option', { name: 'Черновик', exact: true })).toHaveCount(staff ? 0 : 1);
+  const select = page.getByRole('combobox', { name: 'Статус', exact: true }); await select.click();
+  const menu = page.getByRole('listbox', { name: 'Статус', exact: true });
+  await expect(menu.getByRole('option', { name: 'Отозвана', exact: true })).toHaveCount(1);
+  await expect(menu.getByRole('option', { name: 'Черновик', exact: true })).toHaveCount(staff ? 0 : 1);
   const filtered = page.waitForRequest(request => { const url = new URL(request.url()); return url.pathname === '/api/v1/applications' && url.searchParams.get('status') === 'withdrawn' && url.searchParams.get('offset') === '0'; });
-  await select.selectOption('withdrawn'); await filtered;
+  await menu.getByRole('option', { name: 'Отозвана', exact: true }).click(); await filtered;
   await expect(page.getByRole('heading', { name: 'Заявок с таким статусом нет' })).toBeVisible();
-  await page.getByRole('button', { name: 'Сбросить фильтр' }).click(); await expect(select).toHaveValue('');
+  await page.getByRole('button', { name: 'Сбросить фильтр' }).click(); await expect(select).toHaveText('Все статусы');
+});
+
+for (const width of [320, 390, 1366]) test(`status picker shares heading actions and supports keyboard ${width}`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width, height: 800 }); await setup(page);
+  await page.goto('/applications');
+  const picker = page.getByRole('combobox', { name: 'Статус', exact: true });
+  const create = page.locator('.page-heading').getByRole('link', { name: 'Новая заявка' });
+  await expect(picker).toBeVisible();
+  const filterBox = await picker.boundingBox(), createBox = await create.boundingBox();
+  expect(Math.abs(filterBox!.y - createBox!.y)).toBeLessThan(3);
+  expect(filterBox!.x + filterBox!.width).toBeLessThanOrEqual(createBox!.x);
+  await picker.focus(); await page.keyboard.press('Enter');
+  await expect(page.getByRole('option', { name: 'Все статусы', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('End'); await page.keyboard.press('Enter'); await expect(picker).toHaveText('Отозвана');
+  await picker.click(); await page.keyboard.press('Escape'); await expect(page.getByRole('listbox')).toHaveCount(0); await expect(picker).toBeFocused();
+  await picker.click(); await page.getByRole('heading', { name: 'Мои заявки', exact: true }).click(); await expect(page.getByRole('listbox')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await picker.click();
+  const check = page.getByRole('option', { name: 'Отозвана', exact: true }).locator('.status-option-check');
+  const checkBox = await check.boundingBox(), tickBox = await check.locator('svg').boundingBox();
+  expect(tickBox!.width).toBeLessThan(checkBox!.width);
+  expect(tickBox!.height).toBeLessThan(checkBox!.height);
+  await page.screenshot({ path: testInfo.outputPath(`status-picker-${width}.png`) });
 });
