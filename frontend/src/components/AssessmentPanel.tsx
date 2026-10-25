@@ -18,10 +18,12 @@ export default function AssessmentPanel({
   data,
   error,
   reload,
+  withdrawn = false,
 }: {
   data: Assessment | null;
   error: unknown;
   reload: () => void;
+  withdrawn?: boolean;
 }) {
   return (
     <section
@@ -66,7 +68,7 @@ export default function AssessmentPanel({
                       : "Оценка риска не сохранена"}
               </p>
             )}
-            {run.error_code && (
+            {withdrawn && run.status === "interrupted" && run.error_code === "application_withdrawn" ? <div className="notice">Рассмотрение прекращено по отзыву клиента. Предыдущие сведения сохранены.</div> : run.error_code && (
               <div className="notice error">
                 Обработка не завершена из-за технического сбоя. Кредитное решение не принято. Код ошибки доступен в технических сведениях.
               </div>

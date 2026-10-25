@@ -44,8 +44,8 @@ test('sent question appears in chat and next draft survives the pending and comp
   await expect(input).toHaveValue('Как выбрать срок?');
   await page.screenshot({ path: testInfo.outputPath('assistant-exchange.png') });
   release = undefined; await dialog.getByRole('button', { name: 'Спросить', exact: true }).click();
-  await expect(dialog.getByRole('group', { name: 'Ваше сообщение' })).toContainText('Как выбрать срок?');
-  await expect(dialog).not.toContainText('Для покупки оборудования нужен счёт.'); await expect(input).toHaveValue('');
+  await expect(dialog.getByRole('group', { name: 'Ваше сообщение' })).toHaveCount(2); await expect(dialog.getByRole('group', { name: 'Ваше сообщение' }).last()).toContainText('Как выбрать срок?');
+  await expect(dialog).toContainText('Для покупки оборудования нужен счёт.'); await expect(input).toHaveValue('');
   await expect.poll(() => Boolean(release)).toBe(true); release!(); await expect(dialog).toContainText('Для покупки оборудования нужен счёт.');
   expect(questions).toEqual(['Какие документы нужны?', 'Как выбрать срок?']);
 });

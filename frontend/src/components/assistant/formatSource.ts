@@ -33,7 +33,7 @@ const values: Record<string, string> = {
   active: 'Действует', accepted: 'Принято клиентом', declined: 'Отклонено клиентом', superseded: 'Заменено', open: 'Открыт', answered: 'Ответ получен',
   low: 'Низкий', elevated: 'Повышенный', high: 'Высокий', annuity: 'Аннуитет', revolving: 'Лимит с возвратом в конце срока', guarantee: 'Гарантия',
   upload_document: 'Добавить документ', respond_information: 'Ответить на запрос', make_offer: 'Предложить условия', edit_draft: 'Редактировать', submit: 'Отправить заявку', respond_to_information_request: 'Ответить на запрос', accept_offer: 'Принять условия', decline_offer: 'Отклонить условия',
-  request_information: 'Запросить сведения', create_offer: 'Предложить условия', approve: 'Одобрить', reject: 'Отказать', retry_processing: 'Повторить обработку',
+  request_information: 'Запросить сведения', create_offer: 'Предложить условия', approve: 'Одобрить', reject: 'Отказать', retry_processing: 'Повторить обработку', withdraw: 'Отозвать заявку',
   registry: 'Реестр компаний', tax: 'Налоговые сведения', bki: 'Кредитная история',
 };
 const codeKeys = new Set(['status', 'processing_status', 'outcome', 'payment_kind', 'risk_band', 'available_actions', 'requested_fields', 'document_types', 'missing_document_types', 'requested_document_types', 'missing_checks']);

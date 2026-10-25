@@ -205,4 +205,12 @@ export const statusLabels: Record<ApplicationStatus, string> = {
   counteroffer: "Другие условия",
   approved: "Одобрена",
   rejected: "Отказ",
+  withdrawn: "Отозвана",
 };
+
+export function StatusFilter({ value, staff = false, onChange }: { value: ApplicationStatus | ''; staff?: boolean; onChange: (status: ApplicationStatus | '') => void }) {
+  return <select className="application-status-filter" aria-label="Статус" value={value} onChange={event => onChange(event.target.value as ApplicationStatus | '')}>
+    <option value="">Все статусы</option>
+    {Object.entries(statusLabels).filter(([status]) => !staff || status !== 'draft').map(([status, label]) => <option key={status} value={status}>{label}</option>)}
+  </select>;
+}

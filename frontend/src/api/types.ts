@@ -236,7 +236,8 @@ export type ApplicationStatus =
   | "manual_review"
   | "counteroffer"
   | "approved"
-  | "rejected";
+  | "rejected"
+  | "withdrawn";
 export type ProcessingStatus =
   "pending" | "running" | "succeeded" | "failed" | "interrupted";
 export type Action =
@@ -250,7 +251,8 @@ export type Action =
   | "make_offer"
   | "approve"
   | "reject"
-  | "retry_processing";
+  | "retry_processing"
+  | "withdraw";
 export interface InformationRequest {
   id: string;
   revision_id: string;

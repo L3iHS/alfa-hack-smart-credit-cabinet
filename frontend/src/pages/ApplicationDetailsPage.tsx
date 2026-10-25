@@ -6,6 +6,7 @@ import AssistantPanel from "../components/assistant/AssistantPanel";
 import StaffSummaryPanel from "../components/assistant/StaffSummaryPanel";
 import ApplicationDocuments from "../components/ApplicationDocuments";
 import ReviewActions from "../components/ReviewActions";
+import WithdrawalAction from "../components/WithdrawalAction";
 import AssessmentPanel from "../components/AssessmentPanel";
 import SubmissionPanel from "../components/SubmissionPanel";
 import type {
@@ -68,7 +69,8 @@ function Details({
   const [item, setItem] = useState(initial);
   const [submissionLocked, setSubmissionLocked] = useState(false);
   const [reviewLocked, setReviewLocked] = useState(false);
-  const locked = submissionLocked || reviewLocked;
+  const [withdrawalLocked, setWithdrawalLocked] = useState(false);
+  const locked = submissionLocked || reviewLocked || withdrawalLocked;
   const [refreshError, setRefreshError] = useState("");
   const id = item.id;
   const documentsRef = useRef<HTMLDivElement>(null);
@@ -235,6 +237,7 @@ function Details({
           {staff ? <StaffSummaryPanel owner={user!.id} application={item} catalog={catalog} /> : <AssistantPanel owner={user!.id} application={item} catalog={catalog} />}
           {staff && (
             <AssessmentPanel
+              withdrawn={item.status === "withdrawn"}
               data={assessment.data}
               error={assessment.error}
               reload={assessment.reload}
@@ -248,8 +251,10 @@ function Details({
             changed={refresh}
             assessment={assessment.error ? null : assessment.data}
             refreshAssessment={assessment.reload}
+            locked={withdrawalLocked}
             lock={setReviewLocked}
           />
+          {!staff && <WithdrawalAction application={item} locked={locked} lock={setWithdrawalLocked} changed={refresh} />}
           <div ref={documentsRef}><ApplicationDocuments
             application={item}
             required={product?.required_document_types || []}
@@ -297,6 +302,7 @@ const clientHistoryEvents = new Set([
   "document_uploaded",
   "document_deleted",
   "application_submitted",
+  "application_withdrawn",
   "working_copy_updated",
   "information_responded",
   "offer_accepted",
@@ -342,6 +348,7 @@ function History({ id, version }: { id: string; version: number }) {
                         document_uploaded: "Документ добавлен",
                         document_deleted: "Документ удалён",
                         application_submitted: "Заявка отправлена",
+                        application_withdrawn: "Заявка отозвана клиентом",
                         processing_started: "Проверка началась",
                         processing_completed: "Проверка завершена",
                         processing_failed: "Технический сбой обработки",

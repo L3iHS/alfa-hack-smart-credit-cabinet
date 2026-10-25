@@ -49,6 +49,7 @@ const nextStep = {
   approved:
     "Рассмотрение завершено. Одобрение не означает выдачу денег",
   rejected: "Рассмотрение завершено. Причина решения указана ниже",
+  withdrawn: "Заявка отозвана клиентом. Рассмотрение прекращено.",
 };
 type Draft = {
   declineReason: DeclineReason | "";
@@ -91,6 +92,7 @@ export default function ReviewActions({
   assessment,
   refreshAssessment,
   lock,
+  locked = false,
 }: {
   application: Application;
   owner: string;
@@ -100,6 +102,7 @@ export default function ReviewActions({
   assessment: Assessment | null;
   refreshAssessment: () => void;
   lock: (locked: boolean) => void;
+  locked?: boolean;
 }) {
   const draftKey = `credit-review-form:v1:${owner}:${item.id}`;
   const [draft, setDraft] = useState<Draft>(() =>
@@ -144,11 +147,11 @@ export default function ReviewActions({
   useEffect(() => {
     setOfferedAck(false);
   }, [draft.amount, draft.term, offeredRisk?.assessment_id]);
-  const disabled = command.busy || !!command.pending || command.conflict;
+  const disabled = locked || command.busy || !!command.pending || command.conflict;
   const can = (action: Application["available_actions"][number]) =>
     item.available_actions.includes(action);
   const request = item.information_requests.find(
-    (request) => request.status === "open",
+    (request) => request.status === "open" && item.status !== "withdrawn",
   );
   const offer =
     item.offers.find((offer) => offer.status === "active") ||
@@ -298,8 +301,8 @@ export default function ReviewActions({
     void command.send(path, body);
   }
   const technicalFailure =
-    item.processing_status === "failed" ||
-    item.processing_status === "interrupted";
+    item.status !== "withdrawn" &&
+    (item.processing_status === "failed" || item.processing_status === "interrupted");
   if (item.status === "draft" && !command.pending) return null;
   return (
     <section className="panel review-panel" aria-labelledby="review-title">
@@ -347,6 +350,14 @@ export default function ReviewActions({
           </ul>
         </div>
       )}
+      {item.status === "withdrawn" && item.information_requests.some(request => request.status === "open") && <details className="answered-requests">
+        <summary>Запрос уточнений до отзыва</summary>
+        {item.information_requests.filter(request => request.status === "open").map(request => <article key={request.id}>
+          <p className="multiline">{request.message}</p>
+          <ul>{request.requested_fields.map(field => <li key={field}>{itemFieldLabels[field as RequestedField] || field}</li>)}{request.requested_document_types.map(type => <li key={type}>{documentLabels[type]}</li>)}</ul>
+          <p className="muted">Сохранён в истории. Ответ и новые документы не требуются.</p>
+        </article>)}
+      </details>}
       {item.information_requests.some(
         (request) => request.status === "answered",
       ) && (

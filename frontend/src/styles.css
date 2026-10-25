@@ -2431,3 +2431,13 @@ summary:focus-visible { outline: 3px solid #2273ce; outline-offset: 4px; border-
 
 .skip-link { opacity: 0; pointer-events: none; }
 .skip-link:focus { opacity: 1; pointer-events: auto; }
+
+.status-withdrawn { color: #555b64; background: #edf0f2; }
+.withdrawal-action { margin: 20px 0; }
+.withdrawal-dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; margin: auto; padding: 24px; border: 0; border-radius: 18px; color: #242426; background: #fff; box-shadow: 0 20px 70px #12161e33; }
+.withdrawal-dialog::backdrop { background: #12161e66; }
+.withdrawal-dialog h2 { margin: 0 0 12px; font-size: 22px; }
+.withdrawal-dialog p { line-height: 1.6; }
+.withdrawal-dialog .review-buttons { margin-top: 20px; flex-wrap: wrap; }
+.application-filters { display: flex; justify-content: flex-end; margin: 0 0 16px; }
+.application-status-filter { width: auto; max-width: 100%; min-height: 40px; padding: 8px 36px 8px 12px; border: 1px solid #b8bac0; border-radius: 10px; background: #fff; color: #303137; font: inherit; font-size: 14px; }
