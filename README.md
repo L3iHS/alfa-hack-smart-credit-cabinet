@@ -18,7 +18,7 @@
 
 ## Запуск с нуля
 
-Нужны Docker и Docker Compose с поддержкой `up --wait`. Выполните из корня полученного репозитория:
+Нужны Docker и Docker Compose 2.24.4 или новее. Выполните из корня полученного репозитория:
 
 ```sh
 cp .env.example .env
@@ -91,4 +91,4 @@ LLM помогает работать с текстом. RAG добавляет 
 | [HTTP-примеры](docs/api-examples.http) | Дополнительный материал для работы с API |
 | [Лицензии](THIRD_PARTY_NOTICES.md) | Сторонние компоненты и уведомления |
 
-Стек: FastAPI, SQLAlchemy/Alembic, PostgreSQL 17; React 19, TypeScript, Vite и nginx. Зависимости закреплены в `backend/uv.lock` и `frontend/package-lock.json`.
+Стек: FastAPI, SQLAlchemy/Alembic, PostgreSQL 17; React 19, TypeScript, Vite и Caddy. Caddy в контейнере `frontend` отдаёт собранный интерфейс и проксирует API; на VPS он также обеспечивает HTTPS. Основной запуск состоит из трёх контейнеров: `frontend`, `backend`, `db`. Зависимости закреплены в `backend/uv.lock` и `frontend/package-lock.json`.

@@ -6,7 +6,7 @@
 
 Стартовый ориентир для демонстрационного VPS: 2 vCPU и 4 ГБ RAM, без локальной LLM и GPU. До установки проверьте фактически доступные CPU, память, объём и свободное место на диске. Это ориентир для небольшого демо, а не результат нагрузочного теста на таком VPS. После запуска измерьте потребление памяти и диска; сборка образов требует дополнительного запаса.
 
-1. Установите Docker Engine и плагин Docker Compose по [официальной инструкции Docker](https://docs.docker.com/engine/install/) для своей ОС. Нужна поддержка `docker compose up --wait`.
+1. Установите Docker Engine и плагин Docker Compose по [официальной инструкции Docker](https://docs.docker.com/engine/install/) для своей ОС. Нужен Docker Compose 2.24.4 или новее: серверный профиль использует `!override` для замены локальных портов на 80/443.
 2. На Linux с systemd включите автозапуск Docker: `sudo systemctl enable --now docker`. Проверьте `docker version` и `docker compose version`.
 3. Разрешите входящие TCP 80/443 в межсетевом экране VPS и панели провайдера, а также SSH для администрирования. Порты 80/443 должны быть свободны; исходящие DNS и HTTPS необходимы для получения образов и сертификатов.
 4. Создайте A-запись `biom.cloud-path.ru`, указывающую на будущий публичный IPv4 сервера. AAAA добавляйте только при работающем IPv6 и открытых портах по IPv6; удалите неверную AAAA. Дождитесь обновления DNS.
@@ -51,9 +51,9 @@ docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f c
 
 Обычный backend-образ уже содержит выбранную модель и работает без ML extra; переносить папки обучения на сервер не требуется. Backend применяет миграции при запуске. Seed создаёт аккаунты из [README](../README.md#демонстрационные-учётные-записи); пароль — значение `DEMO_PASSWORD`. Повторный seed сохраняет существующие данные и пароли. Успешный `up --wait` подтверждает состояние контейнеров, но сам по себе не подтверждает получение публичного сертификата.
 
-Caddy получает `APP_DOMAIN` внутри контейнера, принимает TCP 80/443, автоматически выпускает сертификат и перенаправляет HTTP на HTTPS. Сертификаты и состояние Caddy хранятся в томах `caddy_data` и `caddy_config`, данные PostgreSQL — в `postgres_data`. Все сервисы имеют `restart: unless-stopped`; ручная остановка сервиса отменяет автоматический запуск до следующего запуска. Логи каждого контейнера ограничены тремя файлами по 10 МБ.
+Сервис `frontend` содержит Caddy и собранный React. Compose передаёт ему `APP_DOMAIN` как `APP_ADDRESS`; Caddy принимает TCP 80/443, автоматически выпускает сертификат и перенаправляет HTTP на HTTPS. Сертификаты и состояние Caddy хранятся в томах `caddy_data` и `caddy_config`, данные PostgreSQL — в `postgres_data`. Все сервисы имеют `restart: unless-stopped`; ручная остановка сервиса отменяет автоматический запуск до следующего запуска. Логи каждого контейнера ограничены тремя файлами по 10 МБ.
 
-Пути `/api` и `/api/*` идут напрямую в `backend:8000` без изменения URI; остальные запросы идут во frontend, где nginx обслуживает также SPA-ссылки. Так API получает Host и HTTPS-схему непосредственно от Caddy. Caddy по умолчанию заменяет входящие пользовательские `X-Forwarded-*`, не доверяя им. Uvicorn принимает заголовки прокси из Docker-сети (`FORWARDED_ALLOW_IPS=*`); это допустимо только при отсутствии внешнего порта backend и доверенных контейнерах сети. Не добавляйте публикацию порта 8000. Порт БД и admin API Caddy также не публикуются. Существующий frontend-порт `127.0.0.1:8080` доступен только на самом сервере, внешний доступ проходит через Caddy.
+Пути `/api` и `/api/*` идут напрямую в `backend:8000` без изменения URI. Остальные запросы Caddy обслуживает из `/srv`; для маршрутов React возвращает `index.html`. Конфигурация включена в образ из `frontend/Caddyfile`, отдельного nginx или второго прокси нет. Так API получает Host и HTTPS-схему непосредственно от Caddy. Caddy по умолчанию заменяет входящие пользовательские `X-Forwarded-*`, не доверяя им. Uvicorn принимает заголовки прокси из Docker-сети (`FORWARDED_ALLOW_IPS=*`); это допустимо только при отсутствии внешнего порта backend и доверенных контейнерах сети. Не добавляйте публикацию порта 8000. Порт БД и admin API Caddy также не публикуются. В серверном профиле локальный порт 8080 заменён на 80/443. В обычном локальном профиле остаётся только `127.0.0.1:8080`, HTTPS не включается.
 
 ## Проверка после запуска
 
@@ -80,7 +80,7 @@ docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f c
 
 ### Обновление из main
 
-На VPS используется ветка `main`, куда публикуются проверенные версии. Небольшие изменения публикуются в `main` после проверки; крупные временные ветки предварительно объединяются в неё. Перед обновлением проверьте состав следующей версии; если она меняет схему БД, сначала выполните резервное копирование по разделу ниже.
+На VPS используется ветка `main`, куда публикуются проверенные версии. Небольшие изменения публикуются в `main` после проверки; крупные временные ветки предварительно объединяются в неё. Перед обновлением проверьте состав следующей версии; если она меняет схему БД, сначала выполните резервное копирование по разделу ниже. При первом переходе со старой схемы nginx + отдельный Caddy сначала используйте однократную процедуру ниже: прежний контейнер занимает порты 80/443.
 
 Выполните на VPS единым блоком. Команды соединены через `&&`: при ошибке следующие шаги не выполняются. Для Docker используется `sudo`, Git запускается от текущего пользователя.
 
@@ -95,12 +95,42 @@ curl --fail --silent --show-error https://biom.cloud-path.ru/api/v1/health
 
 `up --build` пересобирает образы из полученного кода и пересоздаёт изменившиеся контейнеры. Backend применяет миграции при запуске. Сохраняйте существующий `.env.deploy`, имя Compose-проекта и тома с данными. После успешного выполнения проверьте нужный сценарий в браузере; один ответ health не подтверждает работу всего приложения.
 
-### Резервная копия перед изменением схемы БД
+### Однократный переход со старого nginx + Caddy
 
-Перед обновлением согласуйте окно недоступности, запишите текущую ревизию (`git rev-parse HEAD`) и подготовьте конкретную следующую проверенную ревизию. При изменениях схемы учитывайте совместимость и прекратите запись, остановив frontend, Caddy и backend перед резервным копированием; БД продолжает работать:
+Этот раздел нужен только стенду, где ещё существует контейнер `credit-cabinet-vps-caddy-1`. На новом стенде и после перехода используйте обычные команды запуска и обновления. Имя проекта и тома `caddy_data`/`caddy_config` остаются прежними, поэтому сертификаты сохраняются.
+
+Сохраните конфигурацию и прежние образы, соберите новый frontend до остановки сайта. Затем освободите порты старого прокси и пересоздайте только frontend:
 
 ```sh
-sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml stop caddy frontend backend
+cd /srv/credit-cabinet &&
+umask 077 &&
+migration_backup="$HOME/credit-cabinet-backups/caddy-$(date -u +%Y%m%dT%H%M%SZ)" &&
+mkdir -p "$migration_backup" &&
+git rev-parse HEAD > "$migration_backup/revision.txt" &&
+cp deploy/Caddyfile "$migration_backup/Caddyfile" &&
+sudo docker inspect credit-cabinet-vps-frontend-1 credit-cabinet-vps-caddy-1 --format '{{.Name}} {{.Image}}' > "$migration_backup/images.txt" &&
+git pull --ff-only origin main &&
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml config --quiet &&
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml build frontend &&
+sudo docker stop credit-cabinet-vps-caddy-1 &&
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml up -d --no-deps --no-build --wait frontend &&
+curl --fail --silent --show-error https://biom.cloud-path.ru/api/v1/health
+```
+
+Проверьте HTTPS, вход и ранее созданную заявку. Только после успеха удалите остановленный прежний прокси; его тома не удаляются:
+
+```sh
+sudo docker rm credit-cabinet-vps-caddy-1
+```
+
+Если проверка не прошла, не удаляйте старый контейнер и образы. Для отката остановите новый frontend, восстановите конфигурацию прежней ревизии (включая `deploy/Caddyfile` из копии) и запустите прежние образы frontend/Caddy с теми же томами. Переход не требует изменения схемы БД или перезапуска backend.
+
+### Резервная копия перед изменением схемы БД
+
+Перед обновлением согласуйте окно недоступности, запишите текущую ревизию (`git rev-parse HEAD`) и подготовьте конкретную следующую проверенную ревизию. При изменениях схемы учитывайте совместимость и прекратите запись, остановив frontend и backend перед резервным копированием; БД продолжает работать:
+
+```sh
+sudo docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml stop frontend backend
 umask 077
 mkdir -p "$HOME/credit-cabinet-backups"
 chmod 700 "$HOME/credit-cabinet-backups"
@@ -123,9 +153,9 @@ test -s "$backup_file" || exit 1
 ## Диагностика
 
 ```sh
-docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml logs --tail 100 caddy backend db
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml logs --tail 100 frontend backend db
 docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml ps
-docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose -p credit-cabinet-vps --env-file .env.deploy -f compose.yaml -f compose.deploy.yaml exec frontend caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
 При ошибке сертификата проверьте A/AAAA, доступность TCP 80/443 извне и логи Caddy; не повторяйте получение сертификата в цикле. При недоступности API проверьте health backend и миграции, затем доступность БД. Логи и backup могут содержать данные: перед передачей удаляйте секреты. Для временной остановки используйте `stop`, для запуска — `up -d --wait` с теми же двумя Compose-файлами и `.env.deploy`.

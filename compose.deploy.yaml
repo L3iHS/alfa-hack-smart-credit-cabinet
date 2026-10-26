@@ -26,27 +26,10 @@ services:
     restart: unless-stopped
     logging: *bounded-logs
   frontend:
-    restart: unless-stopped
-    logging: *bounded-logs
-  caddy:
-    image: caddy:2.11.7-alpine
     environment:
-      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.deploy}
-    ports:
+      APP_ADDRESS: ${APP_DOMAIN:?Set APP_DOMAIN in .env.deploy}
+    ports: !override
       - "80:80"
       - "443:443"
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_started
     restart: unless-stopped
     logging: *bounded-logs
-
-volumes:
-  caddy_data:
-  caddy_config:

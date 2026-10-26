@@ -47,8 +47,13 @@ services:
       retries: 20
   frontend:
     build: ./frontend
+    environment:
+      APP_ADDRESS: ':80'
     ports:
       - '127.0.0.1:8080:80'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       backend:
         condition: service_healthy
@@ -58,6 +63,8 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 volumes:
+  caddy_data:
+  caddy_config:
   ollama_data:
   postgres_data:
   document_data:
