@@ -1,0 +1,81 @@
+{
+  "brier_tolerance": 0.001,
+  "family_winners": {
+    "catboost": "cat_d4",
+    "constant": "baseline",
+    "logistic": "lr_c1"
+  },
+  "protocol_version": "risk-training-v1",
+  "rule": "Минимум Brier внутри семьи, точный tie: меньший C/depth; глобальный min+0.001, затем constant → logistic → catboost",
+  "scores": [
+    {
+      "brier": 0.13844530612244899,
+      "candidate_id": "baseline",
+      "family": "constant",
+      "params": {}
+    },
+    {
+      "brier": 0.12134940963160591,
+      "candidate_id": "lr_c01",
+      "family": "logistic",
+      "params": {
+        "C": 0.1,
+        "max_iter": 2000,
+        "solver": "lbfgs",
+        "tol": 1e-06
+      }
+    },
+    {
+      "brier": 0.12131414017528967,
+      "candidate_id": "lr_c1",
+      "family": "logistic",
+      "params": {
+        "C": 1,
+        "max_iter": 2000,
+        "solver": "lbfgs",
+        "tol": 1e-06
+      }
+    },
+    {
+      "brier": 0.1213141442548384,
+      "candidate_id": "lr_c10",
+      "family": "logistic",
+      "params": {
+        "C": 10,
+        "max_iter": 2000,
+        "solver": "lbfgs",
+        "tol": 1e-06
+      }
+    },
+    {
+      "brier": 0.12113719003052101,
+      "candidate_id": "cat_d4",
+      "family": "catboost",
+      "params": {
+        "depth": 4,
+        "iterations": 400,
+        "l2_leaf_reg": 5,
+        "learning_rate": 0.05,
+        "loss_function": "Logloss"
+      }
+    },
+    {
+      "brier": 0.12416435406014809,
+      "candidate_id": "cat_d6",
+      "family": "catboost",
+      "params": {
+        "depth": 6,
+        "iterations": 400,
+        "l2_leaf_reg": 5,
+        "learning_rate": 0.05,
+        "loss_function": "Logloss"
+      }
+    }
+  ],
+  "seed": 20261021,
+  "selected_candidate_id": "lr_c1",
+  "selected_on": "validation",
+  "test_used": false,
+  "threads": 2,
+  "tolerance_interpretation": "Заданное предпочтение простоты, не статистическое равенство"
+}

@@ -1,0 +1,287 @@
+{
+  "limitations": "Результаты относятся только к синтетическим данным и не подтверждают качество оценки риска реальных заёмщиков. Допуск выбора означает предпочтение простоты, а не статистическое равенство. Интервал парного bootstrap компаний описывает вариативность этого test и не учитывает переобучение или смену источника данных.",
+  "models": {
+    "baseline": {
+      "calibration": [
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.0,
+          "mean_probability": null,
+          "upper": 0.1
+        },
+        {
+          "count": 1500,
+          "event_rate": 0.16533333333333333,
+          "lower": 0.1,
+          "mean_probability": 0.1648571428571428,
+          "upper": 0.2
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.2,
+          "mean_probability": null,
+          "upper": 0.3
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.3,
+          "mean_probability": null,
+          "upper": 0.4
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.4,
+          "mean_probability": null,
+          "upper": 0.5
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.5,
+          "mean_probability": null,
+          "upper": 0.6
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.6,
+          "mean_probability": null,
+          "upper": 0.7
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.7,
+          "mean_probability": null,
+          "upper": 0.8
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.8,
+          "mean_probability": null,
+          "upper": 0.9
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.9,
+          "mean_probability": null,
+          "upper": 1.0
+        }
+      ],
+      "family": "constant",
+      "metrics": {
+        "average_precision": 0.16533333333333333,
+        "brier": 0.13799844897959182,
+        "events": 248,
+        "log_loss": 0.44840970080197934,
+        "n": 1500,
+        "prevalence": 0.16533333333333333,
+        "roc_auc": 0.5,
+        "unavailable": {}
+      },
+      "params": {},
+      "predict_seconds": 0.003765125060454011
+    },
+    "cat_d4": {
+      "calibration": [
+        {
+          "count": 606,
+          "event_rate": 0.06765676567656766,
+          "lower": 0.0,
+          "mean_probability": 0.06078929265803764,
+          "upper": 0.1
+        },
+        {
+          "count": 495,
+          "event_rate": 0.15757575757575756,
+          "lower": 0.1,
+          "mean_probability": 0.14331870739227504,
+          "upper": 0.2
+        },
+        {
+          "count": 185,
+          "event_rate": 0.24864864864864866,
+          "lower": 0.2,
+          "mean_probability": 0.23956949965238342,
+          "upper": 0.3
+        },
+        {
+          "count": 96,
+          "event_rate": 0.2916666666666667,
+          "lower": 0.3,
+          "mean_probability": 0.34449856369261117,
+          "upper": 0.4
+        },
+        {
+          "count": 57,
+          "event_rate": 0.43859649122807015,
+          "lower": 0.4,
+          "mean_probability": 0.4490295128892689,
+          "upper": 0.5
+        },
+        {
+          "count": 35,
+          "event_rate": 0.42857142857142855,
+          "lower": 0.5,
+          "mean_probability": 0.539504224808383,
+          "upper": 0.6
+        },
+        {
+          "count": 17,
+          "event_rate": 0.47058823529411764,
+          "lower": 0.6,
+          "mean_probability": 0.6455521176257328,
+          "upper": 0.7
+        },
+        {
+          "count": 6,
+          "event_rate": 0.8333333333333334,
+          "lower": 0.7,
+          "mean_probability": 0.7463694946952396,
+          "upper": 0.8
+        },
+        {
+          "count": 3,
+          "event_rate": 0.6666666666666666,
+          "lower": 0.8,
+          "mean_probability": 0.8347889597506777,
+          "upper": 0.9
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.9,
+          "mean_probability": null,
+          "upper": 1.0
+        }
+      ],
+      "family": "catboost",
+      "metrics": {
+        "average_precision": 0.3598984274674858,
+        "brier": 0.12522304517246205,
+        "events": 248,
+        "log_loss": 0.40519539344942557,
+        "n": 1500,
+        "prevalence": 0.16533333333333333,
+        "roc_auc": 0.7214070390600844,
+        "unavailable": {}
+      },
+      "params": {
+        "depth": 4,
+        "iterations": 400,
+        "l2_leaf_reg": 5,
+        "learning_rate": 0.05,
+        "loss_function": "Logloss"
+      },
+      "predict_seconds": 0.002361792023293674
+    },
+    "lr_c1": {
+      "calibration": [
+        {
+          "count": 574,
+          "event_rate": 0.06445993031358885,
+          "lower": 0.0,
+          "mean_probability": 0.06257987285736441,
+          "upper": 0.1
+        },
+        {
+          "count": 506,
+          "event_rate": 0.15810276679841898,
+          "lower": 0.1,
+          "mean_probability": 0.14485846987017972,
+          "upper": 0.2
+        },
+        {
+          "count": 213,
+          "event_rate": 0.20187793427230047,
+          "lower": 0.2,
+          "mean_probability": 0.24137129752466321,
+          "upper": 0.3
+        },
+        {
+          "count": 115,
+          "event_rate": 0.3565217391304348,
+          "lower": 0.3,
+          "mean_probability": 0.3397153570085391,
+          "upper": 0.4
+        },
+        {
+          "count": 49,
+          "event_rate": 0.4489795918367347,
+          "lower": 0.4,
+          "mean_probability": 0.44186891771314674,
+          "upper": 0.5
+        },
+        {
+          "count": 30,
+          "event_rate": 0.5,
+          "lower": 0.5,
+          "mean_probability": 0.542243883760803,
+          "upper": 0.6
+        },
+        {
+          "count": 8,
+          "event_rate": 1.0,
+          "lower": 0.6,
+          "mean_probability": 0.6259238936948578,
+          "upper": 0.7
+        },
+        {
+          "count": 5,
+          "event_rate": 0.4,
+          "lower": 0.7,
+          "mean_probability": 0.7560689408055732,
+          "upper": 0.8
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.8,
+          "mean_probability": null,
+          "upper": 0.9
+        },
+        {
+          "count": 0,
+          "event_rate": null,
+          "lower": 0.9,
+          "mean_probability": null,
+          "upper": 1.0
+        }
+      ],
+      "family": "logistic",
+      "metrics": {
+        "average_precision": 0.3710073554690482,
+        "brier": 0.12334315925056588,
+        "events": 248,
+        "log_loss": 0.4008240480989224,
+        "n": 1500,
+        "prevalence": 0.16533333333333333,
+        "roc_auc": 0.7246502370400907,
+        "unavailable": {}
+      },
+      "params": {
+        "C": 1,
+        "max_iter": 2000,
+        "solver": "lbfgs",
+        "tol": 1e-06
+      },
+      "predict_seconds": 0.0022763339802622795
+    }
+  },
+  "paired_brier_interval": {
+    "difference": -0.01465528972902598,
+    "groups": 1500,
+    "lower": -0.02095856020668395,
+    "resamples": 1000,
+    "seed": 20261022,
+    "upper": -0.008690032293935633
+  },
+  "selected_candidate_id": "lr_c1",
+  "split": "test"
+}

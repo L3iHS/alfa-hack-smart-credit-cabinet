@@ -1,0 +1,42 @@
+{
+  "resources": {
+    "cpu_quota": "200000 100000",
+    "logical_cpu_count": 6,
+    "machine": "aarch64",
+    "max_rss_bytes": 243314688,
+    "platform": "Linux-6.12.76-linuxkit-aarch64-with-glibc2.36",
+    "rss_method": "resource.getrusage(RUSAGE_SELF).ru_maxrss; пик процесса, включая импорты",
+    "runtime_method": "time.perf_counter; от входа функции до записи manifest",
+    "runtime_seconds": 0.46230166708119214,
+    "threads": 2
+  },
+  "selected_candidate_id": "lr_c1",
+  "sha256": {
+    "calibration.png": "e3f95d7e54e4b0c897d2bfa5b83fdf1b2d131b0fbcbcc4dec7d337d2f6c076eb",
+    "calibration.svg": "d884a332537006ae486f66bd4a59642b26c5a5b3ecc281a601886d73ef5fc12d",
+    "comparison.md": "7722151973b94ccc08787f28bfe290b2d02f4ecdd89ab965f49260ef68ecf293",
+    "explanations.json": "f41bb3feebaf1686a09fca94377a5eafe675bf7fd86d949a2f807b2f6e1468fa",
+    "ranking.png": "9530672a62989481224c465c72e6a48caaae96c3ff3f3fe8844c15a3ea8be364",
+    "ranking.svg": "e24093b168c755dcb8615f7597a3f9256b0dacf4d1a79a34debe76652cf5b221"
+  },
+  "source_sha256": {
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "__main__.py": "40419357b881345f39959b4566737365cae20ffd41e76da7b0bcd73b70e1a07c",
+    "artifacts.py": "a9db1e22a930d4df637e71a76175efadcc95adb65e0613111e905d7e7cc0d1c8",
+    "dataset.py": "89617e7c3654ff637e74c4d19c8af41d015c8cadc494a657a5b00ab199feeeaa",
+    "estimators.py": "3d460ecda661f06fd0ceabeafe48f38db6c400a8509418afb3f27999319e5c4d",
+    "experiment.py": "2e1b976e7232bee12980c1bc70b7afa714fba15954b40fc1b889f67c5b44808c",
+    "explanations.py": "d61b08242a9e1ef6a2f3fb2b718d5aed1f01bc5a9139e813beddf296d17983f2",
+    "features.py": "1b0f415bc7278c9c865807d1f7bc9ddae1485e5ff4bd268a8a4e86a974237bc1",
+    "labels.py": "bc5de69e4ba23131b3d76503e08216631991fdf19e202522a5e9ac4801a1cabf",
+    "metrics.py": "716f77565e2de6b757d1f9d1b80bc43d36754347fed67bbba981033b28a03a8e",
+    "reporting.py": "42d9c5ee9800ab602bccb1292efbd0860be9b6c27a298b612ca752a11cc30128",
+    "synthetic.py": "96941ff9c48e9ee8201de86fd558b8d62699240db5d5a1b89dd1c55ba93ae58e",
+    "training_data.py": "630eeaa8763deb11517a04b92c8e1d56fa5e05dee27e3b943eab2bcdc4873452"
+  },
+  "sources": {
+    "dataset_manifest_sha256": "6ee85a3c9de3ec3a5fc19f2448e81b00151c05f2be9f113b11b569b5b8849bd0",
+    "evaluation_manifest_sha256": "99aafabcc3c92b6532a07e7765bc3b8f9896e4d93131c42ee253167dcdf49163",
+    "run_manifest_sha256": "a1d80cb08ceae8f4d7d614af28df946ebf512915f695a869fed8fcc71c898f12"
+  }
+}

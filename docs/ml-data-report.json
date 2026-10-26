@@ -1,0 +1,369 @@
+{
+  "all_numeric_values_finite": true,
+  "company_overlap_counts": {
+    "train_test": 0,
+    "train_validation": 0,
+    "validation_test": 0
+  },
+  "data_kind": "synthetic",
+  "limitations": [
+    "Данные и зависимости генератора синтетические.",
+    "Обучение не выполнялось; качество модели и банковский риск не измерялись.",
+    "Test не предназначен для выбора генератора, признаков или порогов."
+  ],
+  "overall": {
+    "class_counts": {
+      "0": 8349,
+      "1": 1651
+    },
+    "event_rate": 0.1651,
+    "events": 1651,
+    "missing": {
+      "business_age_months": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "coverage_ratio": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "existing_debt_to_revenue_ratio": {
+        "count": 301,
+        "rate": 0.0301
+      },
+      "monthly_revenue_rub": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "operating_margin_ratio": {
+        "count": 301,
+        "rate": 0.0301
+      },
+      "overdue_days": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "product_code": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "requested_amount_rub": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "term_months": {
+        "count": 0,
+        "rate": 0.0
+      }
+    },
+    "products": {
+      "equipment": 5048,
+      "working_capital": 4952
+    },
+    "rows": 10000,
+    "term_months": {
+      "10": 396,
+      "11": 407,
+      "12": 376,
+      "13": 419,
+      "14": 376,
+      "15": 390,
+      "16": 350,
+      "17": 389,
+      "18": 397,
+      "19": 372,
+      "20": 377,
+      "21": 401,
+      "22": 417,
+      "23": 399,
+      "24": 394,
+      "25": 145,
+      "26": 179,
+      "27": 161,
+      "28": 162,
+      "29": 174,
+      "3": 241,
+      "30": 147,
+      "31": 152,
+      "32": 156,
+      "33": 167,
+      "34": 163,
+      "35": 175,
+      "36": 156,
+      "4": 237,
+      "5": 226,
+      "6": 379,
+      "7": 372,
+      "8": 378,
+      "9": 370
+    },
+    "unique_companies": 10000
+  },
+  "splits": {
+    "test": {
+      "class_counts": {
+        "0": 1252,
+        "1": 248
+      },
+      "event_rate": 0.16533333333333333,
+      "events": 248,
+      "missing": {
+        "business_age_months": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "coverage_ratio": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "existing_debt_to_revenue_ratio": {
+          "count": 55,
+          "rate": 0.03666666666666667
+        },
+        "monthly_revenue_rub": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "operating_margin_ratio": {
+          "count": 55,
+          "rate": 0.03666666666666667
+        },
+        "overdue_days": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "product_code": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "requested_amount_rub": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "term_months": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "products": {
+        "equipment": 775,
+        "working_capital": 725
+      },
+      "rows": 1500,
+      "term_months": {
+        "10": 52,
+        "11": 64,
+        "12": 62,
+        "13": 52,
+        "14": 65,
+        "15": 57,
+        "16": 50,
+        "17": 62,
+        "18": 56,
+        "19": 64,
+        "20": 57,
+        "21": 74,
+        "22": 63,
+        "23": 64,
+        "24": 64,
+        "25": 22,
+        "26": 24,
+        "27": 30,
+        "28": 28,
+        "29": 29,
+        "3": 15,
+        "30": 15,
+        "31": 22,
+        "32": 26,
+        "33": 20,
+        "34": 28,
+        "35": 25,
+        "36": 24,
+        "4": 31,
+        "5": 31,
+        "6": 62,
+        "7": 51,
+        "8": 55,
+        "9": 56
+      },
+      "unique_companies": 1500
+    },
+    "train": {
+      "class_counts": {
+        "0": 5846,
+        "1": 1154
+      },
+      "event_rate": 0.16485714285714287,
+      "events": 1154,
+      "missing": {
+        "business_age_months": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "coverage_ratio": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "existing_debt_to_revenue_ratio": {
+          "count": 198,
+          "rate": 0.028285714285714286
+        },
+        "monthly_revenue_rub": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "operating_margin_ratio": {
+          "count": 198,
+          "rate": 0.028285714285714286
+        },
+        "overdue_days": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "product_code": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "requested_amount_rub": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "term_months": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "products": {
+        "equipment": 3524,
+        "working_capital": 3476
+      },
+      "rows": 7000,
+      "term_months": {
+        "10": 269,
+        "11": 279,
+        "12": 255,
+        "13": 291,
+        "14": 253,
+        "15": 272,
+        "16": 257,
+        "17": 266,
+        "18": 284,
+        "19": 259,
+        "20": 256,
+        "21": 270,
+        "22": 287,
+        "23": 265,
+        "24": 269,
+        "25": 99,
+        "26": 131,
+        "27": 104,
+        "28": 108,
+        "29": 121,
+        "3": 173,
+        "30": 106,
+        "31": 113,
+        "32": 105,
+        "33": 122,
+        "34": 120,
+        "35": 128,
+        "36": 117,
+        "4": 173,
+        "5": 161,
+        "6": 275,
+        "7": 274,
+        "8": 275,
+        "9": 263
+      },
+      "unique_companies": 7000
+    },
+    "validation": {
+      "class_counts": {
+        "0": 1251,
+        "1": 249
+      },
+      "event_rate": 0.166,
+      "events": 249,
+      "missing": {
+        "business_age_months": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "coverage_ratio": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "existing_debt_to_revenue_ratio": {
+          "count": 48,
+          "rate": 0.032
+        },
+        "monthly_revenue_rub": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "operating_margin_ratio": {
+          "count": 48,
+          "rate": 0.032
+        },
+        "overdue_days": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "product_code": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "requested_amount_rub": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "term_months": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "products": {
+        "equipment": 749,
+        "working_capital": 751
+      },
+      "rows": 1500,
+      "term_months": {
+        "10": 75,
+        "11": 64,
+        "12": 59,
+        "13": 76,
+        "14": 58,
+        "15": 61,
+        "16": 43,
+        "17": 61,
+        "18": 57,
+        "19": 49,
+        "20": 64,
+        "21": 57,
+        "22": 67,
+        "23": 70,
+        "24": 61,
+        "25": 24,
+        "26": 24,
+        "27": 27,
+        "28": 26,
+        "29": 24,
+        "3": 53,
+        "30": 26,
+        "31": 17,
+        "32": 25,
+        "33": 25,
+        "34": 15,
+        "35": 22,
+        "36": 15,
+        "4": 33,
+        "5": 34,
+        "6": 42,
+        "7": 47,
+        "8": 48,
+        "9": 51
+      },
+      "unique_companies": 1500
+    }
+  },
+  "target": "loan_90dpd_12m"
+}

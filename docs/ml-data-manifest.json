@@ -1,0 +1,26 @@
+{
+  "catalog_version": "demo-v1",
+  "count": 10000,
+  "data_kind": "synthetic",
+  "dataset_version": "risk-dataset-v1",
+  "feature_schema_version": "risk-features-v1",
+  "generator_version": "risk-synthetic-v1",
+  "horizon": {
+    "calendar": true,
+    "end_inclusive": true,
+    "event": "90 days past due on the considered loan",
+    "months": 12
+  },
+  "python_version": "3.12.10",
+  "seed": 20261021,
+  "sha256": {
+    "observations.jsonl": "84579a35f62a4bf2a4a7e9b20867aec583c11ea022982f1936381294cf4af503",
+    "report.json": "8ef766534703334a127cf02b907a92604b7fb773faecb0ca0e096509fb111a98",
+    "schema.json": "f55ab7bef7768fd1d51246798d3c6ac2b8bc751c1c6bcb4da528286048476485",
+    "test.csv": "f8a6e5eb88f5201ac79b256be8c8058d61d28b564f528c45bcad413f054655d9",
+    "train.csv": "5b89ecf2a8de2e9760154101ff7bf00405ada23568131886cdeb0fd0ce88289a",
+    "validation.csv": "3674c69d74fe0240467727fd531db530cc89dda67cc3e60411dc5b96b7af445b"
+  },
+  "target": "loan_90dpd_12m",
+  "target_version": "loan-90dpd-12m-v1"
+}

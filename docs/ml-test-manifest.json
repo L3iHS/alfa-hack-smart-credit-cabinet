@@ -1,0 +1,78 @@
+{
+  "catalog_version": "demo-v1",
+  "data_kind": "synthetic",
+  "dataset_manifest_sha256": "6ee85a3c9de3ec3a5fc19f2448e81b00151c05f2be9f113b11b569b5b8849bd0",
+  "dataset_version": "risk-dataset-v1",
+  "feature_schema_version": "risk-features-v1",
+  "generator_version": "risk-synthetic-v1",
+  "horizon": {
+    "calendar": true,
+    "end_inclusive": true,
+    "event": "90 days past due on the considered loan",
+    "months": 12
+  },
+  "libraries": {
+    "catboost": "1.2.8",
+    "joblib": "1.5.2",
+    "matplotlib": "3.10.7",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scikit-learn": "1.7.2",
+    "threadpoolctl": "3.6.0"
+  },
+  "model_features": [
+    "business_age_months",
+    "monthly_revenue_rub",
+    "operating_margin_ratio",
+    "existing_debt_to_revenue_ratio",
+    "coverage_ratio",
+    "overdue_days",
+    "product_code",
+    "requested_amount_rub",
+    "term_months",
+    "business_age_months_missing",
+    "monthly_revenue_rub_missing",
+    "operating_margin_ratio_missing",
+    "existing_debt_to_revenue_ratio_missing",
+    "coverage_ratio_missing",
+    "overdue_days_missing",
+    "product_code_missing",
+    "requested_amount_rub_missing",
+    "term_months_missing"
+  ],
+  "parent_manifest_sha256": "a1d80cb08ceae8f4d7d614af28df946ebf512915f695a869fed8fcc71c898f12",
+  "protocol_version": "risk-training-v1",
+  "python": "3.12.10",
+  "resources": {
+    "cpu_quota": "200000 100000",
+    "logical_cpu_count": 6,
+    "machine": "aarch64",
+    "max_rss_bytes": 199741440,
+    "platform": "Linux-6.12.76-linuxkit-aarch64-with-glibc2.36",
+    "rss_method": "resource.getrusage(RUSAGE_SELF).ru_maxrss; пик процесса, включая импорты",
+    "runtime_method": "time.perf_counter; от входа функции до записи manifest",
+    "runtime_seconds": 0.08487458305899054,
+    "threads": 2
+  },
+  "selected_candidate_id": "lr_c1",
+  "sha256": {
+    "metrics.json": "2d2871639f10fed00b4351502d9efa24d6d783b6ff72886643ffe39b8eaad34a",
+    "predictions.csv": "20d77cef069b6290426940b4fecca06088edfeda9b3e1c2d3db37b270652bf02"
+  },
+  "source_revision": null,
+  "source_sha256": {
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "__main__.py": "618cabb480e7a45dec936902693cbbad42f4b26bfa9d015407d7575b735b39a1",
+    "artifacts.py": "a9db1e22a930d4df637e71a76175efadcc95adb65e0613111e905d7e7cc0d1c8",
+    "dataset.py": "89617e7c3654ff637e74c4d19c8af41d015c8cadc494a657a5b00ab199feeeaa",
+    "estimators.py": "3d460ecda661f06fd0ceabeafe48f38db6c400a8509418afb3f27999319e5c4d",
+    "experiment.py": "2e1b976e7232bee12980c1bc70b7afa714fba15954b40fc1b889f67c5b44808c",
+    "features.py": "1b0f415bc7278c9c865807d1f7bc9ddae1485e5ff4bd268a8a4e86a974237bc1",
+    "labels.py": "bc5de69e4ba23131b3d76503e08216631991fdf19e202522a5e9ac4801a1cabf",
+    "metrics.py": "716f77565e2de6b757d1f9d1b80bc43d36754347fed67bbba981033b28a03a8e",
+    "synthetic.py": "96941ff9c48e9ee8201de86fd558b8d62699240db5d5a1b89dd1c55ba93ae58e",
+    "training_data.py": "630eeaa8763deb11517a04b92c8e1d56fa5e05dee27e3b943eab2bcdc4873452"
+  },
+  "target": "loan_90dpd_12m",
+  "target_version": "loan-90dpd-12m-v1"
+}
