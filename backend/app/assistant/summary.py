@@ -22,6 +22,10 @@ from app.processing.service import assessment, latest_revision, require_staff
 from app.products.catalog import get_product
 from app.risk.assessments import context_for, digest, terms_for
 from app.risk.models import RiskAssessment
+from app.risk.labels import TARGET_EVENT, HORIZON_MONTHS
+
+RISK_TARGET_DEFINITION = ('Достижение 90 дней просрочки в первые 12 календарных месяцев после '
+    'предполагаемой выдачи, в том числе при последующем полном погашении.')
 
 SYSTEM = '''Ты составляешь фактологическую сводку сотруднику кредитного кабинета по-русски.
 Верни JSON с answer и source_ids использованных источников, без URL и HTML.
@@ -29,6 +33,9 @@ SYSTEM = '''Ты составляешь фактологическую свод�
 а также пробелы в данных и зарегистрированные запросы уточнений.
 Проверки ФНС, реестра и кредитной истории представлены симуляторами: не утверждай, что реальные
 ФНС, реестр или бюро кредитных историй запрашивались. Вместо «BKI» пиши «кредитная история».
+В реестровом источнике liquidated — только признак ликвидации, registered_at — дата регистрации.
+Не выводи отсутствие банкротства, исполнительных производств или иных не переданных юридических признаков
+из liquidated=false или отсутствия данных: эти проверки не проводились, их результат неизвестен.
 В answer используй ровно пять коротких разделов с Markdown-заголовками:
 ### Запрос клиента
 ### Финансы
@@ -60,7 +67,13 @@ revenue_rubles — введённая пользователем выручка 
 operating_expenses_rubles — введённые расходы за тот же период.
 existing_debt_payments_rubles — платежи по действующим кредитам за этот период, не остаток долга.
 Не называй введённые финансы подтверждёнными документами и не превращай их в ожидания на будущее.
-probability — доля: в тексте умножь её на 100 и укажи знак %. Не называй риск вероятностью одобрения. Объяснение LogisticRegression — линейные вклады в логарифм шансов,
+probability — доля: в тексте умножь её на 100 и укажи знак %.
+Для loan_90dpd_12m с горизонтом 12 месяцев используй target_definition: достижение 90 дней просрочки
+в первые 12 календарных месяцев после предполагаемой выдачи, включая последующее полное погашение.
+Не называй это событие невозвратом, вероятностью потери денег или вероятностью одобрения.
+Указывай синтетическое происхождение оценки, если оно передано в data_origin.
+Не придумывай определение неизвестной цели или горизонта, если target_definition отсутствует.
+Объяснение LogisticRegression — линейные вклады в логарифм шансов,
 не называй их SHAP и не трактуй вклад как изменение вероятности. Файлы вложений не читались:
 метаданные и наличие документа не подтверждают его содержимое или достоверность финансов.
 Отсутствие данных, неприменимость модели и технический сбой различай явно.
@@ -119,7 +132,13 @@ def summary_snapshot(application_id: uuid.UUID, expected_version: int, db: Sessi
     checks = {item.kind: item.data.model_dump() for item in run.checks} if run else {}
     add('checks', 'Сохранённые результаты симуляторов текущего рассмотрения', {
         'status': 'available' if checks else 'missing', 'results': checks,
-        'missing_checks': sorted({'registry', 'tax', 'bki'} - checks.keys())})
+        'missing_checks': sorted({'registry', 'tax', 'bki'} - checks.keys()),
+        'registry_scope': {
+            'checked_fields': [field for field in ('registered_at', 'liquidated') if field in checks.get('registry', {})],
+            'other_legal_checks': 'unknown',
+            'note': 'При наличии результата симулятор реестра сообщает дату регистрации и только признак ликвидации. '
+                    'Банкротство, исполнительные производства и иные юридические признаки не проверялись; '
+                    'их результат неизвестен. liquidated=false означает только отсутствие признака ликвидации.'}})
     add('calculation', 'Сохранённый расчёт исходно запрошенных условий', {
         'status': 'available' if run and run.calculation else 'missing',
         'data': run.calculation.model_dump() if run and run.calculation else None})
@@ -157,7 +176,11 @@ def summary_snapshot(application_id: uuid.UUID, expected_version: int, db: Sessi
                  'technical_failure': 'Технический сбой оценки; вероятность неизвестна.',
                  'succeeded': 'Сохранённая оценка этих условий; линейные вклады не являются изменением вероятности.'}
         add(scope, 'Риск исходных условий' if scope == 'requested_terms' else 'Риск действующего предложения', {
-            'status': status, 'note': notes[status], 'data': risk.model_dump() if risk else None})
+            'status': status, 'note': notes[status], 'data': risk.model_dump() if risk else None,
+            'target_definition': RISK_TARGET_DEFINITION if risk and risk.target_event == TARGET_EVENT
+                and risk.horizon_months == HORIZON_MONTHS else None,
+            'data_origin': 'Оценка на синтетических данных; не подтверждает риск реального заёмщика.'
+                if risk and risk.data_kind == 'synthetic' else None})
 
     # Включаем исходные входы риска и попытку обработки: они могут измениться внутри одной версии заявки.
     risks = list(db.scalars(select(RiskAssessment).where(

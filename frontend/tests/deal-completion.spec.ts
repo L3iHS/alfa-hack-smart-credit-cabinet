@@ -1,7 +1,7 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import type { Application, DealOutput, ProductCode } from "../src/api/types";
 
-// UI contract fixtures only: these tests do not verify backend transitions or banking operations.
+// Фикстуры проверяют только контракт интерфейса: переходы сервера и банковские операции не проверяются.
 const id = "00000000-0000-4000-8000-000000000061";
 const owner = "deal-ui-owner";
 const time = "2026-10-26T10:00:00Z";
@@ -204,7 +204,7 @@ test.describe("UI contract (mocked API): deal completion", () => {
     await expect(panel(page)).toContainText("Действие сохранено");
     await expect(panel(page).getByRole("button", { name: "Подтвердить условия", exact: true })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Повторить действие", exact: true })).toHaveCount(0);
-    state.failRead = false; // A lagging read at version 8 after successful POST version 9.
+    state.failRead = false; // Отставший ответ чтения с версией 8 после успешного POST с версией 9.
     await panel(page).getByRole("button", { name: "Загрузить актуальное состояние" }).click();
     await expect(panel(page)).toContainText("Сервер ещё обновляет сведения");
     await expect(panel(page).getByRole("button", { name: "Отменить оформление", exact: true })).toBeDisabled();

@@ -2458,7 +2458,7 @@ summary:focus-visible { outline: 3px solid #2273ce; outline-offset: 4px; border-
   .application-heading-actions .withdrawal-action > .button { font-size: 13px; }
 }
 
-/* Deal delivery is separate from the credit decision. */
+/* Оформление сделки отделено от кредитного решения. */
 .deal-panel { padding: 24px; }
 .deal-heading, .deal-document-line { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
 .deal-heading h2 { margin: 0; font-size: 22px; }

@@ -123,6 +123,7 @@ def test_new_product_risk_is_explicitly_not_applicable(client, fake, case_index)
     risk = facts(fake)['requested_terms']
     assert risk['status'] == 'not_applicable'
     assert risk['data']['probability'] is None and risk['data']['contributions'] == []
+    assert risk['target_definition'] is None
     assert 'не применяется' in risk['note']
 
 
@@ -172,6 +173,9 @@ def test_missing_risk_documents_and_no_attachment_reads(client, db, fake, monkey
     assert summary(client, headers, current).status_code == 200
     data = facts(fake)
     assert data['requested_terms']['status'] == 'missing'
+    assert data['requested_terms']['data'] is None
+    assert data['requested_terms']['target_definition'] is None
+    assert data['requested_terms']['data_origin'] is None
     assert data['documents']['missing_document_types']
     assert data['documents']['content_read'] is False and 'содержимое' in data['documents']['note']
 
@@ -348,3 +352,86 @@ def test_risk_from_previous_attempt_of_same_run_is_not_current(client, db, fake)
     db.commit()
     assert summary(client, headers, current).status_code == 200
     assert facts(fake)['requested_terms']['status'] == 'missing'
+
+
+def test_summary_explains_known_risk_event_and_synthetic_origin(client, fake):
+    headers, current, _ = ready(client)
+    assert summary(client, headers, current).status_code == 200
+    risk = facts(fake)['requested_terms']
+    assert risk['data']['target_event'] == 'loan_90dpd_12m'
+    assert risk['data']['horizon_months'] == 12
+    definition = risk['target_definition']
+    assert '90 дней просрочки' in definition
+    assert 'первые 12 календарных месяцев' in definition
+    assert 'предполагаемой выдачи' in definition
+    assert 'последующем полном погашении' in definition
+    assert 'синтетическ' in risk['data_origin']
+    assert risk['data']['probability'] > 0
+    system = fake.calls[-1][0]
+    assert 'невозвратом' in system and 'потери денег' in system
+    assert 'Не придумывай определение неизвестной цели' in system
+
+
+@pytest.mark.parametrize('target,horizon', [('other_event', 12), (None, 12), ('loan_90dpd_12m', 6)])
+def test_summary_does_not_invent_unknown_target_definition(client, fake, monkeypatch, target, horizon):
+    from dataclasses import replace
+    from app.risk.assessments import score_features
+    def score(*args, **kwargs):
+        return replace(score_features(*args, **kwargs), target_event=target, horizon_months=horizon)
+    monkeypatch.setattr('app.risk.assessments.score_features', score)
+    headers, current, _ = ready(client)
+    assert summary(client, headers, current).status_code == 200
+    shown = facts(fake)['requested_terms']
+    assert shown['data']['target_event'] == target
+    assert shown['data']['horizon_months'] == horizon
+    assert shown['target_definition'] is None
+
+
+@pytest.mark.parametrize('liquidated', [False, True, None])
+def test_summary_registry_scope_does_not_invent_other_legal_checks(client, db, fake, liquidated):
+    from app.processing.models import CheckResult
+    headers, current, submitted = ready(client)
+    registry = db.scalar(select(CheckResult).where(
+        CheckResult.run_id == uuid.UUID(submitted['processing_run_id']), CheckResult.kind == 'registry'))
+    if liquidated is None:
+        db.delete(registry)
+    else:
+        registry.data = {**registry.data, 'liquidated': liquidated}
+    db.commit()
+    assert summary(client, headers, current).status_code == 200
+    checks = facts(fake)['checks']
+    scope = checks['registry_scope']
+    assert scope['checked_fields'] == (['registered_at', 'liquidated'] if liquidated is not None else [])
+    assert scope['other_legal_checks'] == 'unknown'
+    assert 'банкротств' in scope['note'].lower() and 'исполнительн' in scope['note']
+    assert 'Не выводи отсутствие банкротства' in fake.calls[-1][0]
+    if liquidated is None:
+        assert 'registry' not in checks['results'] and 'registry' in checks['missing_checks']
+    else:
+        assert checks['results']['registry']['liquidated'] is liquidated
+        assert set(checks['results']['registry']) == {'registered_at', 'liquidated'}
+
+
+@pytest.mark.parametrize('changed', ['system', 'target_definition'])
+def test_summary_semantics_invalidate_saved_cache(client, fake, monkeypatch, changed):
+    import app.assistant.summary as service
+    headers, current, _ = ready(client)
+    original = summary(client, headers, current)
+    assert original.status_code == 200
+    path = f"/api/v1/applications/{current['id']}/summary?expected_version={current['version']}"
+    assert client.get(path).json() == original.json()
+    assert summary(client, headers, current).json() == original.json()
+    assert len(fake.calls) == 1
+    if changed == 'system':
+        monkeypatch.setattr(service, 'SYSTEM', service.SYSTEM + '\nУточнённая инструкция.')
+    else:
+        monkeypatch.setattr(service, 'RISK_TARGET_DEFINITION', service.RISK_TARGET_DEFINITION + ' Уточнение определения.')
+    saved = client.get(path)
+    assert saved.status_code == 200 and saved.json() is None
+    assert len(fake.calls) == 1
+    refreshed = summary(client, headers, current)
+    assert refreshed.status_code == 200 and len(fake.calls) == 2
+    assert refreshed.json()['generated_at'] != original.json()['generated_at']
+    if changed == 'target_definition':
+        assert facts(fake)['requested_terms']['target_definition'].endswith('Уточнение определения.')
+    assert client.get(path).json() == refreshed.json()
