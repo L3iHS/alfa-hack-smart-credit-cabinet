@@ -264,7 +264,9 @@ def process_next() -> bool:
             db.add(Decision(application_id=application.id, revision_id=revision.id, run_id=run.id, actor_id=None,
                             risk_assessment_id=linked_risk.id if linked_risk else None,
                             application_version=application.version, outcome=result.outcome, public_reason_codes=[result.reason_code],
-                            public_reasons=[result.reason], internal_reason=result.reason, policy_version=run.policy_version))
+                            public_reasons=[result.reason], internal_reason=result.reason, policy_version=run.policy_version,
+                            payment_terms=result.calculation.payment_terms.model_dump(mode='json')
+                            if result.outcome == 'approved' and result.calculation and result.calculation.payment_terms else None))
             if result.outcome == 'needs_info':
                 db.add(InformationRequest(application_id=application.id, revision_id=revision.id, run_id=run.id,
                                           application_version=application.version, message=result.reason,

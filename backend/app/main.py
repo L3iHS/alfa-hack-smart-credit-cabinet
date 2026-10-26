@@ -15,6 +15,7 @@ from app.applications.router import router as applications_router
 from app.companies.router import router as companies_router
 from app.products.router import router as products_router
 from app.documents.router import router as documents_router
+from app.deals.router import router as deals_router
 from app.auth.router import router as auth_router
 from app.auth.schemas import ErrorOutput
 from app.auth.service import require_csrf
@@ -55,6 +56,7 @@ app.include_router(applications_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(processing_router, prefix="/api/v1")
 app.include_router(review_router, prefix="/api/v1")
+app.include_router(deals_router, prefix="/api/v1")
 
 
 @app.middleware("http")

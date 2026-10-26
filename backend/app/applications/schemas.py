@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_
 from pydantic.json_schema import SkipJsonSchema
 
 from app.products.schemas import ProductCode
+from app.deals.schemas import DealOutput
 from app.processing.schemas import ApplicationStatus, ProcessingStatus, Action, InformationRequestOutput, OfferOutput
 
 Money = Annotated[StrictInt, Field(ge=0, le=9_007_199_254_740_991)]
@@ -63,6 +64,7 @@ class ApplicationOutput(DraftFields):
     information_requests: list[InformationRequestOutput] = Field(default_factory=list)
     offers: list[OfferOutput] = Field(default_factory=list)
     available_actions: list[Action] = Field(default_factory=list)
+    deal: DealOutput | None = None
 
 
 class EventOutput(BaseModel):

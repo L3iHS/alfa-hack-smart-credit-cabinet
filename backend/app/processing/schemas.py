@@ -12,7 +12,7 @@ from app.risk.schemas import RiskAssessmentOutput
 ApplicationStatus = Literal['draft', 'submitted', 'processing', 'needs_info', 'manual_review', 'counteroffer', 'approved', 'rejected', 'withdrawn']
 WITHDRAWABLE_STATUSES = ('submitted', 'processing', 'needs_info', 'manual_review', 'counteroffer')
 ProcessingStatus = Literal['pending', 'running', 'succeeded', 'failed', 'interrupted']
-Action = Literal['edit_draft', 'upload_document', 'submit', 'respond_information', 'accept_offer', 'decline_offer', 'request_information', 'make_offer', 'approve', 'reject', 'retry_processing', 'withdraw']
+Action = Literal['edit_draft', 'upload_document', 'submit', 'respond_information', 'accept_offer', 'decline_offer', 'request_information', 'make_offer', 'approve', 'reject', 'retry_processing', 'withdraw', 'prepare_deal']
 Outcome = Literal['needs_info', 'manual_review', 'counteroffer', 'approved', 'rejected']
 
 

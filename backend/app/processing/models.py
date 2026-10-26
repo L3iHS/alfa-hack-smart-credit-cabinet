@@ -48,6 +48,7 @@ class Decision(Base):
     public_reasons: Mapped[list] = mapped_column(JSONB)
     internal_reason: Mapped[str] = mapped_column(String(4000))
     policy_version: Mapped[str] = mapped_column(String(40))
+    payment_terms: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

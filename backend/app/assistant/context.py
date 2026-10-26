@@ -31,7 +31,7 @@ _APPLICATION_SUBJECT = re.compile(
     r'статус|этап|рассмотр|решени|результат|одобр|отказ|причин|дальше|действи|'
     r'документ|вложен|файл|уточн|предлож|услови|финанс|выруч|доход|расход|'
     r'долг|плат[её]ж|ставк|комисси|период|риск|оценк|продукт|кредит|'
-    r'оборудован|овердрафт|оборотн|сырь|закуп|гарант|тендер|инвестици)', re.IGNORECASE,
+    r'оборудован|овердрафт|оборотн|сырь|закуп|гарант|тендер|инвестици|оформлен|сделк|выдан|лимит)', re.IGNORECASE,
 )
 
 
@@ -80,6 +80,18 @@ def build_application_context(db: Session, user: User, application_id: uuid.UUID
     add('state', 'Состояние и доступные действия', {'status': output.status,
         'public_reasons': output.public_reasons, 'available_actions': output.available_actions,
         'processing_status': output.processing_status})
+    if output.deal:
+        from app.deals.service import COMPLETION_TEXT, DEMO_NOTE
+        labels = {'prepared': 'Условия подготовлены', 'confirmed': 'Клиент подтвердил условия',
+                  'completed': COMPLETION_TEXT[output.deal.completion_kind], 'cancelled': 'Оформление отменено'}
+        next_steps = {'confirm_deal': 'Ознакомиться с условиями и явно подтвердить их в кабинете',
+                      'complete_deal': 'Зафиксировать завершение оформления в кабинете',
+                      'cancel_deal': 'Отменить оформление с обязательной причиной в кабинете'}
+        add('deal', 'Оформление по сохранённому кредитному решению', {
+            **output.deal.model_dump(), 'status_text': labels[output.deal.status],
+            'next_steps': [next_steps[action] for action in output.deal.available_actions],
+            'note': DEMO_NOTE,
+            'terms_note': 'Окончательные согласованные условия оформления имеют приоритет над исходным запросом и расчётом.'})
     for item in output.information_requests:
         if output.status != 'withdrawn' and item.status == 'open' and item.revision_id == revision_id:
             add(f'clarification:{item.id}', 'Открытый запрос уточнений', {

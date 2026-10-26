@@ -255,11 +255,11 @@ def guard_risk(db, run, revision, terms, *, offered, user=None, reason=None, ack
     return row
 
 
-def add_decision(db, application, revision, user, outcome, reason, policy_version, code, risk=None):
+def add_decision(db, application, revision, user, outcome, reason, policy_version, code, risk=None, payment_terms=None):
     decision = Decision(id=uuid.uuid4(), application_id=application.id, revision_id=revision.id, actor_id=user.id,
                         application_version=application.version, outcome=outcome, public_reason_codes=[code],
                         public_reasons=[reason], internal_reason=reason, policy_version=policy_version,
-                        risk_assessment_id=risk.id if risk else None)
+                        risk_assessment_id=risk.id if risk else None, payment_terms=payment_terms)
     db.add(decision)
     return decision
 
@@ -271,12 +271,14 @@ def decide(db, user, application_id, body, key):
             conflict('Решение сотрудника сейчас недоступно')
         run = db.scalar(select(ProcessingRun).where(ProcessingRun.revision_id == revision.id))
         risk = None
+        terms = None
         if body.outcome == 'approved':
             terms, run = safe_terms(db, application, revision)
             risk = guard_risk(db,run,revision,terms,offered=False,user=user,reason=body.reason,acknowledged=body.risk_acknowledged)
         supersede_offers(db, application)
         event(db, application, user, revision, 'staff_approved' if body.outcome == 'approved' else 'staff_rejected', body.outcome)
-        decision = add_decision(db, application, revision, user, body.outcome, body.reason, run.policy_version, 'staff_decision',risk)
+        decision = add_decision(db, application, revision, user, body.outcome, body.reason, run.policy_version, 'staff_decision',risk,
+                                payment_terms=terms['payment_terms'] if terms else None)
         return output(application, revision, decision_id=str(decision.id))
     return execute(db, user, application_id, body, key, 'staff_decision', action)
 
@@ -330,7 +332,8 @@ def offer_action(db, user, offer_id, body, key, accept):
         status = 'approved' if accept else 'manual_review'
         event(db, application, user, revision, 'offer_accepted' if accept else 'offer_declined', status)
         reason = 'Клиент принял предложенные условия' if accept else 'Клиент отклонил предложение; требуется рассмотрение сотрудника'
-        add_decision(db, application, revision, user, status, reason, run.policy_version, 'offer_accepted' if accept else 'offer_declined',risk)
+        add_decision(db, application, revision, user, status, reason, run.policy_version, 'offer_accepted' if accept else 'offer_declined',risk,
+                     payment_terms=OfferOutput.model_validate(current).payment_terms.model_dump(mode='json') if accept else None)
         return output(application, revision, offer=OfferOutput.model_validate(current).model_dump(mode='json'))
     # Идентификатор предложения входит в отпечаток повтора команды.
     operation = 'accept_offer' if accept else 'decline_offer'

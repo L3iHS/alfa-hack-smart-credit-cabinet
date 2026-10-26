@@ -37,6 +37,7 @@ def get_application(db: Session, user: User, application_id: uuid.UUID, *, lock=
 
 
 def application_output(application: Application, user: User) -> ApplicationOutput:
+    from app.deals.service import deal_output, get_deal
     from app.processing.models import Decision, InformationRequest, Offer
     from app.processing.schemas import InformationRequestOutput, OfferOutput
     from app.processing.service import latest_revision
@@ -67,6 +68,11 @@ def application_output(application: Application, user: User) -> ApplicationOutpu
         result.available_actions = ['request_information', 'make_offer', 'approve', 'reject']
     elif run and run.status in ('failed', 'interrupted') and application.status in ('submitted', 'processing'):
         result.available_actions = ['retry_processing']
+    deal = get_deal(db, application.id)
+    if deal:
+        result.deal = deal_output(deal, user)
+    elif application.status == 'approved' and user.role == 'staff':
+        result.available_actions.append('prepare_deal')
     return result
 
 

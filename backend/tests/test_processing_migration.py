@@ -87,8 +87,8 @@ def test_upgrade_keeps_legacy_submission_and_retries_it(db, monkeypatch, policy_
             command.check(config)
             with factory() as legacy:
                 for table, rows in saved.items():
-                    if table == 'offers':
-                        # Downgrade до 0005 удаляет новую колонку; прежние суммы и связи сохраняются.
+                    if table in ('offers', 'decisions'):
+                        # Downgrade до 0005 удаляет новые снимки; прежние суммы и связи сохраняются.
                         rows = [{**row, 'payment_terms': None} for row in rows]
                     assert legacy.execute(text(f'SELECT to_jsonb(t) FROM {table} t ORDER BY id')).scalars().all()==rows
                 if profile == 'b':
