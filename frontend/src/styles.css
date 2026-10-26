@@ -2457,3 +2457,48 @@ summary:focus-visible { outline: 3px solid #2273ce; outline-offset: 4px; border-
   .application-heading-actions { width: 100%; justify-content: space-between; gap: 8px; }
   .application-heading-actions .withdrawal-action > .button { font-size: 13px; }
 }
+
+/* Deal delivery is separate from the credit decision. */
+.deal-panel { padding: 24px; }
+.deal-heading, .deal-document-line { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+.deal-heading h2 { margin: 0; font-size: 22px; }
+.deal-status { display: block; max-width: 100%; color: var(--muted); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.deal-status-completed { color: #237349; }
+.deal-status-cancelled { color: #655b56; }
+.deal-document-line { margin-top: 14px; font-size: 13px; }
+.deal-document-line .muted { min-width: 0; overflow-wrap: anywhere; }
+.deal-document-line .button { min-height: 40px; padding: 9px 12px; font-size: 13px; }
+.deal-key-terms { display: flex; gap: 16px 36px; flex-wrap: wrap; margin: 18px 0; }
+.deal-key-terms dt { color: var(--muted); font-size: 13px; }
+.deal-key-terms dd { margin: 5px 0 0; font-size: 21px; font-weight: 650; overflow-wrap: anywhere; }
+.deal-next-step { margin: 16px 0 12px; line-height: 1.5; }
+.deal-confirmation { display: flex; align-items: start; gap: 10px; max-width: 65ch; line-height: 1.5; font-size: 14px; }
+.deal-confirmation input { width: 18px; height: 18px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--red); }
+.deal-actions { margin-top: 16px; flex-wrap: wrap; }
+.deal-actions:empty { display: none; }
+.deal-payment-details { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.deal-payment-details > summary { cursor: pointer; width: fit-content; font-size: 14px; line-height: 1.5; }
+.deal-demo-note { margin: 16px 0 0; max-width: 75ch; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.deal-cancellation, .deal-terminal-date { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.application-status-stack { display: grid; align-content: center; justify-items: start; gap: 7px; min-width: 0; }
+.application-status-stack .status { grid-area: auto; max-width: 100%; white-space: normal; }
+.deal-dialog { width: min(500px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; margin: auto; padding: 24px; border: 0; border-radius: 18px; color: #242426; background: #fff; box-shadow: 0 20px 70px #12161e33; }
+.deal-dialog::backdrop { background: #12161e66; }
+.deal-dialog h2 { margin: 0 0 12px; font-size: 22px; }
+.deal-dialog p { line-height: 1.5; overflow-wrap: anywhere; }
+.deal-dialog textarea { resize: vertical; min-height: 90px; max-height: 35vh; }
+.deal-dialog .review-buttons { flex-wrap: wrap; }
+@media (max-width: 950px) and (min-width: 701px) {
+  .application-row .application-status-stack { grid-column: 1; grid-row: 2; }
+}
+@media (max-width: 700px) {
+  .deal-panel { padding: 20px; }
+  .deal-heading h2 { font-size: 20px; }
+  .application-row .application-status-stack { grid-column: 1; grid-row: 3; }
+  .application-row .application-status-stack .status { grid-column: auto; grid-row: auto; }
+}
+@media (max-width: 390px) {
+  .deal-actions .button, .deal-dialog .review-buttons .button { width: 100%; }
+  .deal-key-terms { gap: 12px 24px; }
+  .deal-dialog { padding: 20px; }
+}

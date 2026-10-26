@@ -17,7 +17,8 @@ import RiskAssessmentPanel from "./RiskAssessmentPanel";
 import PaymentTermsView, { amountLabel } from "./PaymentTermsView";
 import { documentLabels } from "./ApplicationDocuments";
 import { dateTime, money } from "./shared";
-import { readStored, useReviewCommand, writeStored } from "./useReviewCommand";
+import { readStored, writeStored, type ReviewCommand } from "./useReviewCommand";
+import ReviewCommandFeedback from "./ReviewCommandFeedback";
 
 import { useVisibleObservation, viewOffer } from "../analytics/observations";
 import { reasonLabels } from "../analytics/labels";
@@ -88,20 +89,16 @@ export default function ReviewActions({
   owner,
   staff,
   policy,
-  changed,
+  command,
   assessment,
-  refreshAssessment,
-  lock,
   locked = false,
 }: {
   application: Application;
   owner: string;
   staff: boolean;
   policy: SubmissionPolicy | null;
-  changed: () => Promise<void>;
+  command: ReviewCommand;
   assessment: Assessment | null;
-  refreshAssessment: () => void;
-  lock: (locked: boolean) => void;
   locked?: boolean;
 }) {
   const draftKey = `credit-review-form:v1:${owner}:${item.id}`;
@@ -109,7 +106,6 @@ export default function ReviewActions({
     readStored(draftKey, emptyDraft),
   );
   const [validation, setValidation] = useState("");
-  const command = useReviewCommand(owner, item.id, changed, refreshAssessment);
   const [requestedAck, setRequestedAck] = useState(false);
   const [offeredAck, setOfferedAck] = useState(false);
   const requestedRisk = assessment?.risk_assessment;
@@ -147,7 +143,7 @@ export default function ReviewActions({
   useEffect(() => {
     setOfferedAck(false);
   }, [draft.amount, draft.term, offeredRisk?.assessment_id]);
-  const disabled = locked || command.busy || !!command.pending || command.conflict;
+  const disabled = locked || command.busy || !!command.pending || command.conflict || command.needsRefresh;
   const can = (action: Application["available_actions"][number]) =>
     item.available_actions.includes(action);
   const request = item.information_requests.find(
@@ -172,9 +168,6 @@ export default function ReviewActions({
   useEffect(() => {
     writeStored(draftKey, draft);
   }, [draftKey, draft]);
-  useEffect(() => {
-    lock(command.busy || !!command.pending);
-  }, [command.busy, command.pending, lock]);
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
     if (key === "amount" || key === "term") {
@@ -307,15 +300,15 @@ export default function ReviewActions({
   return (
     <section className="panel review-panel" aria-labelledby="review-title">
       <h2 id="review-title">
-        {staff ? "Рассмотрение заявки" : "Следующий шаг"}
+        {item.status === "approved" ? "Кредитное решение" : staff ? "Рассмотрение заявки" : "Следующий шаг"}
       </h2>
-      <p>
+      {item.status !== "approved" && <p>
         {technicalFailure
           ? "Требуется повтор обработки после устранения технического сбоя"
           : staff && item.status === "manual_review"
             ? "Изучите проверки и выберите доступное действие. Для решения укажите основание"
             : nextStep[item.status]}
-      </p>
+      </p>}
       {technicalFailure && (
         <div className="notice error" role="status">
           <strong>Обработка не завершена</strong>
@@ -668,47 +661,8 @@ export default function ReviewActions({
           </button>
         </div>
       )}
-      {(validation || command.error) && (
-        <div className="notice error" role="alert">
-          <p>{validation || command.error}</p>
-          {Object.entries(command.fields).map(([field, message]) => (
-            <p key={field}>
-              {itemFieldLabels[field as RequestedField] || field}: {message}
-            </p>
-          ))}
-        </div>
-      )}
-      {command.pending && !command.busy && (
-        <div className="notice" role="status">
-          <p>
-            Ответ не получен. Повтор сохранит исходные данные команды и не
-            создаст второе действие
-          </p>
-          <button
-            className="button primary"
-            disabled={command.busy}
-            onClick={() => void command.send()}
-          >
-            Повторить действие
-          </button>
-        </div>
-      )}
-      {command.conflict && (
-        <div className="notice">
-          <p>
-            Заявка изменилась. Ваш ввод сохранён; проверьте актуальное состояние
-            перед новым действием
-          </p>
-          <button
-            className="button secondary"
-            disabled={command.busy}
-            onClick={() => void command.refresh()}
-          >
-            Загрузить актуальное состояние
-          </button>
-        </div>
-      )}
-      {command.busy && <p role="status">Выполняем действие…</p>}
+      {validation && <div className="notice error" role="alert"><p>{validation}</p></div>}
+      {item.status !== "approved" && <ReviewCommandFeedback command={command} labels={itemFieldLabels} />}
       {item.offers.some(
         (offer) => offer.status === "declined" || offer.status === "superseded",
       ) && (

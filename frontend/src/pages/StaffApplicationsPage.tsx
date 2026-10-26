@@ -1,3 +1,4 @@
+import DealStatus from "../components/DealStatus";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
@@ -64,7 +65,7 @@ export default function StaffApplicationsPage() {
                     <ApplicationNumber number={item.display_number} />
                   </div>
                   <span className="amount">{money(item.amount_kopecks)}</span>
-                  <Status status={item.status} />
+                  <span className="application-status-stack"><Status status={item.status} />{item.status === "approved" && <DealStatus deal={item.deal} />}</span>
                   <time dateTime={item.updated_at}>
                     {dateTime(item.updated_at)}
                   </time>

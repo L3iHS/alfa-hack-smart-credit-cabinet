@@ -134,6 +134,8 @@ test("recommendation purpose supports keyboard, escape, tab and outside click", 
   await page.getByText("Помочь выбрать", { exact: true }).click();
   const picker = page.getByRole("combobox", { name: "Что планируете финансировать" });
   await expect(picker).toBeEnabled();
+  // Keyboard assertions must not compete with hover from the previous click.
+  await page.mouse.move(0, 0);
   await picker.focus();
   await expect(picker).toBeFocused();
   await page.keyboard.press("ArrowDown");

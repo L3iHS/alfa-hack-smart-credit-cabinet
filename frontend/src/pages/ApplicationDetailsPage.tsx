@@ -6,6 +6,8 @@ import AssistantPanel from "../components/assistant/AssistantPanel";
 import StaffSummaryPanel from "../components/assistant/StaffSummaryPanel";
 import ApplicationDocuments from "../components/ApplicationDocuments";
 import ReviewActions from "../components/ReviewActions";
+import DealPanel from "../components/DealPanel";
+import { useReviewCommand } from "../components/useReviewCommand";
 import WithdrawalAction from "../components/WithdrawalAction";
 import AssessmentPanel from "../components/AssessmentPanel";
 import SubmissionPanel from "../components/SubmissionPanel";
@@ -68,11 +70,10 @@ function Details({
   const staff = user!.role === "staff";
   const [item, setItem] = useState(initial);
   const [submissionLocked, setSubmissionLocked] = useState(false);
-  const [reviewLocked, setReviewLocked] = useState(false);
   const [withdrawalLocked, setWithdrawalLocked] = useState(false);
-  const locked = submissionLocked || reviewLocked || withdrawalLocked;
   const [refreshError, setRefreshError] = useState("");
   const id = item.id;
+  const versionFloor = useRef(initial.version);
   const documentsRef = useRef<HTMLDivElement>(null);
   const reviewRef = useRef<HTMLDivElement>(null);
   const [journey] = useState(() => staff ? null : linkedJourney(user!.id, id));
@@ -97,24 +98,33 @@ function Details({
     user!.id,
   );
   async function refresh(version?: number) {
-    if (version !== undefined)
+    if (version !== undefined) {
+      versionFloor.current = Math.max(versionFloor.current, version);
       setItem((current) => ({
         ...current,
         version: Math.max(current.version, version),
       }));
+    }
     const current = await api<Application>(`/applications/${id}`);
+    if (current.version < versionFloor.current)
+      throw new Error("Сервер ещё обновляет сведения. Загрузите актуальное состояние повторно");
+    versionFloor.current = current.version;
     setItem((previous) =>
       current.version >= previous.version ? current : previous,
     );
     setRefreshError("");
   }
+  const command = useReviewCommand(user!.id, id, refresh, assessment.reload);
+  const reviewLocked = command.busy || !!command.pending || command.conflict || command.needsRefresh;
+  const locked = submissionLocked || reviewLocked || withdrawalLocked;
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
         const current = await api<Application>(`/applications/${id}`);
-        if (active) {
+        if (active && current.version >= versionFloor.current) {
+          versionFloor.current = current.version;
           setItem((previous) =>
             current.version >= previous.version ? current : previous,
           );
@@ -153,6 +163,7 @@ function Details({
       )}
       <div className="details-layout">
         <div className="details-main">
+          {item.status === "approved" && <DealPanel application={item} staff={staff} command={command} locked={submissionLocked || withdrawalLocked} />}
           <section className="panel details-panel">
             {saved &&
               (item.status === "draft" || item.status === "needs_info") && (
@@ -251,11 +262,9 @@ function Details({
             owner={user!.id}
             staff={staff}
             policy={policy}
-            changed={refresh}
+            command={command}
             assessment={assessment.error ? null : assessment.data}
-            refreshAssessment={assessment.reload}
             locked={withdrawalLocked}
-            lock={setReviewLocked}
           />
           <div ref={documentsRef}><ApplicationDocuments
             application={item}
@@ -297,6 +306,8 @@ const staffHistoryEvents = new Set([
   "staff_approved",
   "staff_rejected",
   "processing_retried",
+  "deal_prepared",
+  "deal_completed",
 ]);
 const clientHistoryEvents = new Set([
   "draft_created",
@@ -309,6 +320,7 @@ const clientHistoryEvents = new Set([
   "information_responded",
   "offer_accepted",
   "offer_declined",
+  "deal_confirmed",
 ]);
 function historyAuthor(event: HistoryEvent, owner: string) {
   if (event.actor_type === "system") return "Система";
@@ -366,6 +378,10 @@ function History({ id, version }: { id: string; version: number }) {
                         staff_rejected: "Отказ по решению сотрудника",
                         auto_approved: "Заявка одобрена",
                         auto_rejected: "Отказ по правилам",
+                        deal_prepared: "Условия сделки подготовлены",
+                        deal_confirmed: "Условия подтверждены клиентом",
+                        deal_completed: "Оформление завершено",
+                        deal_cancelled: "Оформление отменено",
                       } as Record<string, string>
                     )[item.event_type] || "Заявка обновлена"}
                   </strong>

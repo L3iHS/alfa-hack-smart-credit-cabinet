@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api, ApiError, errorMessage } from "../api/client";
 import type { CommandResult } from "../api/types";
 
@@ -21,7 +21,7 @@ export function writeStored(key: string, value: unknown) {
 export function useReviewCommand(
   owner: string,
   id: string,
-  changed: () => Promise<void>,
+  changed: (version?: number) => Promise<void>,
   refreshAssessment: () => void = () => {},
 ) {
   const storageKey = `credit-command:v1:${owner}:${id}`;
@@ -39,12 +39,15 @@ export function useReviewCommand(
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState(false);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+  const active = useRef(false);
   function remember(value: Command | null) {
     setPending(value);
     writeStored(storageKey, value);
   }
   async function send(path?: string, body?: Record<string, unknown>) {
-    if (busy || conflict || (!pending && (!path || !body))) return;
+    if (active.current || conflict || needsRefresh || (!pending && (!path || !body))) return;
+    active.current = true;
     const command = pending || {
       key: crypto.randomUUID(),
       path: path!,
@@ -55,15 +58,18 @@ export function useReviewCommand(
     setError("");
     setFields({});
     try {
-      await api<CommandResult>(command.path, {
+      const result = await api<Pick<CommandResult, "version">>(command.path, {
         method: "POST",
         body: command.body,
         headers: { "Idempotency-Key": command.key },
       });
+      if (!result || !Number.isSafeInteger(result.version))
+        throw new ApiError(200, "invalid_response", "Не удалось прочитать версию заявки в ответе сервера");
       remember(null);
       try {
-        await changed();
+        await changed(result.version);
       } catch (value) {
+        setNeedsRefresh(true);
         setError(
           `Действие сохранено. Не удалось обновить карточку: ${errorMessage(value)}`,
         );
@@ -94,22 +100,27 @@ export function useReviewCommand(
         } else if (value.status === 409) setConflict(true);
       }
     } finally {
+      active.current = false;
       setBusy(false);
     }
   }
   async function refresh() {
-    if (busy) return;
+    if (active.current) return;
+    active.current = true;
     setBusy(true);
     try {
       await changed();
       setConflict(false);
+      setNeedsRefresh(false);
       setError("");
       setFields({});
     } catch (value) {
       setError(errorMessage(value));
     } finally {
+      active.current = false;
       setBusy(false);
     }
   }
-  return { pending, busy, error, fields, conflict, send, refresh };
+  return { pending, busy, error, fields, conflict, needsRefresh, send, refresh };
 }
+export type ReviewCommand = ReturnType<typeof useReviewCommand>;

@@ -155,6 +155,27 @@ export interface Application extends DraftFields {
   information_requests: InformationRequest[];
   offers: Offer[];
   available_actions: Action[];
+  deal?: DealOutput | null;
+}
+export type DealStatus = "prepared" | "confirmed" | "completed" | "cancelled";
+export type CompletionKind = "credit" | "limit" | "guarantee";
+export type DealAction = "confirm_deal" | "complete_deal" | "cancel_deal";
+export interface DealOutput {
+  id: string;
+  status: DealStatus;
+  reference: string;
+  product_code: ProductCode;
+  product_name: string;
+  completion_kind: CompletionKind;
+  amount_kopecks: number;
+  term_months: number;
+  payment_terms: PaymentTerms;
+  created_at: string;
+  confirmed_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  available_actions: DealAction[];
 }
 export interface HistoryEvent {
   id: string;
@@ -252,7 +273,8 @@ export type Action =
   | "approve"
   | "reject"
   | "retry_processing"
-  | "withdraw";
+  | "withdraw"
+  | "prepare_deal";
 export interface InformationRequest {
   id: string;
   revision_id: string;
