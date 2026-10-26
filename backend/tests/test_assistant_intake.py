@@ -244,6 +244,34 @@ def test_worded_loan_term_keeps_confirmed_months_and_evidence(client, fake, dura
     assert result['questions'] == []
 
 
+@pytest.mark.parametrize('description,first_quote,second_quote', [
+    ('Кредит на два года или три в зависимости от ставки', 'два года', 'три'),
+    ('Кредит на два года либо три в зависимости от ставки', 'два года', 'три'),
+    ('Кредит на 2 года до 3 в зависимости от ставки', '2 года', '3'),
+])
+@pytest.mark.parametrize('months,quote_index', [(24, 0), (36, 1)])
+def test_alternative_term_with_shared_unit_and_trailing_prose_requires_clarification(
+    client, fake, description, first_quote, second_quote, months, quote_index,
+):
+    fake.result = {
+        'suggested_fields': {'product_code': 'equipment', 'amount_kopecks': 200_000_000,
+                             'term_months': months, 'purpose': 'две печи'},
+        'evidence': {'product_code': 'две печи', 'amount_kopecks': 'два ляма',
+                     'term_months': (first_quote, second_quote)[quote_index], 'purpose': 'две печи'},
+        'questions': [], 'unsupported_need': False,
+    }
+    response = post(client, f'Хочу купить две печи за два ляма. {description}')
+    assert response.status_code == 200
+    result = response.json()
+    assert result['suggested_fields'] == {
+        'product_code': 'equipment', 'amount_kopecks': 200_000_000,
+        'term_months': None, 'purpose': 'две печи',
+    }
+    assert 'term_months' not in result['evidence']
+    assert len(result['questions']) == 1
+    assert 'срок' in result['questions'][0].lower()
+
+
 @pytest.mark.parametrize('text,quote,months', [
     ('Кредит на два года, окупаемость три года', 'два года', 36),
     ('Кредит на два года', '2 года', 24),
