@@ -54,6 +54,11 @@ def saved_terms(data, code, amount, term):
         result = PaymentTerms.model_validate(data)
     except (ValidationError, TypeError):
         conflict('Полные согласованные условия не сохранены; подготовка оформления невозможна')
+    # Для кредита и лимита ставка, платёж и расчётная нагрузка обязательны;
+    # у гарантии эти поля неприменимы и сохраняются как null.
+    if result.payment_kind in ('annuity', 'revolving') and any(value is None for value in (
+            result.annual_rate_bps, result.monthly_payment_kopecks, result.assessment_monthly_burden_kopecks)):
+        conflict('Полные согласованные условия не сохранены; подготовка оформления невозможна')
     values = result.model_dump()
     integers = [value for name, value in values.items() if name.endswith(('_kopecks', '_bps')) and value is not None]
     if (any(type(value) is not int or value < 0 or value > 9_007_199_254_740_991 for value in integers)

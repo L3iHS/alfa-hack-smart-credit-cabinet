@@ -10,4 +10,5 @@ COPY config ./config
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY tests ./tests
+COPY scripts ./scripts
 EXPOSE 8000

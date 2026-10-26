@@ -238,6 +238,46 @@ def test_unprovable_historical_conditions_fail_closed(client, db, tamper):
     assert db.execute(text('SELECT count(*) FROM deals')).scalar_one() == 0
 
 
+@pytest.mark.parametrize('source', ['decision', 'calculation'])
+@pytest.mark.parametrize('code,field,allowed', [
+    ('equipment', 'annual_rate_bps', False),
+    ('equipment', 'monthly_payment_kopecks', False),
+    ('equipment', 'assessment_monthly_burden_kopecks', False),
+    ('equipment', 'all_credit_fields', False),
+    ('credit_line', 'annual_rate_bps', False),
+    ('credit_line', 'monthly_payment_kopecks', False),
+    ('credit_line', 'assessment_monthly_burden_kopecks', False),
+    ('tender_guarantee', 'all_credit_fields', True),
+    ('tender_guarantee', 'annual_commission_bps', False),
+    ('tender_guarantee', 'upfront_fee_kopecks', False),
+])
+def test_prepare_checks_payment_kind_completeness_without_repricing(client, db, monkeypatch, source, code, field, allowed):
+    from app.processing.models import Calculation, Decision
+    from app.products import calculations
+
+    identifier, _, staff, detail = approved(client, code=code)
+    decision = db.scalar(select(Decision).where(Decision.outcome == 'approved'))
+    saved = deepcopy(decision.payment_terms)
+    fields = ('annual_rate_bps', 'monthly_payment_kopecks', 'assessment_monthly_burden_kopecks') if field == 'all_credit_fields' else (field,)
+    for name in fields:
+        saved[name] = None
+    if source == 'decision':
+        decision.payment_terms = saved
+    else:
+        decision.payment_terms = None
+        calculation = db.scalar(select(Calculation))
+        calculation.data = {**calculation.data, 'payment_terms': saved}
+    db.commit()
+    monkeypatch.setattr(calculations, 'calculate_terms', lambda *a, **k: pytest.fail('Сохранённые условия нельзя пересчитывать'))
+    response = deal_command(client, staff, identifier, 'prepare', detail['version'])
+    assert response.status_code == (200 if allowed else 409), response.text
+    if allowed:
+        assert response.json()['deal']['payment_terms'] == saved
+    else:
+        assert current(client, identifier)['version'] == detail['version']
+        assert db.execute(text('SELECT count(*) FROM deals')).scalar_one() == 0
+
+
 def test_document_and_assistant_reflect_saved_deal(client, db):
     from app.assistant.context import application_sources_for_question, build_application_context
     from app.assistant.summary import summary_snapshot
