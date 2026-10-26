@@ -224,6 +224,72 @@ def test_validated_loan_term_does_not_keep_model_clarification(client, fake):
     assert response.json()['questions'] == []
 
 
+@pytest.mark.parametrize('duration,months', [
+    ('два года', 24), ('двенадцать месяцев', 12), ('двадцать четыре месяца', 24),
+    ('полтора года', 18),
+])
+def test_worded_loan_term_keeps_confirmed_months_and_evidence(client, fake, duration, months):
+    fake.result = {
+        'suggested_fields': {'product_code': 'equipment', 'amount_kopecks': 200_000_000,
+                             'term_months': months, 'purpose': 'две печи'},
+        'evidence': {'product_code': 'две печи', 'amount_kopecks': 'два ляма',
+                     'term_months': duration, 'purpose': 'две печи'},
+        'questions': ['Уточните срок кредита.'], 'unsupported_need': False,
+    }
+    response = post(client, f'Купить хорошо бы две печи за два ляма, кредит на {duration}')
+    assert response.status_code == 200
+    result = response.json()
+    assert result['suggested_fields'] == fake.result['suggested_fields']
+    assert result['evidence']['term_months'] == duration
+    assert result['questions'] == []
+
+
+@pytest.mark.parametrize('text,quote,months', [
+    ('Кредит на два года, окупаемость три года', 'два года', 36),
+    ('Кредит на два года', '2 года', 24),
+    ('Кредит на двадцать четыре месяца', 'четыре месяца', 4),
+    ('Кредит на два три года', 'два три года', 36),
+    ('Кредит на минус два года', 'два года', 24),
+    ('Кредит на − два года', 'два года', 24),
+    ('Кредит на полтора месяца', 'полтора месяца', 1),
+    ('Кредит на 1,5 месяца', '1,5 месяца', 1),
+    ('Кредит на два или три года', 'три года', 36),
+    ('Кредит на два года или три года', 'два года', 24),
+    ('Кредит на два года или три', 'два года', 24),
+    ('Кредит на 2 года либо 3 года', '2 года', 24),
+    ('Срок кредита от двух до трёх лет', 'трёх лет', 36),
+    ('Кредит на 2–3 года', '2–3 года', 24),
+    ('Кредит на два — три года', 'три года', 36),
+    ('Кредит на две печи', 'две печи', 2),
+    ('Кредит на оборудование, бизнес работает два года', 'два года', 24),
+    ('Кредит на оборудование, компании два года', 'два года', 24),
+    ('Окупаемость кредита рассчитана на два года', 'два года', 24),
+    ('Кредит на два года и это срок окупаемости', 'два года', 24),
+])
+def test_worded_term_requires_exact_unambiguous_loan_duration(text, quote, months):
+    from app.assistant.intake import _term_supported
+    assert not _term_supported(text, quote, months)
+
+
+@pytest.mark.parametrize('text', [
+    'Кредит на два года — две печи',
+    'Кредит на два года, окупаемость три года',
+])
+def test_worded_term_is_not_confused_with_a_separate_count_or_payback(text):
+    from app.assistant.intake import _term_supported
+    assert _term_supported(text, 'два года', 24)
+
+
+def test_worded_term_still_respects_product_range(client, fake):
+    fake.result['suggested_fields']['term_months'] = 36
+    fake.result['evidence']['term_months'] = 'тридцать шесть месяцев'
+    response = post(client, TEXT.replace('12 месяцев', 'тридцать шесть месяцев'))
+    assert response.status_code == 200
+    assert response.json()['suggested_fields']['term_months'] is None
+    assert 'term_months' not in response.json()['evidence']
+    assert len(response.json()['questions']) == 1
+
+
 @pytest.mark.parametrize('text,quote,term,want', [
     ('Купить две печи за 2 млн, окупить за полтора года', 'окупить за полтора года', 18, None),
     ('Купить оборудование за 2 млн, окупаемость 12 месяцев', '12 месяцев', 12, None),

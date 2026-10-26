@@ -40,7 +40,14 @@ _AMBIGUOUS_AMOUNT = re.compile(
     rf'(?<![\w.,+\-]){_AMOUNT_BOUND}\s*(?:{_AMOUNT_UNIT})?'
     rf'(?:\s*(?:\bили\b|\bлибо\b|\bдо\b|[-–—−])\s*{_AMOUNT_BOUND}\s*(?:{_AMOUNT_UNIT})?)+(?!\w)', re.I,
 )
-_TERM = re.compile(rf'(?<![\w.,+\-])(\d+)\s*({_TERM_UNIT})(?!\w)', re.I)
+_TERM = re.compile(rf'(?<![\w.,+\-])(?P<number>{_AMOUNT_NUMBER})\s*(?P<unit>{_TERM_UNIT})(?!\w)', re.I)
+_TERM_BOUND = rf'(?:{_AMOUNT_NUMBER}|одного|одной|двух|тр[её]х|четыр[её]х|пяти|шести|семи|восьми|девяти|десяти)'
+_AMBIGUOUS_TERM = re.compile(
+    rf'(?<![\w.,+\-]){_TERM_BOUND}\s*(?:{_TERM_UNIT})?'
+    # Без единицы последняя граница допустима только перед пунктуацией или концом текста.
+    rf'(?:\s*(?:\bили\b|\bлибо\b|\bдо\b|[-–—−])\s*{_TERM_BOUND}\s*'
+    rf'(?:{_TERM_UNIT}(?!\w)|(?!\s*\w)))+(?!\w)', re.I,
+)
 _OTHER_DURATION = re.compile(
     r'\bокуп\w*|\bработа(?:ет|ем|ют|ла|ли)\b|\bработы\b|существ\w*|возраст\w*|'
     r'основан\w*|зарегистр\w*|эксплуатац\w*|служб\w*|стаж\w*', re.I,
@@ -106,11 +113,18 @@ def _amount_supported(text: str, quote: str, value: int) -> bool:
 
 def _term_supported(text: str, quote: str, value: int) -> bool:
     occurrences = list(re.finditer(re.escape(quote), text))
+    ambiguous = list(_AMBIGUOUS_TERM.finditer(text))
     for match in _TERM.finditer(text):
         if not any(item.start() <= match.start() and match.end() <= item.end() for item in occurrences):
             continue
-        months = int(match[1]) * (1 if match[2].lower().startswith('мес') else 12)
-        if months != value or re.search(r'[-−]\s*$', text[:match.start()]):
+        # Короткая цитата не должна скрывать альтернативу или отрицательный срок.
+        if any(item.start() < match.end() and match.start() < item.end() for item in ambiguous):
+            continue
+        number = _amount_number(match['number'])
+        if number is None:
+            continue
+        months = number * (1 if match['unit'].lower().startswith('мес') else 12)
+        if months != months.to_integral_value() or months != value or re.search(r'(?:[-−]|\bминус)\s*$', text[:match.start()], re.I):
             continue
         # Число связывается с ближайшей фразой с обеих сторон, а не с ранним словом «кредит».
         prefix = re.split(r'[,;.!?\n]', text[max(0, match.start() - 160):match.start()])[-1]
